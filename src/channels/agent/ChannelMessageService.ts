@@ -159,13 +159,13 @@ export class ChannelMessageService {
     // 获取任务
     // Get task
     let task: BaseAgentManager<unknown>;
-    const db = getDatabase();
-    const dbResult = db.getConversation(conversationId);
     let isOpenClaw = false;
 
     try {
       // 检查会话来源，如果来自 Channel 则开启 yoloMode (自动同意)
       // Check conversation source, enable yoloMode if it's from a Channel
+      const db = getDatabase();
+      const dbResult = db.getConversation(conversationId);
       const isFromChannel = dbResult.success && (dbResult.data?.source === 'lark' || dbResult.data?.source === 'telegram' || dbResult.data?.source === 'dingtalk');
 
       task = await WorkerManage.getTaskByIdRollbackBuild(conversationId, {

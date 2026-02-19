@@ -116,9 +116,9 @@ export class OpenClawAgent {
       const password = gatewayConfig.password ?? getGatewayAuthPassword() ?? undefined;
 
       if (token) {
-        console.log('[OpenClawAgent] Using gateway auth token from config');
+        console.debug('[OpenClawAgent] Using gateway auth token');
       } else if (password) {
-        console.log('[OpenClawAgent] Using gateway auth password from config');
+        console.debug('[OpenClawAgent] Using gateway auth password');
       }
 
       // Start gateway process if not using external

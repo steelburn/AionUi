@@ -162,7 +162,7 @@ class OpenClawAgentManager extends BaseAgentManager<OpenClawAgentManagerData> {
   private handleSessionKeyUpdate(sessionKey: string): void {
     // Store updated session key for resume
     // This could be persisted to conversation extra data
-    console.log('[OpenClawAgentManager] Session key updated:', sessionKey);
+    console.debug('[OpenClawAgentManager] Session key updated:', sessionKey);
   }
 
   async sendMessage(data: { content: string; files?: string[]; msg_id?: string }) {
@@ -233,12 +233,14 @@ class OpenClawAgentManager extends BaseAgentManager<OpenClawAgentManagerData> {
         throw new Error(result.error.message || 'Failed to send channel message');
       }
     } catch (error) {
-      cronBusyGuard.setProcessing(this.conversation_id, false);
-      this.status = 'finished';
-
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.emitErrorMessage(`Failed to send channel message: ${errorMsg}`);
       throw error;
+    } finally {
+      // Always release busy guard to prevent permanent busy state when
+      // the gateway does not emit a finish event.
+      cronBusyGuard.setProcessing(this.conversation_id, false);
+      this.status = 'finished';
     }
   }
 
