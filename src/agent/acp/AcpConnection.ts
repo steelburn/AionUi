@@ -81,6 +81,14 @@ export class AcpConnection {
   private nextRequestId = 0;
   private sessionId: string | null = null;
   private isInitialized = false;
+  /**
+   * When true, incoming session/update notifications are silently discarded.
+   * Set by cancelPendingRequests(); reset only when the backend's response for
+   * the cancelled request arrives, ensuring stale notifications are fully drained.
+   */
+  private _isCancelled = false;
+  /** Request IDs that were cancelled but whose backend responses haven't arrived yet. */
+  private _cancelledRequestIds = new Set<number>();
   private backend: AcpBackend | null = null;
   private initializeResponse: AcpResponse | null = null;
   private workingDir: string = process.cwd();
@@ -771,20 +779,32 @@ export class AcpConnection {
         this.handleIncomingRequest(message as AcpIncomingMessage).catch((_error) => {
           // Handle request errors silently
         });
-      } else if ('id' in message && typeof message.id === 'number' && this.pendingRequests.has(message.id)) {
-        // This is a response to a previous request
-        const { resolve, reject } = this.pendingRequests.get(message.id)!;
-        this.pendingRequests.delete(message.id);
-
-        if ('result' in message) {
-          // Check for end_turn message
-          if (message.result && typeof message.result === 'object' && (message.result as Record<string, unknown>).stopReason === 'end_turn') {
-            this.onEndTurn();
+      } else if ('id' in message && typeof message.id === 'number') {
+        // Response to a cancelled request — use it as the signal that the
+        // backend is done with the old request, so stale notifications are over.
+        if (this._cancelledRequestIds.has(message.id)) {
+          this._cancelledRequestIds.delete(message.id);
+          if (this._cancelledRequestIds.size === 0) {
+            this._isCancelled = false;
           }
-          resolve(message.result);
-        } else if ('error' in message) {
-          const errorMsg = message.error?.message || 'Unknown ACP error';
-          reject(new Error(errorMsg));
+          return; // Drop the response; the local promise was already rejected.
+        }
+
+        if (this.pendingRequests.has(message.id)) {
+          // This is a response to a previous request
+          const { resolve, reject } = this.pendingRequests.get(message.id)!;
+          this.pendingRequests.delete(message.id);
+
+          if ('result' in message) {
+            // Check for end_turn message
+            if (message.result && typeof message.result === 'object' && (message.result as Record<string, unknown>).stopReason === 'end_turn') {
+              this.onEndTurn();
+            }
+            resolve(message.result);
+          } else if ('error' in message) {
+            const errorMsg = message.error?.message || 'Unknown ACP error';
+            reject(new Error(errorMsg));
+          }
         }
       } else {
         // Unknown message format, ignore
@@ -801,6 +821,8 @@ export class AcpConnection {
       // 可辨识联合类型：TypeScript 根据 method 字面量自动窄化 params 类型
       switch (message.method) {
         case ACP_METHODS.SESSION_UPDATE:
+          // Discard stale streaming updates from a cancelled request
+          if (this._isCancelled) return;
           // Track first chunk latency since prompt was sent
           if (!this.firstChunkReceived && this.lastPromptSentAt > 0) {
             this.firstChunkReceived = true;
@@ -818,6 +840,11 @@ export class AcpConnection {
           this.onSessionUpdate(message.params);
           break;
         case ACP_METHODS.REQUEST_PERMISSION:
+          // Auto-reject permission requests that arrive after cancel
+          if (this._isCancelled) {
+            result = { outcome: { outcome: 'rejected', optionId: 'reject_once' } };
+            break;
+          }
           result = await this.handlePermissionRequest(message.params);
           break;
         case ACP_METHODS.READ_TEXT_FILE:
@@ -1130,11 +1157,49 @@ export class AcpConnection {
     return this.models;
   }
 
+  /**
+   * Cancel all pending requests without disconnecting or destroying the session.
+   * Sends `notifications/cancelled` (JSON-RPC / MCP standard) to the backend so
+   * it can stop processing, then rejects local promises. Stale session/update
+   * notifications are discarded until the backend responds to the cancelled
+   * request, ensuring no leftover fragments leak into subsequent responses.
+   */
+  cancelPendingRequests(): void {
+    this._isCancelled = true;
+    for (const [id, request] of this.pendingRequests) {
+      this._cancelledRequestIds.add(id);
+      // Tell the backend to stop processing this request
+      this.sendMessage({
+        jsonrpc: JSONRPC_VERSION,
+        method: 'notifications/cancelled',
+        params: { requestId: id, reason: 'User cancelled' },
+      });
+      if (request.timeoutId) {
+        clearTimeout(request.timeoutId);
+      }
+      request.reject(new Error('Request cancelled by user'));
+    }
+    this.pendingRequests.clear();
+
+    // Safety timeout: if the backend never responds to the cancelled request
+    // (e.g. it crashed or doesn't support notifications/cancelled), reset after 5s.
+    if (this._cancelledRequestIds.size > 0) {
+      setTimeout(() => {
+        if (this._isCancelled) {
+          this._cancelledRequestIds.clear();
+          this._isCancelled = false;
+        }
+      }, 5000);
+    }
+  }
+
   async disconnect(): Promise<void> {
     await this.terminateChild();
 
     // Reset session-level state
     this.pendingRequests.clear();
+    this._cancelledRequestIds.clear();
+    this._isCancelled = false;
     this.sessionId = null;
     this.isInitialized = false;
     this.isSetupComplete = false;

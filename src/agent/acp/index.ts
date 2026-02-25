@@ -401,11 +401,18 @@ export class AcpAgent {
   }
 
   async stop(): Promise<void> {
-    await this.connection.disconnect();
-    this.emitStatusMessage('disconnected');
-    // Clear session-scoped caches when session ends
-    this.approvalStore.clear();
+    // Reject all pending permission requests so that even if the user clicks
+    // "allow" after stop, AcpConnection.handlePermissionRequest's catch block
+    // will send "rejected" back to the backend instead of "allow".
+    for (const [id, pending] of this.pendingPermissions) {
+      pending.reject(new Error('Cancelled by user'));
+    }
+    this.pendingPermissions.clear();
     this.permissionRequestMeta.clear();
+
+    // Cancel pending requests and notify the backend via notifications/cancelled.
+    // Keep session and child process alive to preserve conversation history.
+    this.connection.cancelPendingRequests();
     // Emit finish event to reset frontend UI state
     this.onStreamEvent({
       type: 'finish',
