@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import type { IDirOrFile } from '@/common/ipcBridge';
 import { STORAGE_KEYS } from '@/common/storageKeys';
 import FlexFullContainer from '@/renderer/components/FlexFullContainer';
+import { useLayoutContext } from '@/renderer/context/LayoutContext';
 import useDebounce from '@/renderer/hooks/useDebounce';
 import { usePreviewContext } from '@/renderer/pages/conversation/preview';
 import { iconColors } from '@/renderer/theme/colors';
@@ -51,6 +52,8 @@ const ChangeWorkspaceIcon: React.FC<React.SVGProps<SVGSVGElement>> = ({ classNam
 
 const ChatWorkspace: React.FC<WorkspaceProps> = ({ conversation_id, workspace, eventPrefix = 'gemini', messageApi: externalMessageApi }) => {
   const { t } = useTranslation();
+  const layout = useLayoutContext();
+  const isMobile = layout?.isMobile ?? false;
   const { openPreview } = usePreviewContext();
   const navigate = useNavigate();
 
@@ -433,6 +436,19 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({ conversation_id, workspace, e
 
   const menuButtonBase = 'w-full flex items-center gap-8px px-14px py-6px text-13px text-left text-t-primary rounded-md transition-colors duration-150 hover:bg-2 border-none bg-transparent appearance-none focus:outline-none focus-visible:outline-none';
   const menuButtonDisabled = 'opacity-40 cursor-not-allowed hover:bg-transparent';
+
+  const openNodeContextMenu = useCallback(
+    (node: IDirOrFile, x: number, y: number) => {
+      treeHook.ensureNodeSelected(node);
+      modalsHook.setContextMenu({
+        visible: true,
+        x,
+        y,
+        node,
+      });
+    },
+    [treeHook.ensureNodeSelected, modalsHook.setContextMenu]
+  );
 
   // Get target folder path for paste confirm modal
   const targetFolderPathForModal = getTargetFolderPath(treeHook.selectedNodeRef.current, treeHook.selected, treeHook.files, workspace);
@@ -847,31 +863,55 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({ conversation_id, workspace, e
                   const relativePath = node.dataRef.relativePath;
                   const isFile = node.dataRef.isFile;
                   const isPasteTarget = !isFile && pasteHook.pasteTargetFolder === relativePath;
+                  const nodeData = node.dataRef as IDirOrFile;
 
                   return (
-                    <span
-                      className='flex items-center gap-4px'
+                    <div
+                      className='flex items-center justify-between gap-6px min-w-0'
                       style={{ color: 'inherit' }}
                       onDoubleClick={() => {
                         if (isFile) {
-                          fileOpsHook.handleAddToChat(node.dataRef as IDirOrFile);
+                          fileOpsHook.handleAddToChat(nodeData);
                         }
                       }}
                       onContextMenu={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        treeHook.ensureNodeSelected(node.dataRef as IDirOrFile);
-                        modalsHook.setContextMenu({
-                          visible: true,
-                          x: event.clientX,
-                          y: event.clientY,
-                          node: node.dataRef as IDirOrFile,
-                        });
+                        openNodeContextMenu(nodeData, event.clientX, event.clientY);
                       }}
                     >
-                      {node.title}
-                      {isPasteTarget && <span className='ml-1 text-xs text-blue-700 font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded'>PASTE</span>}
-                    </span>
+                      <span className='flex items-center gap-4px min-w-0'>
+                        <span className='overflow-hidden text-ellipsis whitespace-nowrap'>{node.title}</span>
+                        {isPasteTarget && <span className='ml-1 text-xs text-blue-700 font-bold bg-blue-500 text-white px-1.5 py-0.5 rounded'>PASTE</span>}
+                      </span>
+                      {isMobile && (
+                        <button
+                          type='button'
+                          className='workspace-header__toggle h-28px w-28px rd-8px flex items-center justify-center text-t-secondary hover:text-t-primary active:text-t-primary flex-shrink-0'
+                          aria-label={t('common.more', { defaultValue: 'More' })}
+                          onMouseDown={(event) => {
+                            event.stopPropagation();
+                          }}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                            const menuWidth = 220;
+                            const menuHeight = 220;
+                            const maxX = typeof window !== 'undefined' ? Math.max(8, window.innerWidth - menuWidth - 8) : rect.left;
+                            const maxY = typeof window !== 'undefined' ? Math.max(8, window.innerHeight - menuHeight - 8) : rect.bottom;
+                            const menuX = Math.min(Math.max(8, rect.left - menuWidth + rect.width), maxX);
+                            const menuY = Math.min(Math.max(8, rect.bottom + 4), maxY);
+                            openNodeContextMenu(nodeData, menuX, menuY);
+                          }}
+                        >
+                          <div className='flex flex-col gap-2px items-center justify-center' style={{ width: '12px', height: '12px' }}>
+                            <div className='w-2px h-2px rounded-full bg-current'></div>
+                            <div className='w-2px h-2px rounded-full bg-current'></div>
+                            <div className='w-2px h-2px rounded-full bg-current'></div>
+                          </div>
+                        </button>
+                      )}
+                    </div>
                   );
                 }}
                 onSelect={(keys, extra) => {

@@ -315,7 +315,10 @@ const ChatLayout: React.FC<{
   const chatFlex = isDesktop ? (isPreviewOpen ? chatSplitRatio : 100 - effectiveWorkspaceRatio) : 100;
   const workspaceFlex = effectiveWorkspaceRatio;
   const viewportWidth = containerWidth || (typeof window === 'undefined' ? 0 : window.innerWidth);
-  const workspaceWidthPx = workspaceEnabled ? Math.min(500, Math.max(200, (workspaceSplitRatio / 100) * (viewportWidth || 0))) : 0;
+  const mobileViewportWidth = viewportWidth || window.innerWidth;
+  const mobileWorkspaceWidthPx = Math.min(Math.max(300, Math.round(mobileViewportWidth * 0.84)), Math.max(300, Math.min(420, mobileViewportWidth - 20)));
+  const desktopWorkspaceWidthPx = Math.min(500, Math.max(200, (workspaceSplitRatio / 100) * (viewportWidth || 0)));
+  const workspaceWidthPx = workspaceEnabled ? (layout?.isMobile ? mobileWorkspaceWidthPx : desktopWorkspaceWidthPx) : 0;
 
   useEffect(() => {
     if (!workspaceEnabled || !isPreviewOpen || !isDesktop || rightSiderCollapsed) {
@@ -370,14 +373,7 @@ const ChatLayout: React.FC<{
     previousPreviewOpenRef.current = isPreviewOpen;
   }, [isPreviewOpen, isDesktop, layout, rightSiderCollapsed, workspaceEnabled]);
 
-  const mobileHandle =
-    workspaceEnabled && layout?.isMobile
-      ? createWorkspaceDragHandle({
-          className: 'absolute left-0 top-0 bottom-0',
-          style: { borderRight: 'none', borderLeft: '1px solid var(--bg-3)' },
-          reverse: true,
-        })
-      : null;
+  const mobileWorkspaceHandleRight = rightSiderCollapsed ? 0 : Math.max(0, Math.round(workspaceWidthPx) - 14);
 
   const headerBlock = (
     <>
@@ -496,7 +492,6 @@ const ChatLayout: React.FC<{
               pointerEvents: rightSiderCollapsed ? 'none' : 'auto',
             }}
           >
-            {mobileHandle}
             <WorkspacePanelHeader showToggle collapsed={rightSiderCollapsed} onToggle={() => dispatchWorkspaceToggleEvent()} togglePlacement='left'>
               {props.siderTitle}
             </WorkspacePanelHeader>
@@ -504,6 +499,35 @@ const ChatLayout: React.FC<{
               {props.sider}
             </ArcoLayout.Content>
           </div>
+        )}
+
+        {workspaceEnabled && layout?.isMobile && (
+          <button
+            type='button'
+            className='fixed z-101 flex items-center justify-center transition-colors workspace-toggle-floating'
+            style={{
+              top: '50%',
+              right: `${mobileWorkspaceHandleRight}px`,
+              transform: 'translateY(-50%)',
+              width: '20px',
+              height: '64px',
+              borderTopLeftRadius: '10px',
+              borderBottomLeftRadius: '10px',
+              borderTopRightRadius: '0',
+              borderBottomRightRadius: '0',
+              borderRight: 'none',
+              backgroundColor: 'var(--bg-2)',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)',
+            }}
+            onClick={() => dispatchWorkspaceToggleEvent()}
+            aria-label={rightSiderCollapsed ? 'Expand workspace' : 'Collapse workspace'}
+          >
+            <span className='flex flex-col items-center justify-center gap-5px text-t-secondary'>
+              <span className='block w-8px h-2px rd-999px bg-current opacity-85'></span>
+              <span className='block w-8px h-2px rd-999px bg-current opacity-65'></span>
+              <span className='block w-8px h-2px rd-999px bg-current opacity-45'></span>
+            </span>
+          </button>
         )}
 
         {!isMacRuntime && !isWindowsRuntime && workspaceEnabled && rightSiderCollapsed && !layout?.isMobile && (
