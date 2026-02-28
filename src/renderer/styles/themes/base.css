@@ -397,7 +397,7 @@ body,
     cursor: default !important;
     pointer-events: none !important;
     background: var(--color-fill-2) !important;
-    border-color: var(--border-base) !important;
+    border: none !important;
     box-shadow: none !important;
   }
 
