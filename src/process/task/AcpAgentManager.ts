@@ -380,7 +380,17 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
             try {
               await this.agent.setModelByConfigOption(this.persistedModelId);
             } catch (error) {
+              const errMsg = error instanceof Error ? error.message : String(error);
               mainWarn('[AcpAgentManager]', `Failed to re-apply model ${this.persistedModelId}`, error);
+              // Emit visible error for relay/proxy compatibility issues
+              if (errMsg.includes('model_not_found') || errMsg.includes('无可用渠道')) {
+                ipcBridge.acpConversation.responseStream.emit({
+                  type: 'error',
+                  conversation_id: this.conversation_id,
+                  msg_id: `model_error_${Date.now()}`,
+                  data: `Model "${this.persistedModelId}" is not available on your API relay service. ` + `Please add this model to your relay's channel configuration. Falling back to the default model.`,
+                });
+              }
               this.persistedModelId = null;
             }
           }
@@ -847,18 +857,27 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
   private async cacheModelList(modelInfo: AcpModelInfo): Promise<void> {
     try {
       const cached = (await ProcessConfig.get('acp.cachedModels')) || {};
+      const nextCachedInfo = {
+        ...modelInfo,
+        // Keep the original default from initial session, not from user switches
+        currentModelId: cached[this.options.backend]?.currentModelId ?? modelInfo.currentModelId,
+        currentModelLabel: cached[this.options.backend]?.currentModelLabel ?? modelInfo.currentModelLabel,
+      };
       // Cache the available model list only. Don't overwrite currentModelId from
       // session-level switches — that should not affect the Guid page default.
       // The Guid page default is managed separately via acp.config[backend].preferredModelId.
       await ProcessConfig.set('acp.cachedModels', {
         ...cached,
-        [this.options.backend]: {
-          ...modelInfo,
-          // Keep the original default from initial session, not from user switches
-          currentModelId: cached[this.options.backend]?.currentModelId ?? modelInfo.currentModelId,
-          currentModelLabel: cached[this.options.backend]?.currentModelLabel ?? modelInfo.currentModelLabel,
-        },
+        [this.options.backend]: nextCachedInfo,
       });
+      if (this.options.backend === 'codex') {
+        mainLog('[AcpAgentManager]', 'Cached Codex model list', {
+          backend: this.options.backend,
+          currentModelId: nextCachedInfo.currentModelId,
+          availableModelCount: nextCachedInfo.availableModels?.length || 0,
+          sampleModelIds: (nextCachedInfo.availableModels || []).slice(0, 8).map((model) => model.id),
+        });
+      }
     } catch (error) {
       mainWarn('[AcpAgentManager]', 'Failed to cache model list', error);
     }

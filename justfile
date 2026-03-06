@@ -225,7 +225,7 @@ build-win: preflight
     Get-Process -Name "AionUI","electron" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue; \
     if (Test-Path "out") { Remove-Item -Recurse -Force "out" -ErrorAction SilentlyContinue }; \
     npm install; \
-    npm run postinstall || true; \
+    npm run postinstall; if ($LASTEXITCODE -ne 0) { Write-Host "postinstall failed (continuing)"; $LASTEXITCODE = 0 }; \
     $env:NODE_OPTIONS = "--max-old-space-size=8192"; \
     $env:MSVS_VERSION = "2022"; \
     $env:GYP_MSVS_VERSION = "2022"; \
@@ -329,6 +329,10 @@ test-contract:
 # Run integration tests
 test-integration:
     bun run test:integration
+
+# Verify packaged artifact contains complete renderer assets (i18n safety)
+test-packaged-i18n:
+    bun run test:packaged:i18n
 
 # ============================================================
 # Extension System (RFC-001)
