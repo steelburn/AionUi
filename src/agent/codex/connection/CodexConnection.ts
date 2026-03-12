@@ -162,7 +162,7 @@ export class CodexConnection {
     }
   }
 
-  start(cliPath: string, cwd: string, args: string[] = [], options?: { yoloMode?: boolean }): Promise<void> {
+  start(cliPath: string, cwd: string, args: string[] = [], options?: { yoloMode?: boolean; sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access' }): Promise<void> {
     console.log(`[Codex-Startup] ===== Codex startup diagnostics =====`);
     console.log(`[Codex-Startup] cliPath=${cliPath}, cwd=${cwd}, platform=${process.platform}`);
     console.log(`[Codex-Startup] process.env.PATH (first 200): ${(process.env.PATH || '(empty)').substring(0, 200)}`);
@@ -220,6 +220,10 @@ export class CodexConnection {
       }
       // If no user config or user had 'never', don't add any flag -
       // let Codex use its default (ensures approval events are sent to us)
+    }
+
+    if (options?.sandboxMode) {
+      finalArgs = [...finalArgs, '-c', `sandbox_mode="${options.sandboxMode}"`];
     }
 
     const envVarCount = Object.keys(cleanEnv).length;
@@ -349,6 +353,16 @@ export class CodexConnection {
     // Clear pending elicitations and auto-approvals
     this.elicitationMap.clear();
     this.pendingAutoApprovals.clear();
+    for (const request of this.pausedRequests) {
+      clearTimeout(request.timeout);
+      request.reject(new Error('Codex MCP connection closed'));
+    }
+    this.pausedRequests = [];
+    for (const [_callId, resolver] of this.permissionResolvers) {
+      resolver.reject(new Error('Codex MCP connection closed'));
+    }
+    this.permissionResolvers.clear();
+    this.isPaused = false;
     return Promise.resolve();
   }
 
@@ -783,6 +797,17 @@ export class CodexConnection {
 
     // Clear state
     this.elicitationMap.clear();
+    this.pendingAutoApprovals.clear();
+    for (const request of this.pausedRequests) {
+      clearTimeout(request.timeout);
+      request.reject(new Error(`Codex process exited with code ${code}, signal ${signal}`));
+    }
+    this.pausedRequests = [];
+    for (const [_callId, resolver] of this.permissionResolvers) {
+      resolver.reject(new Error(`Codex process exited with code ${code}, signal ${signal}`));
+    }
+    this.permissionResolvers.clear();
+    this.isPaused = false;
     this.child = null;
   }
 }

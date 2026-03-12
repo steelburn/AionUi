@@ -30,6 +30,7 @@ import BaseAgentManager from '@process/task/BaseAgentManager';
 import { prepareFirstMessageWithSkillsIndex } from '@process/task/agentUtils';
 import { handlePreviewOpenEvent } from '@process/utils/previewUtils';
 import i18n from '@process/i18n';
+import { writeCodexSandboxMode, type CodexSandboxMode } from '@process/utils/codexConfig';
 import { getConfiguredAppClientName, getConfiguredAppClientVersion, getConfiguredCodexMcpProtocolVersion, setAppConfig } from '../../common/utils/appConfig';
 
 const APP_CLIENT_NAME = getConfiguredAppClientName();
@@ -110,6 +111,8 @@ class CodexAgentManager extends BaseAgentManager<CodexAgentManagerData> implemen
       // yoloMode 优先级：data.yoloMode（来自 CronService）> 配置设置
       const codexConfig = await ProcessConfig.get('codex.config');
       const legacyYoloMode = data.yoloMode ?? codexConfig?.yoloMode;
+      const sandboxMode: CodexSandboxMode = data.sandboxMode || codexConfig?.sandboxMode || 'workspace-write';
+      await writeCodexSandboxMode(sandboxMode);
 
       // Migrate legacy yoloMode config (from SecurityModalContent) to currentMode.
       // When old config has yoloMode=true and no explicit session mode was set,
@@ -138,7 +141,7 @@ class CodexAgentManager extends BaseAgentManager<CodexAgentManagerData> implemen
         eventHandler,
         sessionManager,
         fileOperationHandler,
-        sandboxMode: data.sandboxMode || 'workspace-write', // Enable file writing within workspace by default
+        sandboxMode, // Keep runtime sandbox aligned with Codex config preference
         yoloMode: false, // Always false — approval handled by Manager, not CLI
         onNetworkError: (error) => {
           this.handleNetworkError(error);

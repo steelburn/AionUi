@@ -16,6 +16,7 @@ import { addMessage, addOrUpdateMessage, nextTickToLocalFinish } from '../messag
 import { handlePreviewOpenEvent } from '../utils/previewUtils';
 import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { ConversationTurnCompletionService } from '@process/services/ConversationTurnCompletionService';
+import { writeCodexSandboxMode, type CodexSandboxMode } from '@process/utils/codexConfig';
 import { mainLog, mainWarn, mainError } from '../utils/mainLogger';
 import { prepareFirstMessageWithSkillsIndex } from './agentUtils';
 /** Enable ACP performance diagnostics via ACP_PERF=1 */
@@ -48,6 +49,7 @@ interface AcpAgentManagerData {
   sessionMode?: string;
   /** Persisted model ID for resume support / 持久化的模型 ID，用于恢复 */
   currentModelId?: string;
+  sandboxMode?: CodexSandboxMode;
 }
 
 type BufferedStreamTextMessage = {
@@ -188,6 +190,7 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
       } else if (data.backend !== 'custom') {
         // Handle built-in backends: read from acp.config
         const config = await ProcessConfig.get('acp.config');
+        const codexConfig = data.backend === 'codex' ? await ProcessConfig.get('codex.config') : undefined;
         if (!cliPath && config?.[data.backend]?.cliPath) {
           cliPath = config[data.backend].cliPath;
         }
@@ -229,6 +232,12 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
         // If cliPath is not configured, fallback to default cliCommand from ACP_BACKENDS_ALL
         if (!cliPath && backendConfig?.cliCommand) {
           cliPath = backendConfig.cliCommand;
+        }
+
+        if (data.backend === 'codex') {
+          const sandboxMode = data.sandboxMode || codexConfig?.sandboxMode || 'workspace-write';
+          await writeCodexSandboxMode(sandboxMode);
+          data.sandboxMode = sandboxMode;
         }
       } else {
         // backend === 'custom' but no customAgentId - this is an invalid state

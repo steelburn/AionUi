@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import AgentModeSelector from '@/renderer/components/AgentModeSelector';
+import CodexSandboxSelector from '@/renderer/components/CodexSandboxSelector';
 import { getAgentModes, supportsModeSwitch, type AgentModeOption } from '@/renderer/constants/agentModes';
 import { useLayoutContext } from '@/renderer/context/LayoutContext';
 import { getCleanFileNames } from '@/renderer/services/FileService';
@@ -122,6 +123,8 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({ files, onFilesUploaded, o
         {modelSelectorNode}
 
         {supportsModeSwitch(modeBackend) && <AgentModeSelector backend={modeBackend} compact initialMode={selectedMode} onModeSelect={onModeSelect} compactLabelOverride={permissionLabel} compactLeadingIcon={<Shield theme='outline' size='14' fill={iconColors.secondary} />} modeLabelFormatter={getModeDisplayLabel} />}
+
+        {modeBackend === 'codex' && <CodexSandboxSelector compact />}
 
         {isPresetAgent && selectedAgentInfo && <PresetAgentTag agentInfo={selectedAgentInfo} customAgents={customAgents} localeKey={localeKey} onClose={onClosePresetTag} />}
       </div>

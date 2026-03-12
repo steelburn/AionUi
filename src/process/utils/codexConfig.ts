@@ -1,0 +1,88 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { mkdir, readFile, writeFile } from 'fs/promises';
+import { homedir } from 'os';
+import { dirname, join } from 'path';
+
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+
+export interface CodexSandboxConfigState {
+  path: string;
+  exists: boolean;
+  sandboxMode?: CodexSandboxMode;
+}
+
+export function getCodexConfigPath(): string {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    if (appData) {
+      return join(appData, 'codex', 'config.toml');
+    }
+  }
+
+  return join(homedir(), '.codex', 'config.toml');
+}
+
+export async function readCodexSandboxConfig(): Promise<CodexSandboxConfigState> {
+  const path = getCodexConfigPath();
+
+  try {
+    const content = await readFile(path, 'utf8');
+    const match = content.match(/^\s*sandbox_mode\s*=\s*['"]?(read-only|workspace-write|danger-full-access)['"]?\s*$/m);
+
+    return {
+      path,
+      exists: true,
+      sandboxMode: match?.[1] as CodexSandboxMode | undefined,
+    };
+  } catch {
+    return {
+      path,
+      exists: false,
+    };
+  }
+}
+
+export async function writeCodexSandboxMode(sandboxMode: CodexSandboxMode): Promise<CodexSandboxConfigState> {
+  const path = getCodexConfigPath();
+  let content = '';
+
+  try {
+    content = await readFile(path, 'utf8');
+  } catch {
+    content = '';
+  }
+
+  const newline = content.includes('\r\n') ? '\r\n' : '\n';
+  const sandboxLine = `sandbox_mode = "${sandboxMode}"`;
+  let nextContent: string;
+
+  if (/^\s*sandbox_mode\s*=.*$/m.test(content)) {
+    nextContent = content.replace(/^\s*sandbox_mode\s*=.*$/m, sandboxLine);
+  } else {
+    const sectionIndex = content.search(/^\s*\[/m);
+
+    if (sectionIndex >= 0) {
+      const prefix = content.slice(0, sectionIndex).trimEnd();
+      const suffix = content.slice(sectionIndex);
+      nextContent = prefix ? `${prefix}${newline}${sandboxLine}${newline}${newline}${suffix}` : `${sandboxLine}${newline}${newline}${suffix}`;
+    } else if (content.trim().length > 0) {
+      nextContent = `${content.trimEnd()}${newline}${sandboxLine}${newline}`;
+    } else {
+      nextContent = `${sandboxLine}${newline}`;
+    }
+  }
+
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, nextContent, 'utf8');
+
+  return {
+    path,
+    exists: true,
+    sandboxMode,
+  };
+}

@@ -212,6 +212,11 @@ export const googleAuth = {
   status: bridge.buildProvider<IBridgeResponse<{ account: string }>, { proxy?: string }>('google.auth.status'),
 };
 
+export const codexConfig = {
+  getSandboxMode: bridge.buildProvider<IBridgeResponse<{ sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access'; configPath: string; exists: boolean }>, void>('codex.config.get-sandbox-mode'),
+  setSandboxMode: bridge.buildProvider<IBridgeResponse<{ sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access'; configPath: string; exists: boolean }>, { sandboxMode: 'read-only' | 'workspace-write' | 'danger-full-access' }>('codex.config.set-sandbox-mode'),
+};
+
 // 订阅状态查询：用于动态决定是否展示 gemini-3.1-pro-preview / subscription check for Gemini models
 export const gemini = {
   subscriptionStatus: bridge.buildProvider<IBridgeResponse<{ isSubscriber: boolean; tier?: string; lastChecked: number; message?: string }>, { proxy?: string }>('gemini.subscription-status'),
