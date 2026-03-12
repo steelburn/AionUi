@@ -20,7 +20,7 @@ import { AuthType, getOauthInfoWithCache, Storage } from '@office-ai/aioncli-cor
 import { GeminiApprovalStore } from '../../agent/gemini/GeminiApprovalStore';
 import { ToolConfirmationOutcome } from '../../agent/gemini/cli/tools/tools';
 import { getDatabase } from '@process/database';
-import { addMessage, addOrUpdateMessage, nextTickToLocalFinish } from '../message';
+import { addMessage, addOrUpdateMessage, flushConversationMessages, nextTickToLocalFinish } from '../message';
 import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { ConversationTurnCompletionService } from '@process/services/ConversationTurnCompletionService';
 import { handlePreviewOpenEvent } from '../utils/previewUtils';
@@ -89,6 +89,7 @@ export class GeminiAgentManager extends BaseAgentManager<
 
   /** Stored webSearchEngine for worker re-bootstrap / 保存 webSearchEngine 用于重建 worker */
   private webSearchEngine?: 'google' | 'default';
+  private lastProcessedFinishMessageKey: string | null = null;
 
   constructor(
     data: {
@@ -615,39 +616,47 @@ export class GeminiAgentManager extends BaseAgentManager<
 
   /**
    * Retry checking for cron commands with increasing delays
-   * Max 3 retries: 1s, 2s, 3s
+   * Max 3 retries: immediate, 200ms, 500ms
    * @param attempt - current attempt number
-   * @param checkAfterTimestamp - only process messages created after this timestamp
+   * @param checkAfterTimestamp - reference timestamp for the current finish cycle
    */
   private checkCronWithRetry(attempt: number, checkAfterTimestamp?: number): void {
-    const delays = [1000, 2000, 3000];
+    const delays = [0, 200, 500];
     const maxAttempts = delays.length;
 
     if (attempt >= maxAttempts) {
       return;
     }
 
-    // Record timestamp on first attempt to avoid re-processing old messages
     const timestamp = checkAfterTimestamp ?? Date.now();
     const delay = delays[attempt];
-
-    setTimeout(async () => {
+    const runCheck = async () => {
       const found = await this.checkCronCommandsOnFinish(timestamp);
       if (!found && attempt < maxAttempts - 1) {
-        // No assistant messages found, retry with same timestamp
         this.checkCronWithRetry(attempt + 1, timestamp);
       }
+    };
+
+    if (delay === 0) {
+      void runCheck();
+      return;
+    }
+
+    setTimeout(() => {
+      void runCheck();
     }, delay);
   }
 
   /**
    * Check for cron commands when stream finishes
    * Gets recent assistant messages from database and processes them
-   * @param afterTimestamp - Only process messages created after this timestamp
+   * @param afterTimestamp - Reference timestamp used when synthesizing a fallback message key
    * Returns true if assistant messages were found (regardless of cron commands)
    */
   private async checkCronCommandsOnFinish(afterTimestamp: number): Promise<boolean> {
     try {
+      await flushConversationMessages(this.conversation_id);
+
       const { getDatabase } = await import('@process/database');
       const db = getDatabase();
       const result = db.getConversationMessages(this.conversation_id, 0, 20, 'DESC');
@@ -656,24 +665,21 @@ export class GeminiAgentManager extends BaseAgentManager<
         return false;
       }
 
-      // Check recent assistant messages for cron commands (position: left means assistant)
-      // Filter by timestamp to avoid re-processing old messages
-      const assistantMsgs = result.data.filter((m) => m.position === 'left' && (m.createdAt ?? 0) > afterTimestamp);
-
-      // Return false if no assistant messages found after timestamp (will trigger retry)
+      // Flush pending chunks first, then inspect the newest persisted assistant message.
+      // If none exists yet, the caller can retry shortly.
+      const assistantMsgs = result.data.filter((m) => m.position === 'left');
       if (assistantMsgs.length === 0) {
-        const latestCompletedMessage = result.data.find((message) => message.position !== 'right' && (message.createdAt ?? 0) > afterTimestamp);
-        if (latestCompletedMessage) {
-          void ConversationTurnCompletionService.getInstance().notifyPotentialCompletion(this.conversation_id);
-          return true;
-        }
-
         return false;
       }
 
       // Only check the LATEST assistant message to avoid re-processing old messages
       // Messages are sorted DESC, so the first one is the latest
       const latestMsg = assistantMsgs[0];
+      const latestMsgKey = latestMsg.msg_id || latestMsg.id || `createdAt:${latestMsg.createdAt ?? afterTimestamp}`;
+      if (latestMsgKey === this.lastProcessedFinishMessageKey) {
+        return true;
+      }
+      this.lastProcessedFinishMessageKey = latestMsgKey;
       const textContent = extractTextFromMessage(latestMsg);
 
       // Collect system responses to send back to AI

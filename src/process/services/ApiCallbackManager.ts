@@ -8,7 +8,6 @@ import { ipcBridge } from '@/common';
 import type { IConversationTurnCompletedEvent } from '@/common/ipcBridge';
 import { getDatabase } from '@process/database';
 import { CallbackService } from '@/webserver/services/CallbackService';
-import { flushConversationMessages } from '@process/message';
 
 /**
  * API Callback Manager
@@ -50,8 +49,6 @@ export class ApiCallbackManager {
     if (!configResult.success || !configResult.data?.enabled || !configResult.data.callbackEnabled || !configResult.data.callbackUrl) {
       return;
     }
-
-    await flushConversationMessages(event.sessionId);
 
     const messagesResult = db.getConversationMessages(event.sessionId, 0, 100);
     const messages = messagesResult.data || [];
