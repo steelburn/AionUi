@@ -16,7 +16,6 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 interface ConversationTitleMinimapProps {
-  title?: React.ReactNode;
   conversationId?: string;
 }
 
@@ -239,7 +238,7 @@ const buildTurnPreview = (messages: TMessage[]): TurnPreviewItem[] => {
   return turns;
 };
 
-const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ title, conversationId }) => {
+const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ conversationId }) => {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -253,15 +252,6 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
   const triggerRef = useRef<HTMLSpanElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<RefInputType | null>(null);
-  const hideTimerRef = useRef<number | null>(null);
-
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
   useEffect(() => {
     setVisible(false);
     setLoading(false);
@@ -288,13 +278,6 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
       observer.disconnect();
     };
   }, []);
-
-  useEffect(
-    () => () => {
-      clearHideTimer();
-    },
-    [clearHideTimer]
-  );
 
   const fetchTurnPreview = useCallback(async () => {
     if (!conversationId) {
@@ -332,31 +315,28 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
     setPanelPos({ left: Math.round(left), top: Math.round(top) });
   }, []);
 
-  const openPanel = useCallback(() => {
-    clearHideTimer();
-    updatePanelLayout();
-    setVisualStyle(readPopoverVisualStyle());
-    setVisible(true);
-    void fetchTurnPreview();
-  }, [clearHideTimer, fetchTurnPreview, updatePanelLayout]);
-
   const openSearchPanel = useCallback(() => {
     if (!conversationId) return;
-    clearHideTimer();
     updatePanelLayout();
     setVisualStyle(readPopoverVisualStyle());
     setVisible(true);
     setIsSearchMode(true);
     void fetchTurnPreview();
-  }, [clearHideTimer, conversationId, fetchTurnPreview, updatePanelLayout]);
+  }, [conversationId, fetchTurnPreview, updatePanelLayout]);
 
-  const scheduleClosePanel = useCallback(() => {
-    clearHideTimer();
-    hideTimerRef.current = window.setTimeout(() => {
-      setVisible(false);
-      hideTimerRef.current = null;
-    }, 120);
-  }, [clearHideTimer]);
+  const togglePanel = useCallback(() => {
+    setVisible((prev) => {
+      const next = !prev;
+      if (next) {
+        updatePanelLayout();
+        setVisualStyle(readPopoverVisualStyle());
+        void fetchTurnPreview();
+      } else {
+        setIsSearchMode(false);
+      }
+      return next;
+    });
+  }, [fetchTurnPreview, updatePanelLayout]);
 
   useLayoutEffect(() => {
     if (!visible) return;
@@ -380,10 +360,12 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
       if (triggerRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
       setVisible(false);
+      setIsSearchMode(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setVisible(false);
+        setIsSearchMode(false);
       }
     };
     document.addEventListener('mousedown', handleMouseDown, true);
@@ -460,6 +442,7 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
         behavior: 'smooth',
       });
       setVisible(false);
+      setIsSearchMode(false);
     },
     [conversationId]
   );
@@ -635,8 +618,27 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
 
   return (
     <>
-      <span ref={triggerRef} className={classNames('conversation-minimap-trigger font-bold text-16px text-t-primary inline-block overflow-hidden text-ellipsis whitespace-nowrap max-w-full cursor-pointer', visible && 'text-[rgb(var(--primary-6))]')} onMouseEnter={openPanel} onMouseLeave={scheduleClosePanel}>
-        {title}
+      <span
+        ref={triggerRef}
+        role='button'
+        tabIndex={0}
+        aria-expanded={visible}
+        aria-haspopup='dialog'
+        aria-label={t('conversation.minimap.searchAria', { defaultValue: 'Search conversation' })}
+        title={t('conversation.minimap.searchHint', { defaultValue: '点击这里搜索关键词' })}
+        className={classNames(
+          'conversation-minimap-trigger inline-flex h-full w-full items-center justify-center cursor-pointer bg-transparent text-t-secondary transition-colors duration-150 focus:outline-none hover:text-[rgb(var(--primary-6))] focus:text-[rgb(var(--primary-6))]',
+          visible && 'text-[rgb(var(--primary-6))]'
+        )}
+        onClick={togglePanel}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            togglePanel();
+          }
+        }}
+      >
+        <IconSearch className={classNames('text-15px transition-all duration-150', visible ? 'scale-105 opacity-100 text-[rgb(var(--primary-6))]' : 'opacity-72 hover:scale-105 hover:opacity-100 focus:scale-105 focus:opacity-100')} />
       </span>
       {visible &&
         typeof document !== 'undefined' &&
@@ -644,8 +646,6 @@ const ConversationTitleMinimap: React.FC<ConversationTitleMinimapProps> = ({ tit
           <div
             ref={panelRef}
             className='conversation-minimap-layer'
-            onMouseEnter={clearHideTimer}
-            onMouseLeave={scheduleClosePanel}
             style={{
               position: 'fixed',
               left: `${panelPos.left}px`,
