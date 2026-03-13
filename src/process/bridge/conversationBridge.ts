@@ -7,6 +7,7 @@
 import type { CodexAgentManager } from '@/agent/codex';
 import { GeminiAgent, GeminiApprovalStore } from '@/agent/gemini';
 import type { TChatConversation } from '@/common/storage';
+import { getChannelManager } from '@/channels/core/ChannelManager';
 import { getDatabase } from '@process/database';
 import { cronService } from '@process/services/cron/CronService';
 import { ipcBridge } from '../../common';
@@ -246,8 +247,6 @@ export function initConversationBridge(): void {
       // 如果来源不是 aionui（如 telegram），需要清理 channel 相关资源
       if (source && source !== 'aionui') {
         try {
-          // Dynamic import to avoid circular dependency
-          const { getChannelManager } = await import('@/channels/core/ChannelManager');
           const channelManager = getChannelManager();
           if (channelManager.isInitialized()) {
             await channelManager.cleanupConversation(id);

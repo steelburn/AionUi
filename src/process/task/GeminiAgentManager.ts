@@ -670,7 +670,6 @@ export class GeminiAgentManager extends BaseAgentManager<
     try {
       await flushConversationMessages(this.conversation_id);
 
-      const { getDatabase } = await import('@process/database');
       const db = getDatabase();
       const result = db.getConversationMessages(this.conversation_id, 0, 20, 'DESC');
 

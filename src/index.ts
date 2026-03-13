@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import './utils/configureChromium';
+import { cdpPort, verifyCdpReady } from './utils/configureChromium';
 import { app, BrowserWindow, Menu, nativeImage, net, powerMonitor, protocol, screen, Tray } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
@@ -17,9 +17,12 @@ import { initializeProcess } from './process';
 import { ProcessConfig } from './process/initStorage';
 import { loadShellEnvironmentAsync, mergePaths } from './process/utils/shellEnv';
 import { initializeAcpDetector } from './process/bridge';
+import { createAutoUpdateStatusBroadcast } from './process/bridge/updateBridge';
 import { registerWindowMaximizeListeners } from './process/bridge/windowControlsBridge';
 import { onCloseToTrayChanged, onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import WorkerManage from './process/WorkerManage';
+import { cronService } from './process/services/cron/CronService';
+import { autoUpdaterService } from './process/services/autoUpdaterService';
 import { setupApplicationMenu } from './utils/appMenu';
 import { startWebServer } from './webserver';
 import { SERVER_CONFIG } from './webserver/config/constants';
@@ -468,25 +471,47 @@ const createWindow = (): void => {
   void applyZoomToWindow(mainWindow);
   registerWindowMaximizeListeners(mainWindow);
 
+  /*
+
   // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI)
   // 初始化自动更新服务（通过环境变量禁用时跳过，例如 E2E / CI 场景）
   const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
+  const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
   const disableAutoUpdater = process.env.AIONUI_DISABLE_AUTO_UPDATE === '1' || process.env.AIONUI_E2E_TEST === '1' || isCiRuntime;
   if (!disableAutoUpdater) {
-    Promise.all([import('./process/services/autoUpdaterService'), import('./process/bridge/updateBridge')])
-      .then(([{ autoUpdaterService }, { createAutoUpdateStatusBroadcast }]) => {
-        // Create status broadcast callback that emits via ipcBridge (pure emitter, no window binding)
-        const statusBroadcast = createAutoUpdateStatusBroadcast();
-        autoUpdaterService.initialize(statusBroadcast);
-        // Check for updates after 3 seconds delay
+    try {
+      const statusBroadcast = createAutoUpdateStatusBroadcast();
+      autoUpdaterService.initialize(statusBroadcast);
+      setTimeout(() => {
+        void autoUpdaterService.checkForUpdatesAndNotify();
+      }, 3000);
+      // Legacy corrupted comment kept for context; disabled to preserve syntax.
+      // setTimeout(() => {
         // 3秒后检查更新
         setTimeout(() => {
-          void autoUpdaterService.checkForUpdatesAndNotify();
-        }, 3000);
-      })
-      .catch((error) => {
-        console.error('[App] Failed to initialize autoUpdaterService:', error);
-      });
+      //   void autoUpdaterService.checkForUpdatesAndNotify();
+      // }, 3000);
+    } catch (error) {
+      console.error('[App] Failed to initialize autoUpdaterService:', error);
+    }
+  } else {
+    console.log('[AionUi] Auto-updater disabled via env/CI guard');
+  }
+
+  */
+  // Initialize auto-updater service (skip when disabled via env, e.g. E2E / CI)
+  const isCiRuntime = process.env.CI === 'true' || process.env.CI === '1' || process.env.GITHUB_ACTIONS === 'true';
+  const disableAutoUpdater = process.env.AIONUI_DISABLE_AUTO_UPDATE === '1' || process.env.AIONUI_E2E_TEST === '1' || isCiRuntime;
+  if (!disableAutoUpdater) {
+    try {
+      const statusBroadcast = createAutoUpdateStatusBroadcast();
+      autoUpdaterService.initialize(statusBroadcast);
+      setTimeout(() => {
+        void autoUpdaterService.checkForUpdatesAndNotify();
+      }, 3000);
+    } catch (error) {
+      console.error('[App] Failed to initialize autoUpdaterService:', error);
+    }
   } else {
     console.log('[AionUi] Auto-updater disabled via env/CI guard');
   }
@@ -752,7 +777,6 @@ const handleAppReady = async (): Promise<void> => {
   }
 
   // Verify CDP is ready and log status
-  const { cdpPort, verifyCdpReady } = await import('./utils/configureChromium');
   if (cdpPort) {
     const cdpReady = await verifyCdpReady(cdpPort);
     if (cdpReady) {
@@ -766,13 +790,9 @@ const handleAppReady = async (): Promise<void> => {
   // Listen for system resume (wake from sleep/hibernate) to recover missed cron jobs
   powerMonitor.on('resume', () => {
     console.log('[App] System resumed from sleep, triggering cron recovery');
-    import('@process/services/cron/CronService')
-      .then(({ cronService }) => {
-        void cronService.handleSystemResume();
-      })
-      .catch((error) => {
-        console.error('[App] Failed to handle system resume for cron:', error);
-      });
+    void cronService.handleSystemResume().catch((error) => {
+      console.error('[App] Failed to handle system resume for cron:', error);
+    });
   });
 };
 

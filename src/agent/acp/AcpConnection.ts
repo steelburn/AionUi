@@ -7,15 +7,16 @@
 import type { AcpBackend, AcpIncomingMessage, AcpMessage, AcpNotification, AcpPermissionRequest, AcpPromptResponseUsage, AcpRequest, AcpResponse, AcpSessionConfigOption, AcpSessionModels, AcpSessionUpdate } from '@/types/acpTypes';
 import { ACP_METHODS, JSONRPC_VERSION } from '@/types/acpTypes';
 import type { ChildProcess } from 'child_process';
-import { execFile as execFileCb } from 'child_process';
+import { execFile as execFileCb, spawn } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { buildAcpModelInfo, summarizeAcpModelInfo } from './modelInfo';
-import { mainLog } from '@process/utils/mainLogger';
+import { CLAUDE_ACP_NPX_PACKAGE, CODEX_ACP_BRIDGE_VERSION, CODEX_ACP_NPX_PACKAGE } from '@/types/acpTypes';
+import { mainLog, mainWarn } from '@process/utils/mainLogger';
 import { resolveNpxPath } from '@process/utils/shellEnv';
-import { ACP_PERF_LOG, connectClaude, connectCodebuddy, connectCodex, prepareCleanEnv, spawnGenericBackend } from './acpConnectors';
+import { ACP_PERF_LOG, connectClaude, connectCodebuddy, connectCodex, ensureMinNodeVersion as ensureMinNodeVersionForAcp, prepareCleanEnv, spawnGenericBackend } from './acpConnectors';
 import type { SpawnResult } from './acpConnectors';
 import { killChild, readTextFile, writeJsonRpcMessage, writeTextFile } from './utils';
 
@@ -92,6 +93,14 @@ export class AcpConnection {
     this.child = result.child;
     this.isDetached = result.isDetached;
     await this.setupChildProcessHandlers(backend);
+  }
+
+  private prepareNpxEnv(): Record<string, string | undefined> {
+    return prepareCleanEnv();
+  }
+
+  private ensureMinNodeVersion(cleanEnv: Record<string, string | undefined>, minMajor: number, minMinor: number, backendLabel: string): void {
+    ensureMinNodeVersionForAcp(cleanEnv, minMajor, minMinor, backendLabel);
   }
 
   // 通用的后端连接方法
