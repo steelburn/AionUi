@@ -165,10 +165,13 @@ class AutoUpdaterService extends EventEmitter {
    */
   setAllowPrerelease(allow: boolean): void {
     this._allowPrerelease = allow;
-    autoUpdater.allowPrerelease = allow;
-    // When allowing prerelease, also allow downgrade for channel switching
-    autoUpdater.allowDowngrade = allow;
-    log.info(`Prerelease updates ${allow ? 'enabled' : 'disabled'}`);
+    // Do NOT set autoUpdater.allowPrerelease here.
+    // electron-updater's prerelease mode conflicts with custom channel names
+    // (e.g. 'latest-arm64'): it treats the channel as a prerelease identifier
+    // and tries to match it against tag prerelease components, which always fails
+    // with "No published versions on GitHub".
+    // Prerelease filtering is handled by the manual update check (GitHub API) instead.
+    log.info(`Prerelease updates ${allow ? 'enabled' : 'disabled'} (manual check only)`);
   }
 
   /**
@@ -257,6 +260,12 @@ class AutoUpdaterService extends EventEmitter {
       const result = await autoUpdater.checkForUpdates();
       if (!result) {
         return { success: false, error: 'checkForUpdates returned null (not packaged or dev mode)' };
+      }
+      // Only report updateInfo when electron-updater internally confirms the update is available.
+      // When isUpdateAvailable is false, updateInfoAndProvider is NOT set internally,
+      // so a subsequent downloadUpdate() call would fail with "Please check update first".
+      if (!result.isUpdateAvailable) {
+        return { success: true };
       }
       return {
         success: true,
