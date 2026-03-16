@@ -10,7 +10,8 @@ import SearchableSelectorPanel, {
 import { useLayoutContext } from '@/renderer/context/LayoutContext';
 import { useRecentWorkspaces } from '@/renderer/hooks/useRecentWorkspaces';
 import { iconColors } from '@/renderer/theme/colors';
-import { normalizeWorkspacePath } from '@/renderer/utils/recentWorkspaces';
+import { sortRecentWorkspaces } from '@/renderer/utils/recentWorkspaces';
+import { isSameWorkspacePath } from '@/renderer/utils/workspaceIdentity';
 import { getWorkspaceDisplayName } from '@/renderer/utils/workspace';
 import { Button, Popover, Tooltip } from '@arco-design/web-react';
 import { Down, FolderOpen } from '@icon-park/react';
@@ -46,27 +47,7 @@ export const WorkspaceSelectorPopover: React.FC<WorkspaceSelectorPopoverProps> =
   const [query, setQuery] = useState('');
   const { workspaces, refresh } = useRecentWorkspaces();
 
-  const normalizedCurrentWorkspace = useMemo(
-    () => normalizeWorkspacePath(workspacePath).toLowerCase(),
-    [workspacePath]
-  );
-
-  const orderedWorkspaces = useMemo(() => {
-    return [...workspaces].sort((left, right) => {
-      const leftIsCurrent = normalizeWorkspacePath(left.path).toLowerCase() === normalizedCurrentWorkspace;
-      const rightIsCurrent = normalizeWorkspacePath(right.path).toLowerCase() === normalizedCurrentWorkspace;
-
-      if (leftIsCurrent !== rightIsCurrent) {
-        return leftIsCurrent ? -1 : 1;
-      }
-
-      if (right.updatedAt !== left.updatedAt) {
-        return right.updatedAt - left.updatedAt;
-      }
-
-      return left.label.localeCompare(right.label);
-    });
-  }, [normalizedCurrentWorkspace, workspaces]);
+  const orderedWorkspaces = useMemo(() => sortRecentWorkspaces(workspaces, workspacePath), [workspaces, workspacePath]);
 
   const closeSelector = useCallback(() => {
     setVisible(false);
@@ -146,23 +127,14 @@ export const WorkspaceSelectorPopover: React.FC<WorkspaceSelectorPopoverProps> =
           description: workspace.path,
           icon: <FolderOpen theme='outline' size='16' fill={iconColors.secondary} />,
           keywords: [workspace.path],
-          active: normalizeWorkspacePath(workspace.path).toLowerCase() === normalizedCurrentWorkspace,
+          active: isSameWorkspacePath(workspace.path, workspacePath),
           onSelect: () => handleSelectWorkspace(workspace.path),
         })),
       });
     }
 
     return nextSections;
-  }, [
-    closeSelector,
-    handleOpenFolder,
-    handleSelectWorkspace,
-    normalizedCurrentWorkspace,
-    onClearWorkspace,
-    orderedWorkspaces,
-    t,
-    workspacePath,
-  ]);
+  }, [closeSelector, handleOpenFolder, handleSelectWorkspace, onClearWorkspace, orderedWorkspaces, t, workspacePath]);
 
   const content = (
     <SearchableSelectorPanel

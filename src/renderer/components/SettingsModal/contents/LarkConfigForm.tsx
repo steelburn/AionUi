@@ -15,7 +15,7 @@ import { Avatar, Button, Dropdown, Empty, Input, Menu, Message, Spin, Tooltip } 
 import { CheckOne, CloseOne, Copy, Delete, Down, FolderOpen, Refresh, Robot } from '@icon-park/react';
 import { WorkspaceSelectorPopover } from '@/renderer/pages/guid/components/WorkspaceShortcutSelector';
 import { getWorkspaceDisplayName } from '@/renderer/utils/workspace';
-import { normalizeWorkspacePath } from '@/renderer/utils/recentWorkspaces';
+import { isSameWorkspacePath, normalizeWorkspacePath } from '@/renderer/utils/workspaceIdentity';
 import { getAgentLogo } from '@/renderer/utils/agentLogo';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -215,9 +215,7 @@ const LarkConfigForm: React.FC<LarkConfigFormProps> = ({ pluginStatus, modelSele
 
   const handleSelectWorkspace = useCallback(
     async (workspacePath: string) => {
-      const normalizedNext = normalizeWorkspacePath(workspacePath);
-      const normalizedCurrent = normalizeWorkspacePath(selectedWorkspace);
-      if (!normalizedNext || normalizedNext === normalizedCurrent) return;
+      if (!normalizeWorkspacePath(workspacePath) || isSameWorkspacePath(workspacePath, selectedWorkspace)) return;
       try {
         setSelectedWorkspace(workspacePath);
         await ConfigStorage.set('assistant.lark.workspace', workspacePath);

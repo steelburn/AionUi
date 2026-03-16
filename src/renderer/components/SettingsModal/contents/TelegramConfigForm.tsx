@@ -13,7 +13,7 @@ import type { AcpBackendAll } from '@/types/acpTypes';
 import { Avatar, Button, Dropdown, Empty, Input, Menu, Message, Spin, Tooltip } from '@arco-design/web-react';
 import { WorkspaceSelectorPopover } from '@/renderer/pages/guid/components/WorkspaceShortcutSelector';
 import { getWorkspaceDisplayName } from '@/renderer/utils/workspace';
-import { normalizeWorkspacePath } from '@/renderer/utils/recentWorkspaces';
+import { isSameWorkspacePath, normalizeWorkspacePath } from '@/renderer/utils/workspaceIdentity';
 import { getAgentLogo } from '@/renderer/utils/agentLogo';
 import { CheckOne, CloseOne, Copy, Delete, Down, FolderOpen, Refresh, Robot } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -203,9 +203,7 @@ const TelegramConfigForm: React.FC<TelegramConfigFormProps> = ({
 
   const handleSelectWorkspace = useCallback(
     async (workspacePath: string) => {
-      const normalizedNext = normalizeWorkspacePath(workspacePath);
-      const normalizedCurrent = normalizeWorkspacePath(selectedWorkspace);
-      if (!normalizedNext || normalizedNext === normalizedCurrent) return;
+      if (!normalizeWorkspacePath(workspacePath) || isSameWorkspacePath(workspacePath, selectedWorkspace)) return;
       try {
         setSelectedWorkspace(workspacePath);
         await ConfigStorage.set('assistant.telegram.workspace', workspacePath);

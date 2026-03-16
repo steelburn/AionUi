@@ -4,9 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { getWorkspaceIdentityKey, normalizeWorkspacePath } from './workspaceIdentity';
+
 const WORKSPACE_UPDATE_TIME_KEY = 'aionui_workspace_update_time';
 
-const normalizeWorkspaceHistoryPath = (workspace: string): string => workspace.replace(/[\\/]+$/, '').trim();
+const normalizeWorkspaceHistoryPath = (workspace: string): string => normalizeWorkspacePath(workspace);
 
 const readWorkspaceEntries = (): Array<{ workspace: string; updatedAt: number }> => {
   try {
@@ -25,7 +27,7 @@ const readWorkspaceEntries = (): Array<{ workspace: string; updatedAt: number }>
         return;
       }
 
-      const workspaceKey = normalizedWorkspace.toLowerCase();
+      const workspaceKey = getWorkspaceIdentityKey(normalizedWorkspace);
       const currentRecord = workspaceMap.get(workspaceKey);
       if (!currentRecord || normalizedUpdatedAt > currentRecord.updatedAt) {
         workspaceMap.set(workspaceKey, {
@@ -55,12 +57,15 @@ const readWorkspaceTimes = (): Record<string, number> => {
  * 获取 workspace 的最后更新时间
  */
 export const getWorkspaceUpdateTime = (workspace: string): number => {
-  const normalizedWorkspace = normalizeWorkspaceHistoryPath(workspace).toLowerCase();
+  const normalizedWorkspace = getWorkspaceIdentityKey(workspace);
   if (!normalizedWorkspace) {
     return 0;
   }
 
-  return readWorkspaceEntries().find((entry) => entry.workspace.toLowerCase() === normalizedWorkspace)?.updatedAt || 0;
+  return (
+    readWorkspaceEntries().find((entry) => getWorkspaceIdentityKey(entry.workspace) === normalizedWorkspace)
+      ?.updatedAt || 0
+  );
 };
 
 /**
@@ -85,8 +90,10 @@ export const updateWorkspaceTime = (workspace: string): void => {
       return;
     }
 
-    const workspaceKey = normalizedWorkspace.toLowerCase();
-    const nextEntries = readWorkspaceEntries().filter((entry) => entry.workspace.toLowerCase() !== workspaceKey);
+    const workspaceKey = getWorkspaceIdentityKey(normalizedWorkspace);
+    const nextEntries = readWorkspaceEntries().filter(
+      (entry) => getWorkspaceIdentityKey(entry.workspace) !== workspaceKey
+    );
     nextEntries.push({
       workspace: normalizedWorkspace,
       updatedAt: Date.now(),

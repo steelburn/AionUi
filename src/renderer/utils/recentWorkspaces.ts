@@ -6,6 +6,7 @@
 
 import type { TChatConversation } from '@/common/storage';
 import { getWorkspaceDisplayName, isTemporaryWorkspace } from './workspace';
+import { getWorkspaceIdentityKey, isSameWorkspacePath, normalizeWorkspacePath } from './workspaceIdentity';
 
 export type WorkspaceHistoryRecord = {
   workspace: string;
@@ -17,10 +18,6 @@ export type RecentWorkspaceItem = {
   label: string;
   updatedAt: number;
 };
-
-export const normalizeWorkspacePath = (workspacePath: string): string => workspacePath.replace(/[\\/]+$/, '').trim();
-
-const getWorkspaceKey = (workspacePath: string): string => normalizeWorkspacePath(workspacePath).toLowerCase();
 
 const resolveConversationWorkspace = (conversation: TChatConversation): string => {
   const workspace = typeof conversation.extra?.workspace === 'string' ? conversation.extra.workspace : '';
@@ -47,7 +44,7 @@ const upsertWorkspace = (
     return;
   }
 
-  const workspaceKey = getWorkspaceKey(normalizedWorkspace);
+  const workspaceKey = getWorkspaceIdentityKey(normalizedWorkspace);
   const currentItem = workspaceMap.get(workspaceKey);
   if (!currentItem || updatedAt > currentItem.updatedAt) {
     workspaceMap.set(workspaceKey, {
@@ -85,6 +82,26 @@ export const collectRecentWorkspaces = (
   }
 
   return Array.from(workspaceMap.values()).sort((left, right) => {
+    if (right.updatedAt !== left.updatedAt) {
+      return right.updatedAt - left.updatedAt;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
+};
+
+export const sortRecentWorkspaces = (
+  workspaces: RecentWorkspaceItem[],
+  currentWorkspacePath: string
+): RecentWorkspaceItem[] => {
+  return [...workspaces].sort((left, right) => {
+    const leftIsCurrent = isSameWorkspacePath(left.path, currentWorkspacePath);
+    const rightIsCurrent = isSameWorkspacePath(right.path, currentWorkspacePath);
+
+    if (leftIsCurrent !== rightIsCurrent) {
+      return leftIsCurrent ? -1 : 1;
+    }
+
     if (right.updatedAt !== left.updatedAt) {
       return right.updatedAt - left.updatedAt;
     }
