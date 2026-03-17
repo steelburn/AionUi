@@ -53,6 +53,7 @@ export const conversation = {
   confirmMessage: bridge.buildProvider<IBridgeResponse, IConfirmMessageParams>('conversation.confirm.message'), // 通用确认消息
   responseStream: bridge.buildEmitter<IResponseMessage>('chat.response.stream'), // 接收消息（统一接口）
   turnCompleted: bridge.buildEmitter<IConversationTurnCompletedEvent>('conversation.turn.completed'),
+  listChanged: bridge.buildEmitter<IConversationListChangedEvent>('conversation.list-changed'),
   getWorkspace: bridge.buildProvider<
     IDirOrFile[],
     { conversation_id: string; workspace: string; path: string; search?: string }
@@ -861,6 +862,12 @@ export interface IConversationTurnCompletedEvent {
     status?: string | null;
     createdAt: number;
   };
+}
+
+export interface IConversationListChangedEvent {
+  conversationId: string;
+  action: 'created' | 'updated' | 'deleted';
+  source?: string;
 }
 
 interface IBridgeResponse<D = {}> {

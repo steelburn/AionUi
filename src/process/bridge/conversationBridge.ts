@@ -25,6 +25,17 @@ import WorkerManage from '../WorkerManage';
 import { migrateConversationToDatabase } from './migrationUtils';
 
 export function initConversationBridge(): void {
+  const emitConversationListChanged = (
+    conversation: Pick<TChatConversation, 'id' | 'source'>,
+    action: 'created' | 'updated' | 'deleted'
+  ) => {
+    ipcBridge.conversation.listChanged.emit({
+      conversationId: conversation.id,
+      action,
+      source: conversation.source || 'aionui',
+    });
+  };
+
   ipcBridge.openclawConversation.getRuntime.provider(async ({ conversation_id }) => {
     try {
       const db = getDatabase();
@@ -84,6 +95,7 @@ export function initConversationBridge(): void {
       throw new Error(result.error || 'Failed to create conversation');
     }
 
+    emitConversationListChanged(result.conversation, 'created');
     return result.conversation;
   });
 
@@ -164,6 +176,8 @@ export function initConversationBridge(): void {
         const result = db.createConversation(conversation);
         if (!result.success) {
           console.error('[conversationBridge] Failed to create conversation in database:', result.error);
+        } else {
+          emitConversationListChanged(conversation, 'created');
         }
 
         // Migrate messages if sourceConversationId is provided / 如果提供了源会话ID，则迁移消息
@@ -234,6 +248,7 @@ export function initConversationBridge(): void {
               // ON DELETE CASCADE will handle message deletion / 级联删除会自动处理消息删除
               const deleteResult = db.deleteConversation(sourceConversationId);
               if (deleteResult.success) {
+                emitConversationListChanged({ id: sourceConversationId, source: conversation.source }, 'deleted');
                 console.log(
                   `[conversationBridge] Successfully migrated and deleted source conversation ${sourceConversationId}`
                 );
@@ -307,6 +322,9 @@ export function initConversationBridge(): void {
         return false;
       }
 
+      if (conversation) {
+        emitConversationListChanged(conversation, 'deleted');
+      }
       return true;
     } catch (error) {
       console.error('[conversationBridge] Failed to remove conversation:', error);
@@ -349,6 +367,9 @@ export function initConversationBridge(): void {
           }
         }
 
+        if (result.success && existing.success && existing.data) {
+          emitConversationListChanged(existing.data, 'updated');
+        }
         return result.success;
       } catch (error) {
         console.error('[conversationBridge] Failed to update conversation:', error);
