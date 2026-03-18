@@ -81,7 +81,7 @@ export class WebuiService {
    * Get admin user (with auto-loading)
    */
   static async getAdminUser() {
-    const adminUser = UserRepository.findByUsername(AUTH_CONFIG.DEFAULT_USER.USERNAME);
+    const adminUser = UserRepository.getSystemUser();
     if (!adminUser) {
       throw new Error('WebUI user not found');
     }
@@ -100,7 +100,7 @@ export class WebuiService {
       allowRemote: boolean;
     } | null
   ): Promise<IWebUIStatus> {
-    const adminUser = UserRepository.findByUsername(AUTH_CONFIG.DEFAULT_USER.USERNAME);
+    const adminUser = UserRepository.getSystemUser();
     const running = webServerInstance !== null;
     const port = webServerInstance?.port ?? SERVER_CONFIG.DEFAULT_PORT;
     const allowRemote = webServerInstance?.allowRemote ?? false;

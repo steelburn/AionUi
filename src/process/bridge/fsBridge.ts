@@ -79,6 +79,44 @@ function getUserSkillsDir(): string {
   return path.join(userDataPath, 'config', 'skills');
 }
 
+function parseSkillFrontMatter(content: string, fallbackName: string): { name: string; description: string } {
+  const frontMatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  if (!frontMatterMatch) {
+    return { name: fallbackName, description: '' };
+  }
+
+  const yaml = frontMatterMatch[1];
+  const nameMatch = yaml.match(/^name:\s*(.+)$/m);
+  const descMatch = yaml.match(/^description:\s*['"]?(.+?)['"]?$/m);
+
+  return {
+    name: nameMatch ? nameMatch[1].trim() : fallbackName,
+    description: descMatch ? descMatch[1].trim() : '',
+  };
+}
+
+function resolveManagedSkillTarget(
+  userSkillsDir: string,
+  rawSkillName: string
+): { skillName: string; targetDir: string } {
+  const skillName = rawSkillName.trim();
+  if (!skillName) {
+    throw new Error('Skill name cannot be empty');
+  }
+
+  if (path.isAbsolute(skillName) || skillName === '.' || skillName === '..' || /[\\/]/.test(skillName)) {
+    throw new Error(`Invalid skill name "${skillName}"`);
+  }
+
+  const resolvedUserSkillsDir = path.resolve(userSkillsDir);
+  const targetDir = path.resolve(resolvedUserSkillsDir, skillName);
+  if (!targetDir.startsWith(resolvedUserSkillsDir + path.sep)) {
+    throw new Error(`Invalid skill name "${skillName}"`);
+  }
+
+  return { skillName, targetDir };
+}
+
 /**
  * Copy directory recursively
  * 递归复制目录
@@ -929,20 +967,11 @@ export function initFsBridge(): void {
 
       // 读取 SKILL.md 获取 skill 名称 / Read SKILL.md to get skill name
       const content = await fs.readFile(skillMdPath, 'utf-8');
-      const frontMatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-      let skillName = path.basename(skillPath); // 默认使用目录名 / Default to directory name
-
-      if (frontMatterMatch) {
-        const yaml = frontMatterMatch[1];
-        const nameMatch = yaml.match(/^name:\s*(.+)$/m);
-        if (nameMatch) {
-          skillName = nameMatch[1].trim();
-        }
-      }
-
-      // 获取用户 skills 目录 / Get user skills directory
       const userSkillsDir = getUserSkillsDir();
-      const targetDir = path.join(userSkillsDir, skillName);
+      const { skillName, targetDir } = resolveManagedSkillTarget(
+        userSkillsDir,
+        parseSkillFrontMatter(content, path.basename(skillPath)).name
+      );
 
       // 检查是否已存在同名 skill（同时检查内置和用户目录）/ Check if skill already exists in both builtin and user directories
       const builtinSkillsDir = await findBuiltinResourceDir('skills');
@@ -1266,15 +1295,11 @@ export function initFsBridge(): void {
       }
 
       const content = await fs.readFile(skillMdPath, 'utf-8');
-      const frontMatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
-      let skillName = path.basename(skillPath);
-      if (frontMatterMatch) {
-        const nameMatch = frontMatterMatch[1].match(/^name:\s*(.+)$/m);
-        if (nameMatch) skillName = nameMatch[1].trim();
-      }
-
       const userSkillsDir = getUserSkillsDir();
-      const targetDir = path.join(userSkillsDir, skillName);
+      const { skillName, targetDir } = resolveManagedSkillTarget(
+        userSkillsDir,
+        parseSkillFrontMatter(content, path.basename(skillPath)).name
+      );
 
       await fs.mkdir(userSkillsDir, { recursive: true });
 

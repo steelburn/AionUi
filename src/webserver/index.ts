@@ -136,20 +136,22 @@ function getServerIP(): string | null {
  *
  * @returns 初始凭证（仅首次创建时）/ Initial credentials (only on first creation)
  */
-async function initializeDefaultAdmin(): Promise<{ username: string; password: string } | null> {
-  const username = DEFAULT_ADMIN_USERNAME;
-
+export async function initializeDefaultAdmin(): Promise<{ username: string; password: string } | null> {
   const systemUser = UserRepository.getSystemUser();
-  const existingAdmin = UserRepository.findByUsername(username);
 
   // 已存在且密码有效则视为完成初始化
   // Treat existing admin with valid password as already initialized
-  const hasValidPassword = (user: typeof existingAdmin): boolean =>
+  const hasValidPassword = (user: typeof systemUser): boolean =>
     !!user && typeof user.password_hash === 'string' && user.password_hash.trim().length > 0;
+
+  const username =
+    systemUser && systemUser.username.trim() && systemUser.username !== systemUser.id
+      ? systemUser.username.trim()
+      : DEFAULT_ADMIN_USERNAME;
 
   // 如果已经有有效的管理员用户，直接跳过初始化
   // Skip initialization if a valid admin already exists
-  if (hasValidPassword(existingAdmin)) {
+  if (hasValidPassword(systemUser)) {
     return null;
   }
 
@@ -158,24 +160,16 @@ async function initializeDefaultAdmin(): Promise<{ username: string; password: s
   try {
     const hashedPassword = await AuthService.hashPassword(password);
 
-    if (existingAdmin) {
-      // 情况 1：库中已有 admin 记录但密码缺失 -> 重置密码并输出凭证
-      // Case 1: admin row exists but password is blank -> refresh password and expose credentials
-      UserRepository.updatePassword(existingAdmin.id, hashedPassword);
-      initialAdminPassword = password; // 存储初始密码 / Store initial password
-      return { username, password };
-    }
-
     if (systemUser) {
-      // 情况 2：仅存在 system_default_user 占位行 -> 更新用户名和密码
-      // Case 2: only placeholder system user exists -> update username/password in place
+      // 情况 1：存在 system_default_user 记录 -> 在原地更新用户名和密码
+      // Case 1: system user exists -> update username/password in place
       UserRepository.setSystemUserCredentials(username, hashedPassword);
       initialAdminPassword = password; // 存储初始密码 / Store initial password
       return { username, password };
     }
 
-    // 情况 3：初次启动，无任何用户 -> 新建 admin 账户
-    // Case 3: fresh install with no users -> create admin user explicitly
+    // 情况 2：极少数据库异常状态，system user 不存在 -> 新建 admin 账户
+    // Case 2: rare fallback when system user is missing -> create admin user explicitly
     UserRepository.createUser(username, hashedPassword);
     initialAdminPassword = password; // 存储初始密码 / Store initial password
     return { username, password };

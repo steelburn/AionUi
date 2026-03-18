@@ -435,6 +435,44 @@ describe('fsBridge skills functionality', () => {
       expect(result3.success).toBe(false);
       expect(result3.msg).toContain('SKILL.md file not found');
     });
+
+    it('should reject skill names that escape the managed skills directory', async () => {
+      const srcPath = path.resolve('/mock/source/escape-skill');
+      const escapedTarget = path.resolve('/mock/userData/outside');
+
+      mockFsStore[srcPath] = { isDirectory: true };
+      mockFsStore[path.join(srcPath, 'SKILL.md')] = {
+        content: '---\nname: ../../outside\n---\nData',
+        isDirectory: false,
+      };
+
+      const handler = await getProvider('importSkillWithSymlink');
+      const result = await handler({ skillPath: srcPath });
+
+      expect(result.success).toBe(false);
+      expect(result.msg).toContain('Invalid skill name');
+      expect(mockFsStore[escapedTarget]).toBeUndefined();
+    });
+  });
+
+  describe('importSkill', () => {
+    it('should reject copied imports that try to escape the managed skills directory', async () => {
+      const srcPath = path.resolve('/mock/source/copied-escape-skill');
+      const escapedTarget = path.resolve('/mock/userData/outside');
+
+      mockFsStore[srcPath] = { isDirectory: true };
+      mockFsStore[path.join(srcPath, 'SKILL.md')] = {
+        content: '---\nname: ../../outside\n---\nData',
+        isDirectory: false,
+      };
+
+      const handler = await getProvider('importSkill');
+      const result = await handler({ skillPath: srcPath });
+
+      expect(result.success).toBe(false);
+      expect(result.msg).toContain('Invalid skill name');
+      expect(mockFsStore[escapedTarget]).toBeUndefined();
+    });
   });
 
   describe('exportSkillWithSymlink', () => {
