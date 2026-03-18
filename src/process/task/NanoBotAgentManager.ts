@@ -14,6 +14,7 @@ import { addMessage, addOrUpdateMessage } from '@process/message';
 import { cronBusyGuard } from '@process/services/cron/CronBusyGuard';
 import { ConversationTurnCompletionService } from '@process/services/ConversationTurnCompletionService';
 import BaseAgentManager from '@process/task/BaseAgentManager';
+import { IpcAgentEventEmitter } from '@process/task/IpcAgentEventEmitter';
 
 export interface NanoBotAgentManagerData {
   conversation_id: string;
@@ -25,14 +26,13 @@ export interface NanoBotAgentManagerData {
 }
 
 class NanoBotAgentManager extends BaseAgentManager<NanoBotAgentManagerData> {
-  workspace?: string;
   agent!: NanobotAgent;
   bootstrap: Promise<NanobotAgent>;
 
   constructor(data: NanoBotAgentManagerData) {
-    super('nanobot', data);
+    super('nanobot', data, new IpcAgentEventEmitter());
     this.conversation_id = data.conversation_id;
-    this.workspace = data.workspace;
+    this.workspace = data.workspace ?? '';
 
     this.bootstrap = this.initAgent(data);
   }

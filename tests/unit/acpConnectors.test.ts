@@ -20,12 +20,15 @@ vi.mock('child_process', () => ({
       cb(null, { stdout: '', stderr: '' });
     }
   ),
-  execFileSync: vi.fn(() => 'v20.0.0\n'),
+  execFileSync: vi.fn(() => 'v20.10.0\n'),
 }));
 
 vi.mock('@process/utils/shellEnv', () => ({
   findSuitableNodeBin: vi.fn(() => null),
   getEnhancedEnv: vi.fn(() => ({ PATH: '/usr/bin' })),
+  getWindowsShellExecutionOptions: vi.fn(() =>
+    process.platform === 'win32' ? { shell: true, windowsHide: true } : {}
+  ),
   resolveNpxPath: vi.fn(() => 'npx'),
 }));
 

@@ -44,13 +44,18 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'text-summary', 'html'],
+      reporter: ['text', 'text-summary', 'html', 'lcov'],
       reportsDirectory: './coverage',
       // 手动指定需要覆盖的源文件，确保只检测新增/修改的逻辑
       // 新增功能时，将对应的源文件路径添加到此数组
       // 例如: 'src/process/services/newService.ts'
       include: [
-        // Process / bridge
+        // Build scripts
+        'scripts/prepareBundledBun.js',
+        'src/process/tray.ts',
+        'src/process/deepLink.ts',
+        'src/process/mainWindowLifecycle.ts',
+        'src/process/webuiConfig.ts',
         'src/process/bridge/services/WebuiService.ts',
         'src/process/database/index.ts',
         'src/webserver/auth/service/AuthService.ts',
@@ -60,6 +65,13 @@ export default defineConfig({
         'src/process/services/cron/CronStore.ts',
         'src/process/bridge/cronBridge.ts',
         'src/process/bridge/conversationBridge.ts',
+        // Decoupling layer (interfaces + implementations)
+        'src/process/database/SqliteConversationRepository.ts',
+        'src/process/services/ConversationServiceImpl.ts',
+        'src/process/task/AgentFactory.ts',
+        'src/process/task/WorkerTaskManager.ts',
+        'src/process/task/IpcAgentEventEmitter.ts',
+        'src/process/task/BaseAgentManager.ts',
         'src/process/bridge/updateBridge.ts',
         'src/process/bridge/applicationBridge.ts',
         'src/process/utils/workspaceEditor.ts',
