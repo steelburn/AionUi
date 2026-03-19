@@ -371,6 +371,38 @@ export const ASSISTANT_PRESETS: AssistantPreset[] = [
     },
   },
   {
+    id: 'aion-css-theme-designer',
+    avatar: '🎴',
+    presetAgentType: 'gemini',
+    resourceDir: 'assistant/aion-css-theme-designer',
+    ruleFiles: {
+      'en-US': 'aion-css-theme-designer.md',
+      'zh-CN': 'aion-css-theme-designer.zh-CN.md',
+    },
+    defaultEnabledSkills: ['aion-css-theme-designer'],
+    nameI18n: {
+      'en-US': 'Aion CSS Theme Designer',
+      'zh-CN': 'Aion CSS 主题设计师',
+    },
+    descriptionI18n: {
+      'en-US':
+        'Design custom AionUi CSS themes from taste keywords, reference themes, or uploaded images, with strong light/dark readability.',
+      'zh-CN': '根据偏好关键词、参考皮肤或上传图片，为 AionUi 设计自定义 CSS 主题，并兼顾亮暗模式可读性。',
+    },
+    promptsI18n: {
+      'en-US': [
+        'Create a bookish muted AionUi theme with subtle inline highlight chips',
+        'Use this image as palette inspiration and design a complete AionUi CSS theme',
+        'Refine my existing AionUi theme and improve dark mode links and emphasis',
+      ],
+      'zh-CN': [
+        '做一个书卷气、低饱和、带轻柔行内高亮块的 AionUi 主题',
+        '根据我上传的图片色调，设计一套完整的 AionUi CSS 主题',
+        '优化我现有的 AionUi 皮肤，重点改善暗色模式的链接和强调样式',
+      ],
+    },
+  },
+  {
     id: 'story-roleplay',
     avatar: '📖',
     presetAgentType: 'gemini',

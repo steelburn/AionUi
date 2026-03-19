@@ -560,7 +560,8 @@ const getBuiltinAssistants = (): AcpBackendConfig[] => {
       preset.id === 'star-office-helper' ||
       preset.id === 'story-roleplay' ||
       preset.id === 'moltbook' ||
-      preset.id === 'beautiful-mermaid';
+      preset.id === 'beautiful-mermaid' ||
+      preset.id === 'aion-css-theme-designer';
 
     assistants.push({
       id: `builtin-${preset.id}`,
