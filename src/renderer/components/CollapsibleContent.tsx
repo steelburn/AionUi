@@ -19,7 +19,7 @@ const MASK_GRADIENT =
 // 背景渐变模式：使用固定颜色遮罩，适用于普通场景
 // Background gradient mode: use fixed color mask, suitable for normal scenarios
 const BG_GRADIENT_DARK =
-  'linear-gradient(to bottom, rgba(30, 30, 30, 0) 0%, rgba(30, 30, 30, 0.6) 40%, rgba(30, 30, 30, 0.95) 80%, rgba(30, 30, 30, 1) 100%)';
+  'linear-gradient(to bottom, rgba(26, 26, 26, 0) 0%, rgba(26, 26, 26, 0.6) 40%, rgba(26, 26, 26, 0.95) 80%, rgba(26, 26, 26, 1) 100%)';
 const BG_GRADIENT_LIGHT =
   'linear-gradient(to bottom, rgba(247, 248, 250, 0) 0%, rgba(247, 248, 250, 0.6) 40%, rgba(247, 248, 250, 0.95) 80%, rgba(247, 248, 250, 1) 100%)';
 

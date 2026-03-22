@@ -342,8 +342,8 @@ const SendBox: React.FC<{
   // Calculate button disabled state and style
   const isButtonDisabled = disabled || (!input.trim() && domSnippets.length === 0);
   const buttonStyle = {
-    backgroundColor: isButtonDisabled ? undefined : '#000000',
-    borderColor: isButtonDisabled ? undefined : '#000000',
+    backgroundColor: isButtonDisabled ? undefined : 'var(--text-0)',
+    borderColor: isButtonDisabled ? undefined : 'var(--text-0)',
   };
 
   // Reusable send button component

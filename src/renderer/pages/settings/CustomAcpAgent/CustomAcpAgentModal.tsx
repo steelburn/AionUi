@@ -367,7 +367,7 @@ const CustomAcpAgentModal: React.FC<CustomAcpAgentModalProps> = ({ visible, agen
                   className='[&_.cm-editor]:rounded-[6px]'
                 />
                 {!validation.isValid && jsonInput.trim() && (
-                  <div className='mt-8px text-xs text-red-500'>{validation.errorMessage}</div>
+                  <div className='mt-8px text-xs text-danger'>{validation.errorMessage}</div>
                 )}
               </div>
             </Collapse.Item>

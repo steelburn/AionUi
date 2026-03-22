@@ -266,7 +266,7 @@ const JsonImportModal: React.FC<JsonImportModalProps> = ({ visible, server, onCa
 
           {/* JSON 格式错误提示 */}
           {!validation.isValid && jsonInput.trim() && (
-            <div className='mt-2 text-sm text-red-600'>{t('settings.mcpJsonFormatError') || 'JSON format error'}</div>
+            <div className='mt-2 text-sm text-danger'>{t('settings.mcpJsonFormatError') || 'JSON format error'}</div>
           )}
         </div>
 

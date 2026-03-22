@@ -148,9 +148,9 @@ const ApiKeyEditorModal: React.FC<ApiKeyEditorModalProps> = ({ visible, apiKeys,
       case 'testing':
         return <Spin size={14} />;
       case 'valid':
-        return <CheckOne theme='filled' size={16} className='text-green-500 flex' />;
+        return <CheckOne theme='filled' size={16} className='text-success flex' />;
       case 'invalid':
-        return <CloseOne theme='filled' size={16} className='text-red-500 flex' />;
+        return <CloseOne theme='filled' size={16} className='text-danger flex' />;
       default:
         return null;
     }

@@ -951,7 +951,7 @@ const AssistantManagement: React.FC<AssistantManagementProps> = ({ message }) =>
           <div className='flex flex-col flex-1 gap-16px bg-fill-2 rounded-16px p-20px overflow-y-auto'>
             <div className='flex-shrink-0'>
               <Typography.Text bold>
-                <span className='text-red-500'>*</span>{' '}
+                <span className='text-danger'>*</span>{' '}
                 {t('settings.assistantNameAvatar', { defaultValue: 'Name & Avatar' })}
               </Typography.Text>
               <div className='mt-10px flex items-center gap-12px'>

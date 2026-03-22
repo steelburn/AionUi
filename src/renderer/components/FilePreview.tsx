@@ -94,10 +94,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ path, onRemove, readonly = fa
         </div>
         {!readonly && (
           <div
-            className='absolute -top-4px -right-4px w-16px h-16px rd-50% bg-white dark:bg-gray-700 cursor-pointer flex items-center justify-center shadow-md hover:shadow-lg transition-all z-10 border-1 border-solid border-gray-200 dark:border-gray-600'
+            className='absolute -top-4px -right-4px w-16px h-16px rd-50% bg-fill-white-to-black cursor-pointer flex items-center justify-center shadow-md hover:shadow-lg transition-all z-10 border-1 border-solid border-b-base'
             onClick={handleRemove}
           >
-            <Close theme='filled' size='10' fill='#666' />
+            <Close theme='filled' size='10' fill='var(--text-secondary)' />
           </div>
         )}
       </div>
@@ -108,7 +108,7 @@ const FilePreview: React.FC<FilePreviewProps> = ({ path, onRemove, readonly = fa
     <div className='relative inline-block mb-10px'>
       <div
         className='h-60px flex items-center gap-12px px-12px rd-8px bg-bg-2 border border-solid'
-        style={{ borderColor: 'var(--border-base)', boxShadow: '0 0 0 1px rgba(0,0,0,0.02)' }}
+        style={{ borderColor: 'var(--border-base)' }}
       >
         <div className='w-40px h-40px rd-8px flex items-center justify-center flex-shrink-0'>
           <img className='w-full h-full object-contain' src={fileIcon} alt='File Icon' />
@@ -122,10 +122,10 @@ const FilePreview: React.FC<FilePreviewProps> = ({ path, onRemove, readonly = fa
       </div>
       {!readonly && (
         <div
-          className='absolute -top-4px -right-4px w-16px h-16px rd-50% bg-white dark:bg-gray-700 cursor-pointer flex items-center justify-center shadow-md hover:shadow-lg transition-all z-10 border-1 border-solid border-gray-200 dark:border-gray-600'
+          className='absolute -top-4px -right-4px w-16px h-16px rd-50% bg-fill-white-to-black cursor-pointer flex items-center justify-center shadow-md hover:shadow-lg transition-all z-10 border-1 border-solid border-b-base'
           onClick={handleRemove}
         >
-          <Close theme='filled' size='10' fill='#666' />
+          <Close theme='filled' size='10' fill='var(--text-secondary)' />
         </div>
       )}
     </div>

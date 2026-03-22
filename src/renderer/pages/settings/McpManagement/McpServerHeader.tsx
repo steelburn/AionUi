@@ -43,7 +43,7 @@ const getStatusIcon = (status?: IMcpServer['status'], oauthStatus?: McpOAuthStat
   }
 
   if (oauthStatus?.needsLogin) {
-    return <span className='text-orange-500 text-xl font-bold leading-none'>△</span>;
+    return <span className='text-warning text-xl font-bold leading-none'>△</span>;
   }
 
   if (status === 'connected' || oauthStatus?.isAuthenticated) {
@@ -156,7 +156,7 @@ const McpServerHeader: React.FC<McpServerHeaderProps> = ({
                     </div>
                   </Menu.Item>
                   <Menu.Item key='delete' onClick={() => onDeleteServer(server.id)}>
-                    <div className='flex items-center gap-2 text-red-500'>
+                    <div className='flex items-center gap-2 text-danger'>
                       <DeleteFour size={'14'} />
                       {t('settings.mcpDeleteServer')}
                     </div>
