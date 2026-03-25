@@ -86,7 +86,28 @@ Before selecting any remote style template, define a custom style from the topic
 
 This custom style is the primary design source.
 
-**THEN (optional): Resolve style template references from OfficeCli remote repository (on demand)**
+Keep this step fast and decisive:
+
+- Produce exactly 1 primary style direction first, not multiple competing directions
+- Spend at most one short pass on style definition before moving on
+- Do not browse templates at this stage
+- Strong-style topics should preserve room for original invention, not force an early template choice
+
+**THEN: Attempt remote OfficeCli fetch before generation (default required path)**
+
+Before generating slides, you MUST first attempt remote fetch unless the user explicitly asks for freeform exploration such as "自由发挥", "free style", "surprise me", or clearly says not to use remote references.
+
+Mandatory pre-generation remote fetch sequence:
+
+1. Attempt to fetch style candidates from OfficeCli `Styles/index.json` (fallbacks allowed per `reference/remote-style-source.md`)
+2. Attempt to fetch OfficeCli component rules from `Styles/component/COMPONENT_LIBRARY.md`
+3. Record in your working notes whether each fetch succeeded or failed
+
+If both attempts fail, continue immediately with topic-driven custom style + built-in composition rules. Remote failure must not block generation.
+
+Use remote OfficeCli content as a preferred reference source, not as a layout source to copy.
+
+**THEN (conditional): Resolve style template references from OfficeCli remote repository**
 
 Follow `reference/remote-style-source.md` to:
 
@@ -96,27 +117,47 @@ Follow `reference/remote-style-source.md` to:
 
 Do not pre-download all styles and do not keep persistent local style caches.
 
-Default behavior: skip template fetch and proceed with topic-driven custom style + component composition.
+Default behavior: always attempt remote index + component fetch first, then proceed with topic-driven custom style + component composition.
 
 Only fetch template references when:
 
 - User explicitly asks for a specific template/style, or
-- Topic keywords strongly match a known template and you need inspiration.
+- The design is already structurally planned but needs stronger visual calibration, or
+- The agent judges that a remote template will materially improve finish quality after the style and component decisions are already clear.
+
+Skip the remote fetch attempt only when the user explicitly requests freeform generation without reference constraints.
 
 If remote templates are unavailable, continue immediately with topic-driven custom style. Keep all Morph and quality requirements in this skill strictly enforced (`!!`/`#sN-` naming, ghosting, `transition=morph`, per-slide checks, final validation).
 
 **THIRD: Compose pages with component layering workflow**
 
-Use OfficeCli remote component library (on demand), defined in `reference/remote-style-source.md`.
-Fetch only needed component docs for the current task (default: `Styles/component/COMPONENT_LIBRARY.md`).
+Use OfficeCli remote component library, defined in `reference/remote-style-source.md`.
+Attempt to fetch component docs for every normal PPT task first (default: `Styles/component/COMPONENT_LIBRARY.md`), unless the user explicitly asks for freeform generation.
 If remote component fetch fails, continue with the rules below.
 
 Execution model:
 
-- `style.md` (from remote OfficeCli) defines palette, tone, and mood
-- Component composition defines structure and visual assembly
-- Do not treat `style.md` as a fixed layout template
+- Topic-driven custom style defines palette, typography, tone, and motion mood first
+- Component and design-element selection defines structure and visual assembly second
+- Remote OfficeCli index and component library are used to calibrate and improve these decisions
+- `style.md` is a late-stage visual reference when needed, not a fixed layout template
 - Default generation should not depend on template lookup.
+
+Decision order (mandatory):
+
+1. Define the topic-driven custom style
+2. Select the page structure and successful components
+3. Select supporting design elements/textures/decorations under that style
+4. Use OfficeCli remote references to validate or improve the choices quickly
+5. Activate a template only if still needed
+
+Speed rules (mandatory):
+
+- Do not spend long comparing many styles or templates
+- Check at most 3 remote style candidates before committing
+- Prefer the first strong, coherent direction over exhaustive exploration
+- Once the page structure and style direction are good enough, start building
+- If the agent already has a strong original direction, it may skip template activation even for highly stylized topics
 
 Per-slide selection order (mandatory):
 

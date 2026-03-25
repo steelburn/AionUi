@@ -9,8 +9,8 @@ This guide defines how to use OfficeCli `Styles/` as the remote source of truth 
 
 ## Goal
 
-- Discover component library references from OfficeCli remote repository (default path)
-- Discover style templates from OfficeCli remote repository (optional path)
+- Discover component library references from OfficeCli remote repository (default path, required attempt)
+- Discover style templates from OfficeCli remote repository (conditional path)
 - Download only the selected style/component files
 - Use temporary local files only for the current task
 - Delete temporary files after generation
@@ -32,9 +32,21 @@ If your team uses another repo/ref, override these variables.
 
 Use topic-driven custom style + remote component library.
 
-Template discovery/fetch is optional and should run only when user explicitly asks for a template style (or strong keyword match requires inspiration).
+Unless the user explicitly asks for freeform generation without remote references, you MUST first attempt:
 
-## Step 1: Discover style candidates (optional, remote index first)
+1. Style discovery from remote `Styles/index.json` (with fallbacks)
+2. Component rule fetch from remote `Styles/component/COMPONENT_LIBRARY.md`
+
+Template discovery/fetch remains conditional and should happen only after the topic-driven style and component choices are already clear enough to benefit from visual calibration.
+
+Efficiency rules:
+
+- Do not inspect large numbers of styles
+- Prefer a quick shortlist of at most 3 candidates from `index.json`
+- If one direction is already coherent, stop searching and move to build
+- Remote references should speed up decisions, not prolong exploration
+
+## Step 1: Discover style candidates (default required attempt, remote index first)
 
 Try in this order:
 
@@ -55,7 +67,7 @@ curl -fsSL "https://raw.githubusercontent.com/${STYLE_REPO_OWNER}/${STYLE_REPO_N
 curl -fsSL "https://api.github.com/repos/${STYLE_REPO_OWNER}/${STYLE_REPO_NAME}/contents/${STYLE_REPO_DIR}?ref=${STYLE_REPO_REF}" -o /tmp/style-contents.json
 ```
 
-## Step 2: Download only the selected style template (optional)
+## Step 2: Download only the selected style template (conditional)
 
 After selecting `<style-id>`, fetch only needed files:
 
@@ -73,9 +85,9 @@ curl -fsSL "https://raw.githubusercontent.com/${STYLE_REPO_OWNER}/${STYLE_REPO_N
 
 Do not download all style template directories. Do not mirror the whole repo.
 
-## Step 3: Fetch component library references (default path, on demand)
+## Step 3: Fetch component library references (default path, required attempt)
 
-When component composition is needed, fetch only component docs you will actually use:
+For normal PPT generation, always attempt this fetch before composing slides. Skip only when the user explicitly asks for freeform generation without remote references.
 
 ```bash
 SESSION_COMPONENT_DIR="$(mktemp -d /tmp/aionui-morph-component.XXXXXX)"
@@ -94,6 +106,7 @@ If component docs are unavailable, continue with built-in layering constraints i
 ## Step 4: Use fetched material as inspiration, not copy-paste coordinates
 
 - Learn visual language (palette, composition, morph choreography)
+- Prefer borrowing successful components and visual cues over copying a full template
 - Follow this skill's design/quality rules (`pptx-design.md`, `quality-gates.md`)
 - Do not copy all coordinates and dimensions verbatim
 
@@ -108,6 +121,7 @@ No persistent cache by default.
 
 ## Failure Handling
 
+- If style index fetch fails, try the documented fallbacks immediately, then continue with topic-driven custom style if all fail.
 - If remote style template fetch fails, continue immediately with topic-driven custom style + component composition. Do not block generation.
 - If remote component fetch fails, continue with built-in component layering rules in `SKILL.md`.
 - If both `style.md` and `build.sh` unavailable for chosen style, pick another candidate
