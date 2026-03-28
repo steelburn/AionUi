@@ -56,6 +56,7 @@ export class SpawnCliAgentManager implements IAgentManager {
 
   async sendMessage(data: { content: string }): Promise<void> {
     this.status = 'running';
+    this.emitter.emitMessage(this.conversation_id, { type: 'status', data: { status: 'running' } });
 
     const args = this.buildArgs(data.content);
 

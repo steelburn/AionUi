@@ -18,7 +18,8 @@ import { loadConfig } from '../config/loader';
 import { createCliAgentFactory } from '../agents/factory';
 import { startRepl } from '../ui/repl';
 import { InlineCommandPicker } from '../ui/InlineCommandPicker';
-import { fmt, Spinner } from '../ui/format';
+import { fmt, hr, Spinner } from '../ui/format';
+import type { Interface } from 'node:readline';
 import type { AionCliConfig } from '../config/types';
 import type { IAgentManager } from '@process/task/IAgentManager';
 import type { IAgentEventEmitter, AgentMessageEvent } from '@process/task/IAgentEventEmitter';
@@ -39,7 +40,9 @@ const LOGO_LINES = [
 
 // ── Emitter ───────────────────────────────────────────────────────────────────
 
-function makeStdoutEmitter(): IAgentEventEmitter {
+function makeStdoutEmitter(
+  getRl: () => Interface | null = () => null,
+): IAgentEventEmitter {
   const spinner = new Spinner('思考中');
   let textStarted = false;
 
@@ -52,11 +55,17 @@ function makeStdoutEmitter(): IAgentEventEmitter {
         const status = (event.data as { status?: string })?.status;
         if (status === 'running') {
           textStarted = false;
+          process.stdout.write(`\n${fmt.dim(hr())}\n`);
           spinner.start();
         } else if (status === 'done') {
           spinner.stop();
           textStarted = false;
-          process.stdout.write('\n\n');
+          process.stdout.write(`\n${fmt.dim(hr())}\n\n`);
+          const rl = getRl();
+          if (rl) {
+            rl.resume();
+            rl.prompt(true);
+          }
         }
       } else if (event.type === 'text') {
         if (!textStarted) {
@@ -126,6 +135,7 @@ async function handleSlashCommand(
   agentKeyRef: { current: string },
   managerRef: { current: IAgentManager },
   picker: InlineCommandPicker,
+  getRl: () => Interface | null,
 ): Promise<{ handled: boolean; exit?: boolean }> {
   const [cmd, ...rest] = input.slice(1).split(/\s+/);
   const arg = rest.join(' ').trim();
@@ -168,7 +178,7 @@ async function handleSlashCommand(
                 await managerRef.current.stop();
                 agentKeyRef.current = selectedKey;
                 const factory = createCliAgentFactory(config, undefined, selectedKey);
-                managerRef.current = factory(`solo-${Date.now()}`, '', makeStdoutEmitter());
+                managerRef.current = factory(`solo-${Date.now()}`, '', makeStdoutEmitter(getRl));
                 process.stdout.write(`\n→ ${fmt.bold(fmt.cyan(selectedKey))}  ${fmt.dim('(新会话已开始)')}\n\n`);
               }
               resolve();
@@ -208,7 +218,7 @@ async function handleSlashCommand(
       await managerRef.current.stop();
       agentKeyRef.current = resolvedKey;
       const factory = createCliAgentFactory(config, undefined, resolvedKey);
-      managerRef.current = factory(`solo-${Date.now()}`, '', makeStdoutEmitter());
+      managerRef.current = factory(`solo-${Date.now()}`, '', makeStdoutEmitter(getRl));
       process.stdout.write(`→ ${fmt.bold(fmt.cyan(resolvedKey))}  ${fmt.dim('(新会话已开始)')}\n\n`);
       return { handled: true };
     }
@@ -265,19 +275,27 @@ export async function runSolo(options: SoloOptions = {}): Promise<void> {
   printTips();
 
   const agentKeyRef = { current: activeKey };
+  const rlRef: { current: Interface | null } = { current: null };
+  const getRl = (): Interface | null => rlRef.current;
+
   const managerRef: { current: IAgentManager } = {
-    current: createCliAgentFactory(config, undefined, activeKey)(`solo-${Date.now()}`, '', makeStdoutEmitter()),
+    current: createCliAgentFactory(config, undefined, activeKey)(`solo-${Date.now()}`, '', makeStdoutEmitter(getRl)),
   };
 
   const agentKeys = Object.keys(config.agents);
   const picker = new InlineCommandPicker(agentKeys);
 
-  // Graceful Ctrl+C: stop any in-flight agent before exiting
+  // Graceful Ctrl+C: stop agent then force-exit.
+  // We do NOT rely on startRepl resolving because stop() racing with rl.close()
+  // can leave the event loop hanging. Direct process.exit is the safest path.
   const sigintHandler = (): void => {
-    managerRef.current.stop().finally(() => {
-      process.stdout.write('\n' + fmt.dim('再见。\n'));
-      process.exit(0);
-    });
+    process.stdout.write('\n' + fmt.dim('再见。\n'));
+    managerRef.current
+      .stop()
+      .catch(() => {})
+      .finally(() => process.exit(0));
+    // Force-exit after 3s max in case stop() hangs (e.g. SIGKILL timeout path)
+    setTimeout(() => process.exit(0), 3000).unref();
   };
   process.once('SIGINT', sigintHandler);
 
@@ -287,7 +305,7 @@ export async function runSolo(options: SoloOptions = {}): Promise<void> {
     () => `${agentKeyRef.current} >`,
     async (input) => {
       if (input.startsWith('/')) {
-        const result = await handleSlashCommand(input, config, agentKeyRef, managerRef, picker);
+        const result = await handleSlashCommand(input, config, agentKeyRef, managerRef, picker, getRl);
         if (result.exit) process.exit(0);
         if (result.handled) return;
       }
@@ -295,9 +313,15 @@ export async function runSolo(options: SoloOptions = {}): Promise<void> {
     },
     agentKeys,
     picker,
+    () => managerRef.current.stop().catch(() => {}),
+    (rl) => { rlRef.current = rl; },
   );
 
-  // Clean EOF path — remove the SIGINT handler so it doesn't fire after exit
+  // Clean EOF path (Ctrl+D): remove SIGINT handler, stop agent, exit
   process.off('SIGINT', sigintHandler);
-  await managerRef.current.stop();
+  await Promise.race([
+    managerRef.current.stop(),
+    new Promise<void>((r) => setTimeout(r, 1500).unref()),
+  ]);
+  process.exit(0);
 }

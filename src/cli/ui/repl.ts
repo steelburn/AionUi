@@ -5,6 +5,7 @@
  */
 
 import { createInterface } from 'node:readline';
+import type { Interface } from 'node:readline';
 import { fmt } from './format';
 import type { InlineCommandPicker } from './InlineCommandPicker';
 
@@ -17,15 +18,20 @@ const SLASH_COMMANDS = ['/model', '/agents', '/team', '/clear', '/help', '/exit'
  * Start an interactive readline REPL loop.
  * Resolves when the user sends EOF (Ctrl+D) or SIGINT (Ctrl+C).
  *
- * @param prompt    - static string OR function called each tick (for dynamic active-agent prompt)
- * @param handler   - called for every non-empty line
- * @param agentKeys - optional list of configured agent names for /model <tab> completion
+ * @param prompt      - static string OR function called each tick (for dynamic active-agent prompt)
+ * @param handler     - called for every non-empty line
+ * @param agentKeys   - optional list of configured agent names for /model <tab> completion
+ * @param picker      - optional inline command picker
+ * @param onEsc       - optional callback invoked when ESC is pressed during handler execution
+ * @param onRlCreated - optional callback invoked with the readline Interface after creation
  */
 export function startRepl(
   prompt: string | (() => string),
   handler: ReplHandler,
   agentKeys?: string[],
   picker?: InlineCommandPicker,
+  onEsc?: () => void,
+  onRlCreated?: (rl: Interface) => void,
 ): Promise<void> {
   // Resume stdin in case a prior readline left it paused (critical for Warp)
   process.stdin.resume();
@@ -54,15 +60,24 @@ export function startRepl(
   const getPrompt = typeof prompt === 'function' ? prompt : () => prompt;
 
   const ask = (): void => {
+    if ((rl as unknown as { closed?: boolean }).closed) return;
     rl.question(fmt.bold(fmt.cyan(`${getPrompt()} `)), async (line) => {
       const input = line.trim();
       if (input) {
+        // Register ESC listener during handler execution
+        const escListener = (_str: string, key: { name?: string }): void => {
+          if (key?.name === 'escape') onEsc?.();
+        };
+        if (onEsc) process.stdin.on('keypress', escListener);
+
         try {
           await handler(input);
         } catch (err) {
           process.stderr.write(
             fmt.red(`Error: ${err instanceof Error ? err.message : String(err)}\n`),
           );
+        } finally {
+          if (onEsc) process.stdin.off('keypress', escListener);
         }
       }
       ask();
@@ -72,6 +87,8 @@ export function startRepl(
   if (picker) {
     picker.attach(rl);
   }
+
+  if (onRlCreated) onRlCreated(rl);
 
   return new Promise<void>((resolve) => {
     rl.once('close', () => {

@@ -69,6 +69,7 @@ export class Spinner {
       process.stdout.write(`\r${fmt.cyan(f)} ${fmt.dim(this.label)}   `);
       this.frame++;
     }, 80);
+    this.timer.unref(); // don't prevent process exit when all other work is done
   }
 
   stop(): void {

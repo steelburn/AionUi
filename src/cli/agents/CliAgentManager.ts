@@ -54,6 +54,7 @@ export class CliAgentManager implements IAgentManager {
 
   async sendMessage(data: { content: string }): Promise<void> {
     this.status = 'running';
+    this.emitter.emitMessage(this.conversation_id, { type: 'status', data: { status: 'running' } });
     this.abortController = new AbortController();
     this.history.push({ role: 'user', content: data.content });
 
