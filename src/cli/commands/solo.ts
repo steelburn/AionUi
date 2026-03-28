@@ -209,6 +209,7 @@ export async function runSolo(options: SoloOptions = {}): Promise<void> {
   };
 
   // Single readline lifecycle — owns stdin from here to EOF
+  // Pass agent keys so Tab expands /model <Tab> to agent names
   await startRepl(
     () => `${agentKeyRef.current} >`,
     async (input) => {
@@ -219,5 +220,6 @@ export async function runSolo(options: SoloOptions = {}): Promise<void> {
       }
       await managerRef.current.sendMessage({ content: input });
     },
+    Object.keys(config.agents),
   );
 }

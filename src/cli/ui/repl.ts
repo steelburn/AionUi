@@ -9,21 +9,44 @@ import { fmt } from './format';
 
 export type ReplHandler = (input: string) => Promise<void>;
 
+/** Slash command names — used for tab completion */
+const SLASH_COMMANDS = ['/model', '/agents', '/team', '/help', '/exit'];
+
 /**
  * Start an interactive readline REPL loop.
  * Resolves when the user sends EOF (Ctrl+D) or SIGINT (Ctrl+C).
  *
- * @param prompt - static string OR a function called each tick (for dynamic prompts)
+ * @param prompt    - static string OR function called each tick (for dynamic active-agent prompt)
+ * @param handler   - called for every non-empty line
+ * @param agentKeys - optional list of configured agent names for /model <tab> completion
  */
-export function startRepl(prompt: string | (() => string), handler: ReplHandler): Promise<void> {
+export function startRepl(
+  prompt: string | (() => string),
+  handler: ReplHandler,
+  agentKeys?: string[],
+): Promise<void> {
   // Resume stdin in case a prior readline left it paused (critical for Warp)
   process.stdin.resume();
+
+  // Build the completer — extend /model completions if agent names are provided
+  const allSlashCommands = agentKeys?.length
+    ? [...SLASH_COMMANDS, ...agentKeys.map((k) => `/model ${k}`)]
+    : SLASH_COMMANDS;
+
+  function dynamicCompleter(line: string): [string[], string] {
+    if (line.startsWith('/')) {
+      const hits = allSlashCommands.filter((c) => c.startsWith(line));
+      return [hits.length ? hits : allSlashCommands, line];
+    }
+    return [[], line];
+  }
 
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
     terminal: process.stdout.isTTY ?? false,
     historySize: 200,
+    completer: dynamicCompleter,
   });
 
   const getPrompt = typeof prompt === 'function' ? prompt : () => prompt;
