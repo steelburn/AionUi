@@ -5,65 +5,103 @@
  */
 
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { AionCliConfig } from './types';
+import type { AionCliConfig, AgentConfig } from './types';
 
 export const CONFIG_DIR = join(homedir(), '.aion');
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
-const BASE_DEFAULT: AionCliConfig = {
-  defaultAgent: 'claude',
-  agents: {},
-};
+// ── Auto-detection ──────────────────────────────────────────────────────────
 
-export function loadConfig(): AionCliConfig {
-  const file = loadFileConfig();
-  return applyEnvOverrides(file);
-}
-
-function loadFileConfig(): AionCliConfig {
-  if (!existsSync(CONFIG_FILE)) return { ...BASE_DEFAULT, agents: {} };
+/** Find a CLI binary via `which`. Returns null if not found. */
+function findBin(name: string): string | null {
   try {
-    const raw = readFileSync(CONFIG_FILE, 'utf-8');
-    const parsed = JSON.parse(raw) as Partial<AionCliConfig>;
-    return { ...BASE_DEFAULT, ...parsed, agents: parsed.agents ?? {} };
+    return execSync(`which ${name}`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   } catch {
-    return { ...BASE_DEFAULT, agents: {} };
+    return null;
   }
 }
 
 /**
- * Auto-populate agents from well-known environment variables so that
- * users can run `aion` immediately after setting ANTHROPIC_API_KEY without
- * any manual config step.
+ * Detect locally installed CLI agents.
+ * These use their own stored credentials — no API keys needed.
  */
-function applyEnvOverrides(config: AionCliConfig): AionCliConfig {
-  const result: AionCliConfig = { ...config, agents: { ...config.agents } };
+function detectCliAgents(): Record<string, AgentConfig> {
+  const agents: Record<string, AgentConfig> = {};
 
-  if (process.env.ANTHROPIC_API_KEY && !result.agents['claude']) {
-    result.agents['claude'] = {
+  const claudeBin = findBin('claude');
+  if (claudeBin) {
+    agents['claude'] = { provider: 'claude-cli', bin: claudeBin };
+  }
+
+  const codexBin = findBin('codex');
+  if (codexBin) {
+    agents['codex'] = { provider: 'codex-cli', bin: codexBin };
+  }
+
+  return agents;
+}
+
+/**
+ * Apply API-key env var overrides for direct SDK usage.
+ * These supplement (not replace) detected CLI agents.
+ */
+function applyEnvOverrides(agents: Record<string, AgentConfig>): Record<string, AgentConfig> {
+  const result = { ...agents };
+
+  // Anthropic SDK: only add if no claude-cli already detected
+  if (process.env.ANTHROPIC_API_KEY && !result['claude']) {
+    result['claude'] = {
       provider: 'anthropic',
       model: 'claude-opus-4-6',
       apiKey: process.env.ANTHROPIC_API_KEY,
     };
   }
 
-  if ((process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) && !result.agents['gemini']) {
-    result.agents['gemini'] = {
+  if ((process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) && !result['gemini']) {
+    result['gemini'] = {
       provider: 'gemini',
       model: 'gemini-2.0-flash',
-      apiKey: (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY)!,
+      apiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY,
     };
   }
 
-  // Ensure defaultAgent points to an existing agent
-  if (!result.agents[result.defaultAgent]) {
-    const first = Object.keys(result.agents)[0];
-    if (first) result.defaultAgent = first;
+  return result;
+}
+
+// ── Config loading ───────────────────────────────────────────────────────────
+
+function loadFileConfig(): Partial<AionCliConfig> {
+  if (!existsSync(CONFIG_FILE)) return {};
+  try {
+    return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8')) as Partial<AionCliConfig>;
+  } catch {
+    return {};
+  }
+}
+
+export function loadConfig(): AionCliConfig {
+  const fileConfig = loadFileConfig();
+
+  // Start with auto-detected CLI agents, then apply env overrides, then merge
+  // file config on top (file config wins for explicit settings)
+  const detectedAgents = detectCliAgents();
+  const withEnvAgents = applyEnvOverrides(detectedAgents);
+  const agents = { ...withEnvAgents, ...fileConfig.agents };
+
+  // Pick default: prefer claude if available, otherwise first detected
+  let defaultAgent = fileConfig.defaultAgent ?? '';
+  if (!defaultAgent || !agents[defaultAgent]) {
+    defaultAgent = agents['claude'] ? 'claude' : (Object.keys(agents)[0] ?? 'claude');
   }
 
-  return result;
+  return {
+    defaultAgent,
+    agents,
+    team: fileConfig.team,
+  };
 }
 
 export function saveConfig(config: AionCliConfig): void {

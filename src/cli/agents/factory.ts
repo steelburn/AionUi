@@ -6,18 +6,18 @@
 
 import type { AgentManagerFactory } from '@process/task/orchestrator/SubTaskSession';
 import type { AionCliConfig, AgentConfig } from '../config/types';
+import { SpawnCliAgentManager } from './SpawnCliAgentManager';
 import { CliAgentManager } from './CliAgentManager';
 
 /**
- * Create an AgentManagerFactory that satisfies the Orchestrator's interface.
+ * Create an AgentManagerFactory for the Orchestrator.
  *
- * @param config       Loaded AionCliConfig (models + keys)
- * @param agentPerTask Optional map of subTaskId → agentKey for mixed-model teams.
- *                     E.g. { 'abc1': 'gemini', 'abc2': 'claude' }
+ * Routes to the right implementation based on the agent's provider:
+ *   claude-cli / codex-cli  → SpawnCliAgentManager (spawn local binary)
+ *   anthropic               → CliAgentManager (direct Anthropic SDK)
  *
- * The Orchestrator uses conversationIds of the form `orch_{runId}_{subTaskId}`,
- * so we parse the subTaskId from the conversationId to look up the per-task agent.
- * This is what enables "Researcher uses Gemini, Implementer uses Claude" in one team.
+ * Multi-model teams: pass agentPerTask to map subTaskId → agentKey.
+ * The Orchestrator uses conversationIds of the form `orch_{runId}_{subTaskId}`.
  */
 export function createCliAgentFactory(
   config: AionCliConfig,
@@ -26,18 +26,41 @@ export function createCliAgentFactory(
   return (conversationId, _presetContext, emitter) => {
     const agentKey = resolveAgentKey(conversationId, config, agentPerTask);
     const agentConfig = resolveAgentConfig(config, agentKey);
-    return new CliAgentManager(conversationId, agentConfig, emitter);
+    return buildManager(conversationId, agentConfig, emitter);
   };
 }
 
-/** Parse subTaskId from `orch_{runId}_{subTaskId}` and look up its agent key */
+function buildManager(
+  conversationId: string,
+  config: AgentConfig,
+  emitter: Parameters<AgentManagerFactory>[2],
+) {
+  if (config.provider === 'claude-cli') {
+    return new SpawnCliAgentManager(
+      conversationId,
+      { bin: config.bin!, flavor: 'claude', extraArgs: config.extraArgs },
+      emitter,
+    );
+  }
+
+  if (config.provider === 'codex-cli') {
+    return new SpawnCliAgentManager(
+      conversationId,
+      { bin: config.bin!, flavor: 'codex', extraArgs: config.extraArgs },
+      emitter,
+    );
+  }
+
+  // Direct Anthropic SDK fallback
+  return new CliAgentManager(conversationId, config, emitter);
+}
+
 function resolveAgentKey(
   conversationId: string,
   config: AionCliConfig,
   agentPerTask?: Record<string, string>,
 ): string {
   if (agentPerTask) {
-    // conversationId format: orch_{runId}_{subTaskId}
     const parts = conversationId.split('_');
     const subTaskId = parts[parts.length - 1];
     if (subTaskId && agentPerTask[subTaskId]) return agentPerTask[subTaskId];
@@ -48,13 +71,12 @@ function resolveAgentKey(
 function resolveAgentConfig(config: AionCliConfig, key: string): AgentConfig {
   if (config.agents[key]) return config.agents[key];
 
-  // Fall back to first available agent
   const first = Object.values(config.agents)[0];
   if (first) return first;
 
   throw new Error(
-    `No agent configured.\n` +
-      `  Set an API key:  export ANTHROPIC_API_KEY=sk-ant-...\n` +
-      `  Then run:        node out/main/cli.js config`,
+    `No agent found. Install claude or codex CLI, or set ANTHROPIC_API_KEY.\n` +
+      `  brew install anthropics/tap/claude-code\n` +
+      `  Run: aion doctor`,
   );
 }

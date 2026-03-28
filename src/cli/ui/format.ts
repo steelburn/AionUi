@@ -47,3 +47,21 @@ export function clearLines(n: number): void {
 export function hr(char = '─'): string {
   return char.repeat(Math.min(process.stdout.columns ?? 80, 80));
 }
+
+/** Render a bordered banner box. Lines are centered within the box. */
+export function banner(lines: string[], width = 44): string {
+  const top = '╭' + '─'.repeat(width - 2) + '╮';
+  const bot = '╰' + '─'.repeat(width - 2) + '╯';
+  const mid = lines
+    .map((line) => {
+      // Strip ANSI escape codes to measure visible length (control char is intentional)
+      // eslint-disable-next-line no-control-regex
+      const visible = line.replace(/\u001b\[[0-9;]*m/g, '');
+      const pad = Math.max(0, width - 2 - visible.length);
+      const left = Math.floor(pad / 2);
+      const right = pad - left;
+      return '│' + ' '.repeat(left) + line + ' '.repeat(right) + '│';
+    })
+    .join('\n');
+  return `${top}\n${mid}\n${bot}`;
+}
