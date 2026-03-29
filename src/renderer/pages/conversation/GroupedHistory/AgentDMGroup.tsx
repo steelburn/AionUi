@@ -145,7 +145,7 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
       {/* Agent row header */}
       <div
         className={classNames(
-          'px-12px py-6px rd-8px flex items-center gap-8px cursor-pointer transition-colors min-w-0',
+          'px-12px py-8px rd-8px flex items-center gap-8px cursor-pointer transition-colors min-w-0',
           'hover:bg-[rgba(var(--primary-6),0.08)]'
         )}
         onClick={handleToggle}
@@ -171,7 +171,6 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
 
       {/* Expanded conversation list */}
       {isExpanded && renderExpandedContent()}
-
     </div>
   );
 };
