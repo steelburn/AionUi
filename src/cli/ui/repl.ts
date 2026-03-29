@@ -6,8 +6,8 @@
 
 import { createInterface } from 'node:readline';
 import type { Interface } from 'node:readline';
-import { Duplex } from 'node:stream';
 import { fmt } from './format';
+import { createDedupStdin } from './stdinDedup';
 import type { InlineCommandPicker } from './InlineCommandPicker';
 
 export type ReplHandler = (input: string) => Promise<void>;
@@ -37,35 +37,7 @@ export function startRepl(
   // Resume stdin in case a prior readline left it paused (critical for Warp)
   process.stdin.resume();
 
-  // IME deduplication: macOS CJK input methods can send the same UTF-8
-  // sequence twice within ~20ms (composition commit + echo). Deduplicate
-  // non-ASCII chunks within a short window to prevent doubled characters.
-  class IMEDedupStream extends Duplex {
-    private _lastChunk = '';
-    private _lastTime = 0;
-    constructor() {
-      super({ allowHalfOpen: false });
-      (this as unknown as { isTTY: boolean }).isTTY = process.stdin.isTTY ?? false;
-      (this as unknown as { setRawMode: typeof process.stdin.setRawMode }).setRawMode =
-        process.stdin.setRawMode?.bind(process.stdin);
-      process.stdin.on('data', (chunk: Buffer) => {
-        const str = chunk.toString();
-        const now = Date.now();
-        if (/[\u0080-\uffff]/.test(str) && str === this._lastChunk && now - this._lastTime < 20) {
-          return; // drop duplicate IME commit
-        }
-        this._lastChunk = str;
-        this._lastTime = now;
-        this.push(chunk);
-      });
-      process.stdin.on('end', () => this.push(null));
-      process.stdin.on('error', (e: Error) => this.emit('error', e));
-    }
-    _read() { process.stdin.resume(); }
-    _write(_c: Buffer, _e: BufferEncoding, cb: () => void) { cb(); }
-  }
-
-  const stdinSource = process.stdout.isTTY ? new IMEDedupStream() : process.stdin;
+  const stdinSource = createDedupStdin();
 
   // Build the completer — extend /model completions if agent names are provided
   const allSlashCommands = agentKeys?.length

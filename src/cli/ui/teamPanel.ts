@@ -12,7 +12,7 @@
  * Uses terminal escape codes to update in place (no external deps).
  */
 import type { OrchestratorEvent } from '@process/task/orchestrator/types';
-import { fmt, clearLines, hr } from './format';
+import { fmt, clearLines, hr, STATUS_ICONS } from './format';
 import { stripMarkdown } from './markdown';
 
 /** Calculate terminal display width — CJK, full-width chars, and emoji occupy 2 columns. */
@@ -168,14 +168,14 @@ export class TeamPanel {
           statusSuffix = ' ' + fmt.dim(`${elapsed}s`);
         }
       } else if (state.status === 'done') {
-        coloredIcon = fmt.green('✓');
+        coloredIcon = fmt.green(STATUS_ICONS.done);
       } else if (state.status === 'failed') {
-        coloredIcon = fmt.red('✗');
+        coloredIcon = fmt.red(STATUS_ICONS.failed);
       } else if (state.status === 'cancelled') {
-        coloredIcon = fmt.yellow('⊘');
+        coloredIcon = fmt.yellow(STATUS_ICONS.cancelled);
         statusSuffix = ' ' + fmt.dim('已取消');
       } else {
-        coloredIcon = fmt.dim('○');
+        coloredIcon = fmt.dim(STATUS_ICONS.pending);
         statusSuffix = ' ' + fmt.dim('等待中');
       }
 
@@ -186,7 +186,7 @@ export class TeamPanel {
       const prefixCols = 2 + 1 + 1 + labelWidth + 6;
       const maxPreviewCols = Math.max(0, cols - prefixCols - 2);
       if (state.status === 'failed' && state.preview) {
-        preview = fmt.dim(' ' + truncateToWidth(state.preview.trim(), maxPreviewCols));
+        preview = fmt.red(' ' + truncateToWidth(state.preview.trim(), maxPreviewCols));
       } else if (state.preview) {
         preview = fmt.dim(' ' + truncateToWidth(state.preview.trim(), maxPreviewCols));
       }

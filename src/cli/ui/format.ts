@@ -45,7 +45,7 @@ export function clearLines(n: number): void {
 
 /** Horizontal rule sized to terminal width */
 export function hr(char = '─'): string {
-  return char.repeat(Math.min(process.stdout.columns ?? 80, 80));
+  return char.repeat(Math.min(process.stdout.columns ?? 80, 120));
 }
 
 const SPIN_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];

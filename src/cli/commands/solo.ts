@@ -32,12 +32,10 @@ const VERSION: string =
 declare const __AION_VERSION__: string | undefined;
 
 const LOGO_LINES = [
-  ' ██╗  ██╗ ██████╗  ██████╗ ███╗   ██╗',
-  ' ██║  ██║██╔═══██╗██╔═══██╗████╗  ██║',
-  ' ███████║██║   ██║██║   ██║██╔██╗ ██║',
-  ' ██╔══██║██║   ██║██║   ██║██║╚██╗██║',
-  ' ██║  ██║╚██████╔╝╚██████╔╝██║ ╚████║',
-  ' ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝',
+  '  ▄▄   ▀█▀  ▄▄▄  ▄  ▄',
+  ' █▄▄█   █   █ █  ██ █',
+  ' █  █   █   █ █  █▀██',
+  ' █  █  ▄█▄  ▀▀▀  █  █',
 ];
 
 // ── Emitter ───────────────────────────────────────────────────────────────────
@@ -84,7 +82,7 @@ function makeStdoutEmitter(
 
 function printOnboarding(): void {
   process.stdout.write('\n');
-  for (const line of LOGO_LINES) process.stdout.write(fmt.bold(fmt.cyan(line)) + '\n');
+  for (const line of LOGO_LINES) process.stdout.write(fmt.cyan(line) + '\n');
   process.stdout.write('\n');
   process.stdout.write(`   ${fmt.dim('Multi-Model Agent Platform')}   ${fmt.cyan('v' + VERSION)}\n\n`);
   process.stdout.write(fmt.bold('No agents detected.\n\n'));
@@ -104,7 +102,7 @@ function printOnboarding(): void {
 function printHeader(config: AionCliConfig, activeKey: string): void {
   process.stdout.write('\n');
   for (const line of LOGO_LINES) {
-    process.stdout.write(fmt.bold(fmt.cyan(line)) + '\n');
+    process.stdout.write(fmt.cyan(line) + '\n');
   }
   process.stdout.write('\n');
   process.stdout.write(`   ${fmt.dim('Multi-Model Agent Platform')}   ${fmt.cyan('v' + VERSION)}\n\n`);
@@ -119,7 +117,7 @@ function printHeader(config: AionCliConfig, activeKey: string): void {
     })
     .join('  ');
 
-  process.stdout.write(fmt.dim(`   ${'─'.repeat(44)}`) + '\n');
+  process.stdout.write(fmt.dim(`  ${'─'.repeat(23)}`) + '\n');
   process.stdout.write(`   ${agentList}   ${fmt.dim('/help')}\n\n`);
 }
 
@@ -128,8 +126,8 @@ function printTips(): void {
     `  ${fmt.dim('╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴')}\n` +
     `  ${fmt.cyan('?')}  ${fmt.dim('输入消息开始对话')}\n` +
     `  ${fmt.cyan('/')}  ${fmt.dim('打开命令菜单  (Tab 补全)')}\n` +
-    `  ${fmt.cyan('⇄')}  ${fmt.dim('/team [目标]  启动多 Agent 协作')}\n` +
-    `  ${fmt.cyan('⊞')}  ${fmt.dim('/model        切换模型')}\n` +
+    `  ${fmt.cyan('⇌')}  ${fmt.dim('/team [目标]  启动多 Agent 协作')}\n` +
+    `  ${fmt.cyan('⊡')}  ${fmt.dim('/model        切换模型')}\n` +
     `  ${fmt.dim('╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴╴')}\n\n`,
   );
 }
@@ -248,7 +246,7 @@ async function handleSlashCommand(
 
     case 'team': {
       const { runTeam } = await import('./team');
-      await runTeam({ goal: arg || undefined });
+      await runTeam({ goal: arg || undefined }, getRl() ?? undefined);
       return { handled: true };
     }
 

@@ -179,7 +179,7 @@ export class AgentSelector {
       const prefix = isSelected ? fmt.cyan('❯ ') : '  ';
       const rawLen = `${isSelected ? '❯ ' : '  '}${dot}  ${agent.key}  ${agent.provider}${agent.isActive ? '  ← 当前' : ''}`.length;
       const padLen = Math.max(0, cols - rawLen - 2);
-      const bg = isSelected ? '\x1b[48;5;236m' : '';
+      const bg = isSelected ? '\x1b[7m' : '';
       const reset = isSelected ? '\x1b[0m' : '';
       return `${bg}${prefix}${dot} ${nameStr}  ${providerStr}${activeLabel}${' '.repeat(padLen)}${reset}`;
     });
@@ -400,6 +400,11 @@ export class InlineCommandPicker {
     const cmd = this.commands.find((c) => c.name === name);
     const toInject = cmd?.inject ?? (name.endsWith('>') ? name.slice(0, -1).trim() : name + ' ');
     this.rl.write(toInject);
+    // Remove the injected text from history to avoid duplicate entry
+    const history = (this.rl as unknown as { history: string[] }).history;
+    if (history && history[0] === toInject.trim()) {
+      history.shift();
+    }
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────
@@ -443,7 +448,7 @@ export class InlineCommandPicker {
     const rows: string[] = [];
     for (const [i, cmd] of visibleMatches.entries()) {
       const isSelected = i === this.selectedIdx;
-      const bg = isSelected ? `\x1b[48;5;236m` : '';
+      const bg = isSelected ? '\x1b[7m' : '';
       const reset = isSelected ? '\x1b[0m' : '';
 
       // Row 1: prefix + name (padded to maxNameLen) + hint

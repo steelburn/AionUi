@@ -25,7 +25,7 @@
  *     → 5 parallel agents (roles inferred from "design" keyword)
  */
 import { randomUUID } from 'node:crypto';
-import { createInterface } from 'node:readline';
+import { createInterface, type Interface } from 'node:readline';
 import { Orchestrator } from '@process/task/orchestrator/Orchestrator';
 import type { SubTask } from '@process/task/orchestrator/types';
 import { createCliAgentFactory } from '../agents/factory';
@@ -34,6 +34,7 @@ import type { AionCliConfig } from '../config/types';
 import { TeamPanel } from '../ui/teamPanel';
 import { fmt, hr } from '../ui/format';
 import { renderMarkdown } from '../ui/markdown';
+import { createDedupStdin } from '../ui/stdinDedup';
 
 export type TeamOptions = {
   goal?: string;
@@ -123,7 +124,7 @@ function autoDistributeAgents(config: AionCliConfig, count: number): string[] {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export async function runTeam(options: TeamOptions = {}): Promise<void> {
+export async function runTeam(options: TeamOptions = {}, rl?: Interface): Promise<void> {
   const config = loadConfig();
 
   // Guard: NaN concurrency from bad --concurrency flag
@@ -140,7 +141,7 @@ export async function runTeam(options: TeamOptions = {}): Promise<void> {
 
   // Guard: blank goal
   const goalRaw = options.goal?.trim();
-  const goal = goalRaw || (await promptGoal());
+  const goal = goalRaw || (await promptGoal(rl));
 
   // Resolve per-task agent keys
   let agentKeys: string[];
@@ -179,7 +180,7 @@ export async function runTeam(options: TeamOptions = {}): Promise<void> {
   const agentSummary = subTasks
     .map((t) => {
       const key = agentPerTask?.[t.id] ?? config.defaultAgent;
-      return `${fmt.bold(t.label)}${fmt.dim(`[${key}]`)}`;
+      return `${fmt.bold(t.label)} ${fmt.dim(`[${key}]`)}`;
     })
     .join(fmt.dim('  '));
 
@@ -224,14 +225,27 @@ export async function runTeam(options: TeamOptions = {}): Promise<void> {
   }
 }
 
-async function promptGoal(): Promise<string> {
+async function promptGoal(existingRl?: Interface): Promise<string> {
   if (!process.stdin.isTTY) {
     process.stderr.write(fmt.red('Goal required in non-interactive mode. Use: aion team --goal "your goal"\n'));
     process.exit(1);
   }
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const promptStr = '\x1b[2m⟩\x1b[0m \x1b[1m\x1b[36mGoal\x1b[0m ';
+  if (existingRl) {
+    return new Promise<string>((resolve) => {
+      existingRl.question(promptStr, (answer) => {
+        const goal = answer.trim();
+        if (!goal) {
+          process.stderr.write(fmt.red('Goal cannot be empty.\n'));
+          process.exit(1);
+        }
+        resolve(goal);
+      });
+    });
+  }
+  const rl = createInterface({ input: createDedupStdin(), output: process.stdout });
   return new Promise<string>((resolve) => {
-    rl.question(fmt.bold('Goal: '), (answer) => {
+    rl.question(promptStr, (answer) => {
       rl.close();
       process.stdin.resume();
       const goal = answer.trim();
