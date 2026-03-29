@@ -282,7 +282,7 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
       <span
         className={
           onAgentNameClick
-            ? 'inline-flex items-center gap-2 cursor-pointer rounded-full px-6px py-2px -mx-6px -my-2px transition-colors hover:bg-fill-2'
+            ? 'inline-flex items-center gap-2 cursor-pointer rounded-full px-6px py-2px -mx-6px -my-2px transition-colors hover:bg-fill-3'
             : 'inline-flex items-center gap-2'
         }
         onClick={
