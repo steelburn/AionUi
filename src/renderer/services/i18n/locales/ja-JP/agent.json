@@ -34,6 +34,18 @@
     "noAvailable": "現在の環境で利用可能なエージェントがありません",
     "checkConfig": "設定を確認するか、後でもう一度お試しください"
   },
+  "drawer": {
+    "title": "エージェントプロフィール",
+    "ruleTitle": "システムルール",
+    "ruleEmpty": "ルールが設定されていません",
+    "skillsTitle": "スキル",
+    "skillsEmpty": "有効なスキルがありません",
+    "mountedAgentsTitle": "マウントされたエージェント",
+    "mountedAgentsEmpty": "マウントされたエージェントはありません",
+    "groupChatsTitle": "グループチャット",
+    "groupChatsEmpty": "グループチャットに参加していません",
+    "memberCount": "{{count}} メンバー"
+  },
   "setup": {
     "connectionError": "接続エラー",
     "notConfigured": "{{agent}} は設定されていません",

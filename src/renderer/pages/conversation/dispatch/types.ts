@@ -107,6 +107,8 @@ export type GroupMemberSiderProps = {
   onToggleCollapse: () => void;
   /** Callback when dispatcher row is clicked (opens settings) */
   onDispatcherClick: () => void;
+  /** Callback when an agent name is clicked (opens profile drawer) */
+  onAgentNameClick?: (agentId: string) => void;
 };
 
 /** Props for the MemberCard component (S3) */

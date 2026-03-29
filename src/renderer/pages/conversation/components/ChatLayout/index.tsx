@@ -26,8 +26,10 @@ import {
 } from '@/renderer/pages/conversation/utils/layoutCalc';
 import { Layout as ArcoLayout } from '@arco-design/web-react';
 import { ExpandLeft, ExpandRight } from '@icon-park/react';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import useSWR from 'swr';
+import AgentProfileDrawer from '../AgentProfileDrawer';
 import './chat-layout.css';
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
@@ -47,9 +49,40 @@ const ChatLayout: React.FC<{
   workspaceEnabled?: boolean;
   /** Conversation ID for mode switching */
   conversationId?: string;
+  /** Resolved agent ID for opening the profile drawer */
+  agentId?: string;
 }> = (props) => {
-  const { conversationId } = props;
+  const { conversationId, agentId: propsAgentId } = props;
   const { backend, agentName, agentLogo, agentLogoIsEmoji, workspaceEnabled = true } = props;
+  const navigate = useNavigate();
+
+  // Agent profile drawer state
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [drawerAgentId, setDrawerAgentId] = useState('');
+
+  const handleAgentNameClick = useCallback(() => {
+    const resolvedId = propsAgentId || backend || '';
+    if (resolvedId) {
+      setDrawerAgentId(resolvedId);
+      setDrawerVisible(true);
+    }
+  }, [propsAgentId, backend]);
+
+  const handleStartConversation = useCallback(
+    (agentIdParam: string) => {
+      setDrawerVisible(false);
+      navigate('/guid', { state: { prefillAgentId: agentIdParam } });
+    },
+    [navigate]
+  );
+
+  const handleNavigateToGroupChat = useCallback(
+    (groupConversationId: string) => {
+      setDrawerVisible(false);
+      navigate(`/conversation/${groupConversationId}`);
+    },
+    [navigate]
+  );
   const layout = useLayoutContext();
   const isMacRuntime = isMacEnvironment();
   const isWindowsRuntime = isWindowsEnvironment();
@@ -204,6 +237,7 @@ const ChatLayout: React.FC<{
               compact={Boolean(layout?.isMobile)}
               showLogoInCompact={Boolean(layout?.isMobile)}
               compactLabelType={layout?.isMobile ? 'agent' : 'mode'}
+              onAgentNameClick={handleAgentNameClick}
             />
           )}
           {isWindowsRuntime && workspaceEnabled && (
@@ -328,6 +362,15 @@ const ChatLayout: React.FC<{
           <DesktopWorkspaceToggle />
         )}
       </div>
+
+      {/* Agent profile drawer */}
+      <AgentProfileDrawer
+        visible={drawerVisible}
+        agentId={drawerAgentId}
+        onClose={() => setDrawerVisible(false)}
+        onStartConversation={handleStartConversation}
+        onNavigateToGroupChat={handleNavigateToGroupChat}
+      />
     </ArcoLayout>
   );
 };

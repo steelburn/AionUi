@@ -34,6 +34,18 @@
     "noAvailable": "当前环境没有可用 agent",
     "checkConfig": "请检查配置或稍后重试"
   },
+  "drawer": {
+    "title": "Agent 资料",
+    "ruleTitle": "系统规则",
+    "ruleEmpty": "未配置规则",
+    "skillsTitle": "技能",
+    "skillsEmpty": "未启用技能",
+    "mountedAgentsTitle": "挂载的 Agent",
+    "mountedAgentsEmpty": "无挂载的 Agent",
+    "groupChatsTitle": "群组对话",
+    "groupChatsEmpty": "未参与任何群组对话",
+    "memberCount": "{{count}} 个成员"
+  },
   "setup": {
     "connectionError": "连接错误",
     "notConfigured": "{{agent}} 尚未配置",

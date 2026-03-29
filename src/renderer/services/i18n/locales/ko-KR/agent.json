@@ -34,6 +34,18 @@
     "noAvailable": "현재 환경에서 사용 가능한 에이전트 없음",
     "checkConfig": "설정을 확인하거나 나중에 다시 시도하세요"
   },
+  "drawer": {
+    "title": "에이전트 프로필",
+    "ruleTitle": "시스템 규칙",
+    "ruleEmpty": "규칙이 설정되지 않았습니다",
+    "skillsTitle": "스킬",
+    "skillsEmpty": "활성화된 스킬 없음",
+    "mountedAgentsTitle": "마운트된 에이전트",
+    "mountedAgentsEmpty": "마운트된 에이전트 없음",
+    "groupChatsTitle": "그룹 채팅",
+    "groupChatsEmpty": "그룹 채팅에 참여하지 않음",
+    "memberCount": "{{count}}명의 멤버"
+  },
   "setup": {
     "connectionError": "연결 오류",
     "notConfigured": "{{agent}}이(가) 설정되지 않았습니다",

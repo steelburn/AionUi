@@ -34,6 +34,18 @@
     "noAvailable": "當前環境沒有可用 agent",
     "checkConfig": "請檢查配置或稍後重試"
   },
+  "drawer": {
+    "title": "Agent 資料",
+    "ruleTitle": "系統規則",
+    "ruleEmpty": "未設定規則",
+    "skillsTitle": "技能",
+    "skillsEmpty": "未啟用技能",
+    "mountedAgentsTitle": "掛載的 Agent",
+    "mountedAgentsEmpty": "無掛載的 Agent",
+    "groupChatsTitle": "群組對話",
+    "groupChatsEmpty": "未參與任何群組對話",
+    "memberCount": "{{count}} 個成員"
+  },
   "setup": {
     "connectionError": "連接錯誤",
     "notConfigured": "{{agent}} 尚未配置",

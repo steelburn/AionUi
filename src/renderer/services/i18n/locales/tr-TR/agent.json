@@ -34,6 +34,18 @@
     "noAvailable": "No available agents in current environment",
     "checkConfig": "Please check configuration or try again later"
   },
+  "drawer": {
+    "title": "Ajan Profili",
+    "ruleTitle": "Sistem Kuralı",
+    "ruleEmpty": "Kural yapılandırılmadı",
+    "skillsTitle": "Beceriler",
+    "skillsEmpty": "Etkin beceri yok",
+    "mountedAgentsTitle": "Bağlı Ajanlar",
+    "mountedAgentsEmpty": "Bağlı ajan yok",
+    "groupChatsTitle": "Grup Sohbetleri",
+    "groupChatsEmpty": "Herhangi bir grup sohbetine üye değil",
+    "memberCount": "{{count}} üye"
+  },
   "setup": {
     "connectionError": "Connection Error",
     "notConfigured": "{{agent}} is not configured",

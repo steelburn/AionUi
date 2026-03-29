@@ -14,7 +14,7 @@ import { Down, Robot } from '@icon-park/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export interface AgentModeSelectorProps {
+export type AgentModeSelectorProps = {
   /** Agent backend type / 代理后端类型 */
   backend?: string;
   /** Display name for the agent / 代理显示名称 */
@@ -45,7 +45,9 @@ export interface AgentModeSelectorProps {
   compactLabelPrefix?: string;
   /** Hide compact prefix on mobile */
   hideCompactLabelPrefixOnMobile?: boolean;
-}
+  /** Callback when the agent name/logo area is clicked (opens profile drawer) */
+  onAgentNameClick?: () => void;
+};
 
 /**
  * AgentModeSelector - A dropdown component for switching agent modes
@@ -70,6 +72,7 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   modeLabelFormatter,
   compactLabelPrefix,
   hideCompactLabelPrefixOnMobile = false,
+  onAgentNameClick,
 }) => {
   const { t } = useTranslation();
   const layout = useLayoutContext();
@@ -276,8 +279,24 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
       className={`flex items-center gap-2 bg-2 w-fit rounded-full px-[8px] py-[2px] ${canSwitchMode ? 'cursor-pointer hover:bg-3' : ''}`}
       style={{ opacity: isLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}
     >
-      {renderLogo()}
-      <span className='text-sm text-t-primary'>{agentName || backend}</span>
+      <span
+        className={
+          onAgentNameClick
+            ? 'inline-flex items-center gap-2 cursor-pointer hover:opacity-80'
+            : 'inline-flex items-center gap-2'
+        }
+        onClick={
+          onAgentNameClick
+            ? (e) => {
+                e.stopPropagation();
+                onAgentNameClick();
+              }
+            : undefined
+        }
+      >
+        {renderLogo()}
+        <span className='text-sm text-t-primary'>{agentName || backend}</span>
+      </span>
       {canSwitchMode && (
         <>
           {currentMode !== defaultMode && <span className='text-xs text-t-tertiary'>({getCurrentModeLabel()})</span>}

@@ -34,6 +34,18 @@
     "noAvailable": "No available agents in current environment",
     "checkConfig": "Please check configuration or try again later"
   },
+  "drawer": {
+    "title": "Agent Profile",
+    "ruleTitle": "System Rule",
+    "ruleEmpty": "No rule configured",
+    "skillsTitle": "Skills",
+    "skillsEmpty": "No skills enabled",
+    "mountedAgentsTitle": "Mounted Agents",
+    "mountedAgentsEmpty": "No mounted agents",
+    "groupChatsTitle": "Group Chats",
+    "groupChatsEmpty": "Not a member of any group chat",
+    "memberCount": "{{count}} members"
+  },
   "setup": {
     "connectionError": "Connection Error",
     "notConfigured": "{{agent}} is not configured",

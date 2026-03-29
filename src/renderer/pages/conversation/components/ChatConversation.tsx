@@ -10,6 +10,7 @@ import { uuid } from '@/common/utils';
 import addChatIcon from '@/renderer/assets/icons/add-chat.svg';
 import { CronJobManager } from '@/renderer/pages/cron';
 import { usePresetAssistantInfo } from '@/renderer/hooks/agent/usePresetAssistantInfo';
+import { resolveAgentId } from '@renderer/utils/model/agentIdentity';
 import { iconColors } from '@/renderer/styles/colors';
 import { Button, Dropdown, Menu, Tooltip, Typography } from '@arco-design/web-react';
 import { History } from '@icon-park/react';
@@ -162,6 +163,7 @@ const GeminiConversationPanel: React.FC<{ conversation: GeminiConversation; slid
     agentName: presetAssistantInfo?.name,
     agentLogo: presetAssistantInfo?.logo,
     agentLogoIsEmoji: presetAssistantInfo?.isEmoji,
+    agentId: resolveAgentId(conversation),
   };
 
   return (
@@ -337,6 +339,7 @@ const ChatConversation: React.FC<{
       sider={<ChatSider conversation={conversation} />}
       workspaceEnabled={workspaceEnabled}
       conversationId={conversation?.id}
+      agentId={conversation ? resolveAgentId(conversation) : undefined}
     >
       {conversationNode}
     </ChatLayout>
