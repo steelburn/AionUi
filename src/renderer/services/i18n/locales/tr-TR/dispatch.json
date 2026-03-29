@@ -5,6 +5,8 @@
     "childTaskCount": "{{count}} görev",
     "channelsSection": "Kanallar",
     "directMessagesSection": "Direkt Mesajlar",
+    "generalAgentsSection": "Genel Ajanlar",
+    "assistantsSection": "Asistanlar",
     "newConversation": "Yeni Sohbet",
     "savedAssistant": "Kayıtlı asistan",
     "noChannels": "Henüz kanal yok",

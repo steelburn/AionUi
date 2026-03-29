@@ -5,6 +5,8 @@
     "childTaskCount": "{{count}} タスク",
     "channelsSection": "チャンネル",
     "directMessagesSection": "ダイレクトメッセージ",
+    "generalAgentsSection": "汎用エージェント",
+    "assistantsSection": "アシスタント",
     "newConversation": "新規会話",
     "savedAssistant": "保存済みアシスタント",
     "noChannels": "チャンネルはまだありません",

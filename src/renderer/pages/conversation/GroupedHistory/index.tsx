@@ -207,6 +207,9 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     [onSessionClick]
   );
 
+  // Split DM groups into general agents (CLI/temporary) and assistants (preset/custom/permanent)
+  const generalAgentGroups = useMemo(() => agentDMGroups.filter((g) => !g.isPermanent), [agentDMGroups]);
+  const assistantGroups = useMemo(() => agentDMGroups.filter((g) => g.isPermanent), [agentDMGroups]);
   const hasDMGroups = agentDMGroups.length > 0;
 
   if (
@@ -443,11 +446,11 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
           />
         </div>
 
-        {/* Direct Messages section (agent-based DM groups) — always render header with "+" */}
+        {/* General Agents section (CLI agents like Gemini, Claude Code) */}
         <div className='mb-8px min-w-0'>
           {!collapsed && (
             <div className='chat-history__section px-12px py-8px text-13px text-t-secondary font-bold flex items-center justify-between'>
-              <span>{t('dispatch.sidebar.directMessagesSection')}</span>
+              <span>{t('dispatch.sidebar.generalAgentsSection')}</span>
               <Tooltip content={t('dispatch.sidebar.newDirectMessage')} position='top' mini>
                 <span
                   className='flex-center cursor-pointer hover:bg-fill-2 rd-4px p-2px transition-colors'
@@ -458,9 +461,9 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
               </Tooltip>
             </div>
           )}
-          {hasDMGroups ? (
+          {generalAgentGroups.length > 0 ? (
             <div className='min-w-0'>
-              {agentDMGroups.map((group) => (
+              {generalAgentGroups.map((group) => (
                 <AgentDMGroup
                   key={group.agentId}
                   group={group}
@@ -474,6 +477,30 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
             <div className='px-12px py-4px text-12px text-t-secondary'>{t('dispatch.sidebar.noDirectMessages')}</div>
           ) : null}
         </div>
+
+        {/* Assistants section (preset/custom wrapped agents) */}
+        {(assistantGroups.length > 0 || !collapsed) && (
+          <div className='mb-8px min-w-0'>
+            {!collapsed && (
+              <div className='chat-history__section px-12px py-8px text-13px text-t-secondary font-bold'>
+                <span>{t('dispatch.sidebar.assistantsSection')}</span>
+              </div>
+            )}
+            {assistantGroups.length > 0 && (
+              <div className='min-w-0'>
+                {assistantGroups.map((group) => (
+                  <AgentDMGroup
+                    key={group.agentId}
+                    group={group}
+                    collapsed={collapsed}
+                    selectedConversationId={id}
+                    renderConversation={renderConversation}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Timeline sections (workspace-grouped conversations — fallback view) */}
         {!hasDMGroups &&

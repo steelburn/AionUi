@@ -5,6 +5,8 @@
     "childTaskCount": "{{count}} task(s)",
     "channelsSection": "Channels",
     "directMessagesSection": "Direct Messages",
+    "generalAgentsSection": "General Agents",
+    "assistantsSection": "Assistants",
     "newConversation": "New Conversation",
     "savedAssistant": "Saved assistant",
     "noChannels": "No channels yet",

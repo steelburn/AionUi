@@ -555,6 +555,8 @@ export type I18nKey =
   | 'dispatch.sidebar.childTaskCount'
   | 'dispatch.sidebar.collapseChannels'
   | 'dispatch.sidebar.directMessagesSection'
+  | 'dispatch.sidebar.generalAgentsSection'
+  | 'dispatch.sidebar.assistantsSection'
   | 'dispatch.sidebar.expandChannels'
   | 'dispatch.sidebar.groupChatSection'
   | 'dispatch.sidebar.newConversation'

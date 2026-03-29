@@ -5,6 +5,8 @@
     "childTaskCount": "{{count}} 個任務",
     "channelsSection": "頻道",
     "directMessagesSection": "私訊",
+    "generalAgentsSection": "通用 Agent",
+    "assistantsSection": "助手",
     "newConversation": "新增對話",
     "savedAssistant": "已儲存的助手",
     "noChannels": "還沒有頻道",

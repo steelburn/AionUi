@@ -79,11 +79,6 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
           <div className='flex flex-col min-w-0'>
             <div className='flex items-center gap-4px min-w-0'>
               <span className='text-14px text-t-primary truncate min-w-0 font-medium'>{group.agentName}</span>
-              {group.isPermanent && (
-                <span className='text-10px text-t-secondary flex-shrink-0' title={t('dispatch.sidebar.savedAssistant')}>
-                  ✓
-                </span>
-              )}
             </div>
             <Tooltip content={group.singleWorkspacePath} position='right'>
               <span className='text-12px text-t-secondary truncate lh-16px'>{group.singleWorkspaceDisplayName}</span>
@@ -98,11 +93,6 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
       <FlexFullContainer className='h-20px min-w-0 flex-1'>
         <div className='flex items-center gap-4px min-w-0'>
           <span className='text-14px text-t-primary truncate min-w-0 font-medium'>{group.agentName}</span>
-          {group.isPermanent && (
-            <span className='text-10px text-t-secondary flex-shrink-0' title={t('dispatch.sidebar.savedAssistant')}>
-              ✓
-            </span>
-          )}
         </div>
       </FlexFullContainer>
     );
@@ -160,13 +150,8 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
         )}
         onClick={handleToggle}
       >
-        {/* Expand/Collapse chevron */}
-        <span className='flex-shrink-0 text-t-secondary w-12px flex-center'>
-          {isExpanded ? <Down theme='outline' size='10' /> : <Right theme='outline' size='10' />}
-        </span>
-
         {/* Avatar with online indicator */}
-        <span className='relative flex-shrink-0 cursor-pointer' onClick={handleAvatarClick}>
+        <span className='relative flex-shrink-0'>
           {renderAvatar()}
           {isActive && (
             <span className='absolute -right-1px -bottom-1px w-6px h-6px rounded-full bg-green-500 border border-solid border-[var(--color-bg-1)]' />
@@ -177,7 +162,7 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
         {renderAgentNameArea()}
 
         {/* Conversation count badge */}
-        {conversationCount > 1 && (
+        {conversationCount > 0 && (
           <span className='text-11px text-t-secondary bg-fill-2 px-4px py-1px rd-full flex-shrink-0'>
             {conversationCount}
           </span>
@@ -187,8 +172,6 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
       {/* Expanded conversation list */}
       {isExpanded && renderExpandedContent()}
 
-      {/* Collapsed: show latest conversation preview */}
-      {!isExpanded && latestConversation && <div className='ml-20px'>{renderConversation(latestConversation)}</div>}
     </div>
   );
 };
