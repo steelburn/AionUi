@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "에이전트 프로필",
+    "back": "뒤로",
+    "startConversation": "새 대화 시작",
+    "editConfig": "설정 편집",
+    "configuration": "설정 정보",
+    "conversations": "대화",
+    "noConversations": "대화 기록이 없습니다",
+    "notFound": "에이전트를 찾을 수 없습니다",
+    "permanent": "정규 직원",
+    "temporary": "임시 직원",
+    "backendType": "백엔드",
+    "description": "설명",
+    "workspaces": "워크스페이스",
+    "sourcePreset": "프리셋",
+    "sourceCustom": "커스텀",
+    "sourceCli": "CLI 에이전트",
+    "sourceDispatch": "디스패치 팀원",
+    "generating": "생성 중"
+  },
   "health": {
     "detectedError": "현재 에이전트 ({{agent}})에서 오류 감지됨",
     "autoSwitching": ". 시스템이 자동으로 전환을 시도합니다.",

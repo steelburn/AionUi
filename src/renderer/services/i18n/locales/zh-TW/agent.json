@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "Agent 資料",
+    "back": "返回",
+    "startConversation": "開始新對話",
+    "editConfig": "編輯設定",
+    "configuration": "設定資訊",
+    "conversations": "對話",
+    "noConversations": "暫無對話記錄",
+    "notFound": "未找到該 Agent",
+    "permanent": "永久員工",
+    "temporary": "臨時員工",
+    "backendType": "後端類型",
+    "description": "描述",
+    "workspaces": "工作空間",
+    "sourcePreset": "預設",
+    "sourceCustom": "自訂",
+    "sourceCli": "CLI Agent",
+    "sourceDispatch": "調度成員",
+    "generating": "生成中"
+  },
   "health": {
     "detectedError": "檢測到當前 Agent ({{agent}}) 回應異常",
     "autoSwitching": "。系統將自動嘗試切換線路。",

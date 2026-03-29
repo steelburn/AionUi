@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "Ajan Profili",
+    "back": "Geri",
+    "startConversation": "Yeni konuşma başlat",
+    "editConfig": "Yapılandırmayı düzenle",
+    "configuration": "Yapılandırma",
+    "conversations": "Konuşmalar",
+    "noConversations": "Henüz konuşma yok",
+    "notFound": "Ajan bulunamadı",
+    "permanent": "Kalıcı",
+    "temporary": "Geçici",
+    "backendType": "Arka uç",
+    "description": "Açıklama",
+    "workspaces": "Çalışma Alanları",
+    "sourcePreset": "Ön Ayar",
+    "sourceCustom": "Özel",
+    "sourceCli": "CLI Ajan",
+    "sourceDispatch": "Görev Üyesi",
+    "generating": "Oluşturuluyor"
+  },
   "health": {
     "detectedError": "Detected error with current agent ({{agent}})",
     "autoSwitching": ". System will attempt to switch automatically.",

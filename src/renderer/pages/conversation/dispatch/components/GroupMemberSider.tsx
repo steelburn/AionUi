@@ -7,8 +7,9 @@
 import { Button, Tooltip } from '@arco-design/web-react';
 import { Crown, DoubleLeft, DoubleRight, People } from '@icon-park/react';
 import classNames from 'classnames';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import type { GroupMemberSiderProps } from '../types';
 import MemberCard from './MemberCard';
@@ -26,6 +27,14 @@ const GroupMemberSider: React.FC<GroupMemberSiderProps> = ({
   onDispatcherClick,
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const handleNavigateToProfile = useCallback(
+    (agentId: string) => {
+      navigate(`/agent/${encodeURIComponent(agentId)}`);
+    },
+    [navigate]
+  );
 
   const totalCount = members.length + 1; // +1 for dispatcher
 
@@ -108,6 +117,7 @@ const GroupMemberSider: React.FC<GroupMemberSiderProps> = ({
                     isSelected={member.sessionId === selectedMemberId}
                     onClick={() => onSelectMember(member.sessionId)}
                     onEditConfig={() => onEditConfig(member.sessionId)}
+                    onNavigateToProfile={handleNavigateToProfile}
                   />
                 ))}
               </div>

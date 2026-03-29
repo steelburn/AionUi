@@ -44,7 +44,7 @@ const getStatusColor = (status: string): string => {
   }
 };
 
-const MemberCard: React.FC<MemberCardProps> = ({ member, isSelected, onClick, onEditConfig }) => {
+const MemberCard: React.FC<MemberCardProps> = ({ member, isSelected, onClick, onEditConfig, onNavigateToProfile }) => {
   const { t } = useTranslation();
 
   const truncatedRules = member.presetRules
@@ -102,7 +102,20 @@ const MemberCard: React.FC<MemberCardProps> = ({ member, isSelected, onClick, on
         {/* Center: name + badges + status */}
         <div className='flex-1 flex flex-col min-w-0 gap-2px'>
           <div className={styles.badgesRow}>
-            <span className='text-13px font-medium truncate flex-1 min-w-0'>{member.name}</span>
+            <span
+              className={`text-13px font-medium truncate flex-1 min-w-0${member.agentId && onNavigateToProfile ? ' cursor-pointer hover:text-[var(--color-primary-6)]' : ''}`}
+              onClick={
+                member.agentId && onNavigateToProfile
+                  ? (e) => {
+                      e.stopPropagation();
+                      const { agentId } = member;
+                      if (agentId) onNavigateToProfile(agentId);
+                    }
+                  : undefined
+              }
+            >
+              {member.name}
+            </span>
             {member.isLeader && (
               <Tooltip content={t('dispatch.memberSider.leader')}>
                 <span className={styles.leaderBadge}>

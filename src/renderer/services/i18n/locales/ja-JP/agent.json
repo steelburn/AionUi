@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "エージェントプロフィール",
+    "back": "戻る",
+    "startConversation": "新しい会話を開始",
+    "editConfig": "設定を編集",
+    "configuration": "設定情報",
+    "conversations": "会話",
+    "noConversations": "会話履歴がありません",
+    "notFound": "エージェントが見つかりません",
+    "permanent": "正規員",
+    "temporary": "臨時員",
+    "backendType": "バックエンド",
+    "description": "説明",
+    "workspaces": "ワークスペース",
+    "sourcePreset": "プリセット",
+    "sourceCustom": "カスタム",
+    "sourceCli": "CLI エージェント",
+    "sourceDispatch": "ディスパッチメンバー",
+    "generating": "生成中"
+  },
   "health": {
     "detectedError": "現在のエージェント ({{agent}}) の応答エラーを検出しました",
     "autoSwitching": "。システムは自動的に切り替えを試みます。",

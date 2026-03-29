@@ -11,6 +11,7 @@ import { Down, Right } from '@icon-park/react';
 import classNames from 'classnames';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 
 import type { AgentDMGroupData } from './types';
 import WorkspaceSubGroup from './WorkspaceSubGroup';
@@ -29,6 +30,7 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
   renderConversation,
 }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const isActive = group.hasActiveConversation;
   const latestConversation = group.conversations[0];
@@ -44,6 +46,14 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
   const handleToggle = useCallback(() => {
     setExpanded((prev) => !prev);
   }, []);
+
+  const handleAvatarClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigate(`/agent/${encodeURIComponent(group.agentId)}`);
+    },
+    [navigate, group.agentId]
+  );
 
   const renderAvatar = () => {
     if (group.agentAvatar) {
@@ -156,7 +166,7 @@ const AgentDMGroup: React.FC<AgentDMGroupProps> = ({
         </span>
 
         {/* Avatar with online indicator */}
-        <span className='relative flex-shrink-0'>
+        <span className='relative flex-shrink-0 cursor-pointer' onClick={handleAvatarClick}>
           {renderAvatar()}
           {isActive && (
             <span className='absolute -right-1px -bottom-1px w-6px h-6px rounded-full bg-green-500 border border-solid border-[var(--color-bg-1)]' />

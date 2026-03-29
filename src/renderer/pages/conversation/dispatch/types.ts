@@ -80,6 +80,8 @@ export type GroupChatMemberVO = {
   lastActivityAt: number;
   /** Creation timestamp */
   createdAt: number;
+  /** S4: Agent registry ID for navigation to agent profile (e.g. "custom:abc123", "preset:word-creator") */
+  agentId?: string;
 };
 
 /** Props for the GroupMemberSider component (S3) */
@@ -117,6 +119,8 @@ export type MemberCardProps = {
   onClick: () => void;
   /** Double-click or edit-icon click — opens config edit modal */
   onEditConfig: () => void;
+  /** S4: Navigate to agent profile page for this member */
+  onNavigateToProfile?: (agentId: string) => void;
 };
 
 /** Group chat info returned by get-group-chat-info */

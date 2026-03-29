@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "Agent 资料",
+    "back": "返回",
+    "startConversation": "开始新对话",
+    "editConfig": "编辑配置",
+    "configuration": "配置信息",
+    "conversations": "对话",
+    "noConversations": "暂无对话记录",
+    "notFound": "未找到该 Agent",
+    "permanent": "永久员工",
+    "temporary": "临时员工",
+    "backendType": "后端类型",
+    "description": "描述",
+    "workspaces": "工作空间",
+    "sourcePreset": "预设",
+    "sourceCustom": "自定义",
+    "sourceCli": "CLI Agent",
+    "sourceDispatch": "调度成员",
+    "generating": "生成中"
+  },
   "health": {
     "detectedError": "检测到当前 Agent ({{agent}}) 响应异常",
     "autoSwitching": "。系统将自动尝试切换线路。",

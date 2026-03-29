@@ -1,4 +1,24 @@
 {
+  "profile": {
+    "title": "Agent Profile",
+    "back": "Back",
+    "startConversation": "Start new conversation",
+    "editConfig": "Edit configuration",
+    "configuration": "Configuration",
+    "conversations": "Conversations",
+    "noConversations": "No conversations yet",
+    "notFound": "Agent not found",
+    "permanent": "Permanent",
+    "temporary": "Temporary",
+    "backendType": "Backend",
+    "description": "Description",
+    "workspaces": "Workspaces",
+    "sourcePreset": "Preset",
+    "sourceCustom": "Custom",
+    "sourceCli": "CLI Agent",
+    "sourceDispatch": "Dispatch Teammate",
+    "generating": "Generating"
+  },
   "health": {
     "detectedError": "Detected error with current agent ({{agent}})",
     "autoSwitching": ". System will attempt to switch automatically.",
