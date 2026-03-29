@@ -81,3 +81,112 @@ describe('ResultCollector', () => {
     expect(collector.isAllSettled()).toBe(true);
   });
 });
+
+describe('ResultCollector — partial result support', () => {
+  it('getPartialText returns empty string when no text has been emitted', () => {
+    const collector = new ResultCollector();
+    const session = makeFakeSession('p1');
+    collector.register(session);
+    expect(collector.getPartialText('p1')).toBe('');
+    expect(collector.getPartialText('unknown')).toBe('');
+  });
+
+  it('getPartialText accumulates text emitted before done', () => {
+    const collector = new ResultCollector();
+    const session = makeFakeSession('p2');
+    collector.register(session);
+
+    session.emit('text', 'chunk one ');
+    session.emit('text', 'chunk two');
+
+    expect(collector.getPartialText('p2')).toBe('chunk one chunk two');
+  });
+
+  it('getPartialText continues accumulating after done', () => {
+    const collector = new ResultCollector();
+    const session = makeFakeSession('p3');
+    collector.register(session);
+
+    session.emit('text', 'before');
+    session.emit('done');
+    // Partial text should still be accessible after settling
+    expect(collector.getPartialText('p3')).toBe('before');
+  });
+
+  it('injectPartialResult settles the slot so waitForAll resolves', async () => {
+    const collector = new ResultCollector();
+    const session = makeFakeSession('p4');
+    collector.register(session);
+
+    session.emit('text', 'partial output');
+
+    const partialResult = {
+      subTaskId: 'p4',
+      conversationId: 'conv-p4',
+      outputText: 'partial output',
+      partialOutput: 'partial output',
+      timedOut: true,
+      completedAt: Date.now(),
+    };
+
+    const pending = collector.waitForAll();
+    collector.injectPartialResult(partialResult);
+
+    const results = await pending;
+    expect(results).toHaveLength(1);
+    expect(results[0].subTaskId).toBe('p4');
+    expect(results[0].timedOut).toBe(true);
+    expect(results[0].partialOutput).toBe('partial output');
+  });
+
+  it('injectPartialResult emits result event', () => {
+    const collector = new ResultCollector();
+    const session = makeFakeSession('p5');
+    collector.register(session);
+
+    const emittedResults: unknown[] = [];
+    collector.on('result', (r) => emittedResults.push(r));
+
+    const partialResult = {
+      subTaskId: 'p5',
+      conversationId: 'conv-p5',
+      outputText: '[timed out]',
+      timedOut: true,
+      completedAt: Date.now(),
+    };
+
+    collector.injectPartialResult(partialResult);
+    expect(emittedResults).toHaveLength(1);
+    expect((emittedResults[0] as typeof partialResult).timedOut).toBe(true);
+  });
+
+  it('injectPartialResult + normal done: two tasks settle correctly', async () => {
+    const collector = new ResultCollector();
+    const s1 = makeFakeSession('q1');
+    const s2 = makeFakeSession('q2');
+    collector.register(s1);
+    collector.register(s2);
+
+    const pending = collector.waitForAll();
+
+    // s1 times out → inject partial
+    collector.injectPartialResult({
+      subTaskId: 'q1',
+      conversationId: 'conv-q1',
+      outputText: 'partial',
+      timedOut: true,
+      completedAt: Date.now(),
+    });
+
+    // s2 completes normally
+    s2.emit('text', 'done text');
+    s2.emit('done');
+
+    const results = await pending;
+    expect(results).toHaveLength(2);
+    const q1r = results.find((r) => r.subTaskId === 'q1');
+    const q2r = results.find((r) => r.subTaskId === 'q2');
+    expect(q1r?.timedOut).toBe(true);
+    expect(q2r?.outputText).toBe('done text');
+  });
+});

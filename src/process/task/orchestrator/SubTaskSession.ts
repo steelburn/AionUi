@@ -15,7 +15,7 @@ import { EventEmitter } from 'events';
 import type { IConfirmation } from '@/common/chat/chatLib';
 import type { IAgentManager } from '../IAgentManager';
 import type { IAgentEventEmitter, AgentMessageEvent } from '../IAgentEventEmitter';
-import type { SubTask } from './types';
+import type { SubTask, DependencyOutput } from './types';
 
 // --------------------------------------------------------
 // Internal emitter that captures agent output events
@@ -56,6 +56,21 @@ export type AgentManagerFactory = (
   emitter: IAgentEventEmitter,
 ) => IAgentManager;
 
+/**
+ * Build an enriched prompt that injects structured dependency outputs before
+ * the task's own instructions. This replaces the raw text-prepend approach
+ * with a clearly sectioned document that agents can parse reliably.
+ */
+function buildDependencyPrompt(deps: DependencyOutput[], taskPrompt: string): string {
+  const sections = deps
+    .map(
+      (d) =>
+        `## Output from ${d.label}\n_Completed at ${new Date(d.completedAt).toISOString()}_\n\n${d.outputText.trim()}`,
+    )
+    .join('\n\n---\n\n');
+  return `# Context from Prior Phase\n\n${sections}\n\n---\n\n# Your Task\n\n${taskPrompt}`;
+}
+
 export class SubTaskSession extends EventEmitter {
   readonly conversationId: string;
   readonly subTaskId: string;
@@ -65,7 +80,7 @@ export class SubTaskSession extends EventEmitter {
   private readonly captureEmitter: CaptureEmitter;
 
   constructor(
-    subTask: SubTask,
+    private readonly subTask: SubTask,
     conversationId: string,
     private readonly factory: AgentManagerFactory,
   ) {
@@ -95,11 +110,16 @@ export class SubTaskSession extends EventEmitter {
    */
   async start(prompt: string): Promise<void> {
     if (this.manager) throw new Error('SubTaskSession already started');
-    this.manager = this.factory(this.conversationId, '', this.captureEmitter);
+    this.manager = this.factory(this.conversationId, this.subTask.presetContext ?? '', this.captureEmitter);
     this.finished = false;
 
+    // Enrich prompt with structured dependency context if available
+    const enrichedPrompt = this.subTask.dependencyOutputs?.length
+      ? buildDependencyPrompt(this.subTask.dependencyOutputs, prompt)
+      : prompt;
+
     // AcpAgentManager.sendMessage expects { content: string; ... }
-    await this.manager.sendMessage({ content: prompt });
+    await this.manager.sendMessage({ content: enrichedPrompt });
   }
 
   /**
@@ -122,6 +142,16 @@ export class SubTaskSession extends EventEmitter {
   /** Force-kill the agent */
   kill(): void {
     this.manager?.kill();
+  }
+
+  /**
+   * Override EventEmitter.emit so that emitting 'error' marks the session as
+   * finished — preventing a subsequent 'done' emission (race between timeout
+   * and natural completion) from flipping TeamPanel status back to ✓.
+   */
+  override emit(event: string | symbol, ...args: unknown[]): boolean {
+    if (event === 'error') this.finished = true;
+    return super.emit(event, ...args);
   }
 
   get isFinished(): boolean {

@@ -33,6 +33,20 @@ export type SpawnAgentConfig = {
   flavor: 'claude' | 'codex';
   /** Extra args always appended (e.g. --model sonnet) */
   extraArgs?: string[];
+  /** Resume the most recent claude session on the very first turn (--continue/-c) */
+  continueSession?: boolean;
+  /**
+   * Never use -c/--continue even for subsequent turns.
+   * Use this for coordinator sessions: each call already embeds the full context
+   * in the prompt, so session continuation is unnecessary — and harmful when
+   * other claude sessions (e.g. specialist runs) have run in between.
+   */
+  noAutoResume?: boolean;
+  /**
+   * Optional system prompt to inject via --append-system-prompt (claude only).
+   * Used to inject role-specific instructions without touching the user message.
+   */
+  systemPrompt?: string;
 };
 
 export class SpawnCliAgentManager implements IAgentManager {
@@ -123,20 +137,28 @@ export class SpawnCliAgentManager implements IAgentManager {
     const extra = this.config.extraArgs ?? [];
 
     if (this.config.flavor === 'claude') {
-      // claude --print --dangerously-skip-permissions [-c] [--extra...] "<prompt>"
+      // claude --print --dangerously-skip-permissions [-c] [--extra...] [--append-system-prompt <sp>] "<prompt>"
+      // Use -c on: (a) subsequent turns within this session, or (b) first turn with continueSession=true
+      const useContinue = !this.config.noAutoResume && (!this.isFirstTurn || !!this.config.continueSession);
+      const systemPromptArgs =
+        this.config.systemPrompt
+          ? ['--append-system-prompt', this.config.systemPrompt]
+          : [];
       return [
         '--print',
         '--dangerously-skip-permissions',
-        ...(this.isFirstTurn ? [] : ['-c']),
+        ...(useContinue ? ['-c'] : ['--no-session-persistence']),
         ...extra,
+        ...systemPromptArgs,
         prompt,
       ];
     }
 
     if (this.config.flavor === 'codex') {
-      // codex exec --skip-git-repo-check [--extra...] "<prompt>"
-      // --skip-git-repo-check is required when running outside a trusted git directory
-      return ['exec', '--skip-git-repo-check', ...extra, prompt];
+      // codex exec --full-auto --skip-git-repo-check [--extra...] "<prompt>"
+      // --full-auto: skip tool-approval prompts (stdin is 'ignore', so any prompt hangs forever)
+      // --skip-git-repo-check: allow running outside a trusted git directory
+      return ['exec', '--full-auto', '--skip-git-repo-check', ...extra, prompt];
     }
 
     // Generic fallback: pass prompt as last arg

@@ -58,7 +58,12 @@ describe('SpawnCliAgentManager — buildArgs', () => {
       });
 
       await mgr.sendMessage({ content: 'hello world' });
-      expect(spawnArgs).toEqual(['--print', '--dangerously-skip-permissions', 'hello world']);
+      expect(spawnArgs).toEqual([
+        '--print',
+        '--dangerously-skip-permissions',
+        '--no-session-persistence',
+        'hello world',
+      ]);
     });
 
     it('second turn: adds -c (continue) flag', async () => {
@@ -92,7 +97,69 @@ describe('SpawnCliAgentManager — buildArgs', () => {
       });
 
       await mgr.sendMessage({ content: 'task' });
-      expect(spawnArgs).toEqual(['--print', '--dangerously-skip-permissions', '--model', 'sonnet', 'task']);
+      expect(spawnArgs).toEqual([
+        '--print',
+        '--dangerously-skip-permissions',
+        '--no-session-persistence',
+        '--model',
+        'sonnet',
+        'task',
+      ]);
+    });
+
+    it('injects --append-system-prompt before the prompt when systemPrompt is set', async () => {
+      const emitter = makeEmitter();
+      const mgr = new SpawnCliAgentManager(
+        'c5',
+        { bin: 'claude', flavor: 'claude', systemPrompt: 'You are a careful reviewer.' },
+        emitter,
+      );
+
+      let spawnArgs: string[] = [];
+      (spawn as ReturnType<typeof vi.fn>).mockImplementationOnce((_b: string, args: string[]) => {
+        spawnArgs = args;
+        return {
+          stdout: { on: vi.fn() },
+          stderr: { on: vi.fn() },
+          on: vi.fn((e: string, cb: (n: number) => void) => {
+            if (e === 'close') cb(0);
+          }),
+          once: vi.fn(),
+          kill: vi.fn(),
+          exitCode: null,
+        };
+      });
+
+      await mgr.sendMessage({ content: 'review this' });
+      // --append-system-prompt must appear BEFORE the prompt text
+      const apIdx = spawnArgs.indexOf('--append-system-prompt');
+      const promptIdx = spawnArgs.indexOf('review this');
+      expect(apIdx).toBeGreaterThan(-1);
+      expect(spawnArgs[apIdx + 1]).toBe('You are a careful reviewer.');
+      expect(apIdx).toBeLessThan(promptIdx);
+    });
+
+    it('does NOT inject --append-system-prompt when systemPrompt is not set', async () => {
+      const emitter = makeEmitter();
+      const mgr = new SpawnCliAgentManager('c6', { bin: 'claude', flavor: 'claude' }, emitter);
+
+      let spawnArgs: string[] = [];
+      (spawn as ReturnType<typeof vi.fn>).mockImplementationOnce((_b: string, args: string[]) => {
+        spawnArgs = args;
+        return {
+          stdout: { on: vi.fn() },
+          stderr: { on: vi.fn() },
+          on: vi.fn((e: string, cb: (n: number) => void) => {
+            if (e === 'close') cb(0);
+          }),
+          once: vi.fn(),
+          kill: vi.fn(),
+          exitCode: null,
+        };
+      });
+
+      await mgr.sendMessage({ content: 'hello' });
+      expect(spawnArgs).not.toContain('--append-system-prompt');
     });
   });
 
@@ -154,7 +221,7 @@ describe('SpawnCliAgentManager — buildArgs', () => {
       });
 
       await mgr.sendMessage({ content: 'task' });
-      expect(spawnArgs).toEqual(['exec', '--skip-git-repo-check', '--quiet', 'task']);
+      expect(spawnArgs).toEqual(['exec', '--full-auto', '--skip-git-repo-check', '--quiet', 'task']);
     });
   });
 });
