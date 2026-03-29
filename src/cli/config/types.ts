@@ -30,5 +30,12 @@ export type AionCliConfig = {
   team?: {
     concurrency?: number;
     timeoutMs?: number;
+    /** Max refinement iterations (default 3). */
+    maxIterations?: number;
+    /** Quality score threshold to stop early (0–1, default 0.85). */
+    qualityThreshold?: number;
+    backgroundSpawn?: boolean;
+    preservePartialOnTimeout?: boolean;
+    conflictDetection?: boolean;
   };
 };

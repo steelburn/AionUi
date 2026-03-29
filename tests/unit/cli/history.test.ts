@@ -250,3 +250,71 @@ describe('getHistoryPath', () => {
     expect(getHistoryPath()).toBe('/mock-home/.aion/history.tsv');
   });
 });
+
+// ---------------------------------------------------------------------------
+// compressHistory
+// ---------------------------------------------------------------------------
+describe('compressHistory', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('keeps exactly COMPRESS_THRESHOLD (500) lines when the file has more', async () => {
+    // Build 600 non-empty lines
+    const lines = Array.from({ length: 600 }, (_, i) => `2024-01-01T00:00:00.000Z\tcmd-${i}`);
+    vi.mocked(fs.readFileSync).mockReturnValue(lines.join('\n') + '\n');
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined);
+    vi.mocked(fs.renameSync).mockReturnValue(undefined);
+
+    const { compressHistory } = await import('@/cli/ui/history');
+    compressHistory();
+
+    expect(fs.writeFileSync).toHaveBeenCalledOnce();
+    const writtenContent = vi.mocked(fs.writeFileSync).mock.calls[0]![1] as string;
+    const writtenLines = writtenContent.split('\n').filter((l) => l.trim().length > 0);
+    expect(writtenLines).toHaveLength(500);
+    // Last 500 of 600 means cmd-100 … cmd-599
+    expect(writtenLines[0]).toContain('cmd-100');
+    expect(writtenLines[499]).toContain('cmd-599');
+  });
+
+  it('does nothing when the file has fewer than or equal to COMPRESS_THRESHOLD (500) lines', async () => {
+    const lines = Array.from({ length: 400 }, (_, i) => `2024-01-01T00:00:00.000Z\tcmd-${i}`);
+    vi.mocked(fs.readFileSync).mockReturnValue(lines.join('\n') + '\n');
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined);
+
+    const { compressHistory } = await import('@/cli/ui/history');
+    compressHistory();
+
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it('is silent when the history file does not exist — does not throw', async () => {
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    });
+
+    const { compressHistory } = await import('@/cli/ui/history');
+    expect(() => compressHistory()).not.toThrow();
+  });
+
+  it('renames the tmp file to the history path after writing', async () => {
+    const lines = Array.from({ length: 600 }, (_, i) => `2024-01-01T00:00:00.000Z\tcmd-${i}`);
+    vi.mocked(fs.readFileSync).mockReturnValue(lines.join('\n') + '\n');
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined);
+    vi.mocked(fs.renameSync).mockReturnValue(undefined);
+
+    const { compressHistory } = await import('@/cli/ui/history');
+    compressHistory();
+
+    expect(fs.renameSync).toHaveBeenCalledOnce();
+    const [tmpPath, destPath] = vi.mocked(fs.renameSync).mock.calls[0]!;
+    expect(String(tmpPath)).toMatch(/history\.tsv\.tmp$/);
+    expect(String(destPath)).toMatch(/history\.tsv$/);
+  });
+});

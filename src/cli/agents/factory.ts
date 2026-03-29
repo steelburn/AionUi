@@ -26,11 +26,15 @@ export function createCliAgentFactory(
   agentPerTask?: Record<string, string>,
   /** Override the default agent key — used by solo mode when user selects a specific agent */
   defaultAgentOverride?: string,
+  /** Resume the most recent claude session on first turn (--continue/-c flag) */
+  continueSession?: boolean,
+  /** Never use -c even for subsequent turns — use for coordinator sessions */
+  noAutoResume?: boolean,
 ): AgentManagerFactory {
-  return (conversationId, _presetContext, emitter) => {
+  return (conversationId, presetContext, emitter) => {
     const agentKey = resolveAgentKey(conversationId, config, agentPerTask, defaultAgentOverride);
     const agentConfig = resolveAgentConfig(config, agentKey);
-    return buildManager(conversationId, agentConfig, emitter);
+    return buildManager(conversationId, agentConfig, emitter, continueSession, presetContext || undefined, noAutoResume);
   };
 }
 
@@ -38,11 +42,14 @@ function buildManager(
   conversationId: string,
   config: AgentConfig,
   emitter: Parameters<AgentManagerFactory>[2],
+  continueSession?: boolean,
+  systemPrompt?: string,
+  noAutoResume?: boolean,
 ) {
   if (config.provider === 'claude-cli') {
     return new SpawnCliAgentManager(
       conversationId,
-      { bin: config.bin!, flavor: 'claude', extraArgs: config.extraArgs },
+      { bin: config.bin!, flavor: 'claude', extraArgs: config.extraArgs, continueSession, noAutoResume, systemPrompt },
       emitter,
     );
   }
@@ -56,15 +63,15 @@ function buildManager(
   }
 
   if (config.provider === 'openai') {
-    return new OpenAIAgentManager(conversationId, config, emitter);
+    return new OpenAIAgentManager(conversationId, config, emitter, undefined, systemPrompt);
   }
 
   if (config.provider === 'gemini') {
-    return new GeminiAgentManager(conversationId, config, emitter);
+    return new GeminiAgentManager(conversationId, config, emitter, undefined, systemPrompt);
   }
 
   // Direct Anthropic SDK fallback
-  return new CliAgentManager(conversationId, config, emitter);
+  return new CliAgentManager(conversationId, config, emitter, undefined, systemPrompt);
 }
 
 function resolveAgentKey(
