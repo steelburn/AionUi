@@ -43,7 +43,7 @@ const WorkspaceSubGroup: React.FC<WorkspaceSubGroupProps> = ({
       <Tooltip content={workspacePath} position='top' mini>
         <div
           className={classNames(
-            'h-32px px-8px py-4px rd-4px flex items-center gap-6px cursor-pointer transition-colors min-w-0',
+            'h-32px pl-8px pr-12px py-4px rd-4px flex items-center gap-6px cursor-pointer transition-colors min-w-0',
             'hover:bg-[rgba(var(--primary-6),0.08)]'
           )}
           onClick={handleToggle}
