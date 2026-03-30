@@ -138,6 +138,7 @@ const GroupChatView: React.FC<GroupChatViewProps> = ({ conversation }) => {
         workspaceEnabled={true}
         agentName={conversation.name}
         sider={<ChatSider conversation={conversation} />}
+      siderTitle={<span className='text-16px font-bold text-t-primary'>{t('conversation.workspace.title')}</span>}
         conversationId={conversation.id}
         title={conversation.name}
       >
@@ -159,6 +160,7 @@ const GroupChatView: React.FC<GroupChatViewProps> = ({ conversation }) => {
       agentLogoIsEmoji={Boolean(dispatcherAvatar)}
       headerExtra={headerExtra}
       sider={<ChatSider conversation={conversation} />}
+      siderTitle={<span className='text-16px font-bold text-t-primary'>{t('conversation.workspace.title')}</span>}
       conversationId={conversation.id}
       title={conversation.name}
     >
