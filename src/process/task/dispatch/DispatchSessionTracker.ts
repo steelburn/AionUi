@@ -166,7 +166,6 @@ export class DispatchSessionTracker {
         title: extra.dispatchTitle ?? conv.name ?? 'Untitled',
         // After restart, all processes are gone; running/pending become idle
         status: this.inferRestoredStatus(conv.status),
-        teammateName: extra.teammateConfig?.name,
         createdAt: conv.createTime ?? Date.now(),
         lastActivityAt: conv.modifyTime ?? Date.now(),
       };

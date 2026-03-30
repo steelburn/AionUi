@@ -20,45 +20,23 @@ export const MIN_CONCURRENT_CHILDREN = 1;
 /** Maximum configurable concurrent children */
 export const MAX_CONCURRENT_CHILDREN_LIMIT = 10;
 
-/** Temporary teammate config (unsaved assistant) */
-export type TemporaryTeammateConfig = {
-  /** Unique identifier for correlating child sessions */
-  id: string;
-  /** Display name (3-6 words) */
-  name: string;
-  /** Avatar URL or emoji */
-  avatar?: string;
-  /** System rules */
-  presetRules?: string;
-  /** Engine type for this teammate. Supports any registered AgentType. */
-  agentType: AgentType;
-  /** Creation timestamp */
-  createdAt: number;
-};
-
 /** Parameters for creating a child task */
 export type StartChildTaskParams = {
   /** Initial prompt */
   prompt: string;
   /** Short title (3-6 words) */
   title: string;
-  /** Optional temporary teammate config */
-  teammate?: TemporaryTeammateConfig;
-  /** F-4.2: Optional model override for child agent */
+  /** Optional model override for child agent */
   model?: {
     providerId: string;
     modelName: string;
   };
-  /** F-6.1: Optional working directory override for child agent */
+  /** Optional working directory override for child agent */
   workspace?: string;
   /** Engine type for the child worker. Defaults to 'gemini'. */
   agent_type?: AgentType;
-  /** Reference an existing group member; auto-fills config from their profile. */
-  member_id?: string;
-  /** Isolation mode. Declared here for forward-compat; G2 implements 'worktree'. */
+  /** Isolation mode: 'worktree' for git worktree isolation (used by start_code_task). */
   isolation?: 'worktree';
-  /** Tool allowlist for permission policy. Omit = all tools allowed. */
-  allowedTools?: string[];
 };
 
 /** Child task info (for listing/querying) */
@@ -67,19 +45,16 @@ export type ChildTaskInfo = {
   title: string;
   /** Unified AgentStatus, no separate DispatchLifecycleState */
   status: AgentStatus;
-  teammateName?: string;
   createdAt: number;
   lastActivityAt: number;
-  /** F-6.1: Working directory for this child */
+  /** Working directory for this child */
   workspace?: string;
   /** Engine type of this child worker */
   agentType?: AgentType;
-  /** G2.1: Worktree path if isolation='worktree' was used */
+  /** Worktree path if isolation='worktree' was used */
   worktreePath?: string;
-  /** G2.1: Worktree branch name for merge/cleanup */
+  /** Worktree branch name for merge/cleanup */
   worktreeBranch?: string;
-  /** G2.2: Allowed tools for this child (permission policy) */
-  allowedTools?: string[];
 };
 
 /** Options for reading child task transcript */
@@ -140,7 +115,7 @@ export type ChildCompletionNotification = {
 
 /** Dispatch event types emitted via IPC */
 export type DispatchEventData =
-  | { type: 'dispatch:child_started'; childId: string; title: string; teammateName?: string }
+  | { type: 'dispatch:child_started'; childId: string; title: string }
   | { type: 'dispatch:child_progress'; childId: string; summary: string }
   | { type: 'dispatch:child_completed'; childId: string; title: string; resultSummary: string }
   | { type: 'dispatch:child_failed'; childId: string; title: string; error: string }

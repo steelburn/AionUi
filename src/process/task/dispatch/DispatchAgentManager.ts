@@ -30,14 +30,13 @@ import { DispatchSessionTracker } from './DispatchSessionTracker';
 import { DispatchNotifier } from './DispatchNotifier';
 import { DispatchResourceGuard } from './DispatchResourceGuard';
 import { buildDispatchSystemPrompt } from './dispatchPrompt';
-import { createWorktree, cleanupWorktree } from './worktreeManager';
+import { createWorktree } from './worktreeManager';
 import { checkPermission } from './permissionPolicy';
 import type {
   ChildTaskInfo,
   StartChildTaskParams,
   ReadTranscriptOptions,
   TranscriptResult,
-  TemporaryTeammateConfig,
   GroupChatMessage,
   SendMessageToChildParams,
   ListSessionsParams,
@@ -86,7 +85,6 @@ export class DispatchAgentManager extends BaseAgentManager<
   private notifier!: DispatchNotifier;
   private resourceGuard!: DispatchResourceGuard;
   private readonly mcpServer: DispatchMcpServer;
-  private readonly temporaryTeammates = new Map<string, TemporaryTeammateConfig>();
 
   /** HTTP MCP server for dispatch tools (runs in main process, no child process) */
   private httpMcpServer: DispatchHttpMcpServer | null = null;
@@ -448,16 +446,6 @@ export class DispatchAgentManager extends BaseAgentManager<
       throw new Error(limitError);
     }
 
-    // G1: member_id resolution not yet implemented
-    if (params.member_id) {
-      throw new Error('member_id resolution not yet implemented (planned for G3).');
-    }
-
-    // Store teammate config if provided
-    if (params.teammate) {
-      this.temporaryTeammates.set(params.teammate.id, params.teammate);
-    }
-
     // F-4.2: Resolve model override
     let childModel = this.model;
     let childModelName: string | undefined;
@@ -561,15 +549,11 @@ export class DispatchAgentManager extends BaseAgentManager<
         dispatchSessionType: 'dispatch_child' as const,
         parentSessionId: this.conversation_id,
         dispatchTitle: params.title,
-        presetRules: params.teammate?.presetRules,
-        teammateConfig: params.teammate ? { name: params.teammate.name, avatar: params.teammate.avatar } : undefined,
         yoloMode: true,
         childModelName,
         // G2.1: store worktree info
         worktreePath,
         worktreeBranch,
-        // G2.2: store allowed tools
-        allowedTools: params.allowedTools,
         // ACP-type children need backend config from parent
         ...acpChildExtra,
       },
@@ -581,16 +565,12 @@ export class DispatchAgentManager extends BaseAgentManager<
       sessionId: childId,
       title: params.title,
       status: 'pending',
-      teammateName: params.teammate?.name,
       createdAt: Date.now(),
       lastActivityAt: Date.now(),
       workspace: childWorkspace,
       agentType: childAgentType,
-      // G2.1: store worktree info
       worktreePath,
       worktreeBranch,
-      // G2.2: store allowed tools
-      allowedTools: params.allowedTools,
     };
     this.tracker.registerChild(this.conversation_id, childInfo);
 
@@ -623,12 +603,11 @@ export class DispatchAgentManager extends BaseAgentManager<
     this.emitGroupChatEvent({
       sourceSessionId: childId,
       sourceRole: 'child',
-      displayName: params.teammate?.name ?? 'Agent',
+      displayName: params.title,
       content: '',
       messageType: 'task_started',
       timestamp: Date.now(),
       childTaskId: childId,
-      avatar: params.teammate?.avatar,
     });
 
     return childId;
@@ -652,7 +631,7 @@ export class DispatchAgentManager extends BaseAgentManager<
     this.emitGroupChatEvent({
       sourceSessionId: childId,
       sourceRole: 'child',
-      displayName: this.tracker.getChildInfo(childId)?.teammateName ?? 'Agent',
+      displayName: this.tracker.getChildInfo(childId)?.title ?? 'Task',
       content: '',
       messageType: result === 'completed' ? 'task_completed' : 'task_failed',
       timestamp: Date.now(),
@@ -953,7 +932,7 @@ export class DispatchAgentManager extends BaseAgentManager<
     mainLog('[DispatchAgentManager]', `Cancelling child: ${childSessionId}, previousStatus=${childInfo.status}`);
 
     // Capture info before kill (kill removes task from taskList)
-    const displayName = childInfo.teammateName ?? 'Agent';
+    const displayName = childInfo.title;
 
     // 1. Kill the worker process FIRST (ensures polling loop exits cleanly)
     if (this.taskManager) {
@@ -987,76 +966,14 @@ export class DispatchAgentManager extends BaseAgentManager<
   }
 
   /**
-   * G2.3: Stop a running child task.
-   * Kills the worker, cleans up worktree if present, updates tracker.
-   */
-  private async stopChild(sessionId: string, reason?: string): Promise<string> {
-    if (!this.taskManager) throw new Error('Dependencies not set');
-
-    const childInfo = this.tracker.getChildInfo(sessionId);
-    if (!childInfo) {
-      throw new Error(`Session "${sessionId}" not found. Use list_sessions to see available sessions.`);
-    }
-
-    if (childInfo.status === 'cancelled' || childInfo.status === 'finished') {
-      return `Session "${childInfo.title}" is already ${childInfo.status}.`;
-    }
-
-    const displayName = childInfo.teammateName ?? 'Agent';
-
-    // 1. Kill worker
-    this.taskManager.kill(sessionId);
-
-    // 2. Cleanup worktree if present
-    if (childInfo.worktreePath && childInfo.worktreeBranch) {
-      try {
-        await cleanupWorktree(this.workspace, childInfo.worktreePath, childInfo.worktreeBranch);
-        mainLog('[DispatchAgentManager]', `Cleaned up worktree for stopped child: ${sessionId}`);
-      } catch (err) {
-        mainWarn('[DispatchAgentManager]', `Failed to cleanup worktree on stop: ${sessionId}`, err);
-      }
-    }
-
-    // 3. Update tracker
-    this.tracker.updateChildStatus(sessionId, 'cancelled');
-
-    // 4. Emit UI event
-    this.emitGroupChatEvent({
-      sourceSessionId: sessionId,
-      sourceRole: 'child',
-      displayName,
-      content: reason ? `Stopped: ${reason}` : 'Stopped by admin',
-      messageType: 'task_cancelled',
-      timestamp: Date.now(),
-      childTaskId: sessionId,
-    });
-
-    const reasonSuffix = reason ? ` Reason: ${reason}` : '';
-    return `Stopped "${childInfo.title}" (${sessionId}).${reasonSuffix} Use read_transcript to see partial results.`;
-  }
-
-  /**
-   * G4.7: Handle save_memory from the admin agent.
-   * Persists a memory entry to the workspace memory directory.
-   */
-  /**
-   * G2.2: Monitor child tool calls for permission violations.
-   * Called when child task reports a tool_call event.
+   * Monitor child tool calls for dangerous operations.
    * SOFT enforcement: log + notify admin, do not block.
    */
   private handleChildToolCallReport(childId: string, toolName: string, args: Record<string, unknown>): void {
     const childInfo = this.tracker.getChildInfo(childId);
     if (!childInfo) return;
 
-    const allowedTools = childInfo.allowedTools;
-    const result = checkPermission(toolName, args, allowedTools);
-
-    if (!result.allowed) {
-      mainWarn(
-        '[DispatchAgentManager]',
-        `Permission violation: child=${childId} tool=${toolName} reason=${result.reason}`
-      );
-    }
+    const result = checkPermission(toolName, args, undefined);
 
     if (result.requiresApproval) {
       const description = `${toolName}(${JSON.stringify(args).slice(0, 200)})`;
@@ -1064,17 +981,15 @@ export class DispatchAgentManager extends BaseAgentManager<
         '[DispatchAgentManager]',
         `Dangerous tool call: child=${childId} tool=${toolName} -- requires user approval`
       );
-      // Notify UI
       this.emitGroupChatEvent({
         sourceSessionId: childId,
         sourceRole: 'child',
-        displayName: childInfo.teammateName ?? 'Agent',
+        displayName: childInfo.title,
         content: `Dangerous operation detected: ${description}`,
         messageType: 'system',
         timestamp: Date.now(),
         childTaskId: childId,
       });
-      // Inject system notification to parent dispatcher so it can inform the user
       void this.sendMessage({
         input: `[SYSTEM] Child "${childInfo.title}" (${childId}) is executing a dangerous operation: ${description}. Please inform the user.`,
         msg_id: uuid(),

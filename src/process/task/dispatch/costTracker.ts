@@ -206,7 +206,7 @@ export async function aggregateGroupCost(
 
       sessions.push({
         sessionId: child.sessionId,
-        displayName: child.teammateName ?? child.title,
+        displayName: child.title,
         role: 'child',
         totalTokens: usage.totalTokens,
         inputTokens: usage.inputTokens,

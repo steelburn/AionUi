@@ -14,7 +14,6 @@ export { DispatchResourceGuard } from './DispatchResourceGuard';
 export { buildDispatchSystemPrompt } from './dispatchPrompt';
 export type {
   DispatchSessionType,
-  TemporaryTeammateConfig,
   StartChildTaskParams,
   ChildTaskInfo,
   ReadTranscriptOptions,
