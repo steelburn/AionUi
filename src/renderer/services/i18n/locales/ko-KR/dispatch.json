@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}}개 작업",
     "channelsSection": "채널",
     "directMessagesSection": "다이렉트 메시지",
-    "generalAgentsSection": "일반 에이전트",
-    "assistantsSection": "어시스턴트",
     "newConversation": "새 대화",
     "savedAssistant": "저장된 어시스턴트",
     "noChannels": "아직 채널이 없습니다",
     "collapseChannels": "채널 접기",
     "expandChannels": "채널 펼치기",
-    "newDirectMessage": "새 다이렉트 메시지",
-    "noDirectMessages": "아직 대화가 없습니다",
-    "selectAgent": "에이전트 선택",
-    "searchAgents": "에이전트 검색...",
-    "permanentAgents": "저장된 어시스턴트",
-    "temporaryAgents": "CLI 에이전트",
-    "noAgentsFound": "에이전트를 찾을 수 없습니다",
-    "agentSourcePreset": "프리셋",
-    "agentSourceCustom": "커스텀",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "아직 대화가 없습니다"
   },
   "create": {
     "title": "그룹 채팅 만들기",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "찾아보기",
     "leaderAgentLabel": "리더 에이전트 / 페르소나 (선택사항)",
     "leaderAgentPlaceholder": "에이전트 페르소나를 선택하세요...",
+    "adminLabel": "관리 에이전트 (필수)",
+    "adminPlaceholder": "관리 에이전트를 선택하세요...",
     "modelLabel": "모델 (선택사항)",
     "modelPlaceholder": "기본 모델 사용",
     "modelTooltip": "디스패치에는 도구 호출(function calling)을 지원하는 모델이 필요합니다",
     "advancedSettings": "고급 설정",
     "seedMessageLabel": "커스텀 시스템 프롬프트",
     "seedMessagePlaceholder": "오케스트레이터에 추가 지침을 입력하세요...",
-    "seedMessageHint": "이 지침은 디스패치 시스템 프롬프트에 추가됩니다 (최대 2000자)."
+    "seedMessageHint": "이 지침은 디스패치 시스템 프롬프트에 추가됩니다 (최대 2000자).",
+    "teamConfigLabel": "팀 설정 (선택사항)",
+    "teamConfigPlaceholder": "팀 워크플로 설정을 선택하세요..."
   },
   "header": {
     "taskCount": "{{count}}개 작업"
@@ -145,6 +138,65 @@
     "completed": "{{count}}개 완료",
     "failed": "{{count}}개 실패",
     "pending": "{{count}}개 대기 중"
+  },
+  "memberBar": {
+    "addMember": "멤버 추가"
+  },
+  "tabs": {
+    "groupChat": "그룹 채팅"
+  },
+  "profile": {
+    "baseAgent": "기본 에이전트",
+    "model": "모델",
+    "rules": "규칙",
+    "skills": "스킬",
+    "currentInstruction": "현재 지침",
+    "currentTask": "현재 작업",
+    "removeMember": "그룹에서 제거",
+    "statusOnline": "온라인",
+    "statusWorking": "작업 중",
+    "statusIdle": "유휴",
+    "statusError": "오류",
+    "typeAdmin": "관리자",
+    "typePermanent": "고정 멤버",
+    "typeTemporary": "임시 멤버",
+    "noRules": "사전 설정 규칙 없음",
+    "elapsed": "{{time}} 경과",
+    "removeConfirmTitle": "멤버 제거",
+    "removeConfirmContent": "\"{{name}}\"을(를) 그룹에서 제거하시겠습니까?",
+    "modelChangeSuccess": "모델이 업데이트되었습니다",
+    "modelChangeFailed": "모델 업데이트에 실패했습니다"
+  },
+  "addMember": {
+    "title": "멤버 추가",
+    "placeholder": "추가할 에이전트를 선택하세요...",
+    "confirm": "추가",
+    "success": "멤버가 추가되었습니다",
+    "error": "멤버 추가에 실패했습니다",
+    "alreadyAdded": "이미 그룹에 있음"
+  },
+  "teammateView": {
+    "noTranscript": "아직 대화 기록이 없습니다",
+    "adminPrompt": "관리자",
+    "teammateResponse": "팀원"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "비용 추적",
+    "tokens": "토큰",
+    "totalTokens": "총 토큰",
+    "totalCost": "예상 비용",
+    "memberColumn": "멤버",
+    "tokensColumn": "토큰",
+    "modelColumn": "모델",
+    "estimatedCostColumn": "예상 비용",
+    "adminTag": "관리자",
+    "notAvailable": "N/A",
+    "noData": "비용 데이터가 없습니다",
+    "disclaimer": "비용은 추정치이며 실제 요금과 다를 수 있습니다."
   },
   "memberSider": {
     "title": "멤버",

@@ -187,19 +187,9 @@ vi.mock('@/renderer/hooks/useAgentRegistry', () => ({
   useAgentRegistry: () => new Map(),
 }));
 
-// Mock AgentSelectionModal so we can track its visible prop
-const mockAgentSelectionModalProps = vi.fn();
+// Mock AgentSelectionModal — S6 removed this component; mock as sentinel to detect accidental presence
 vi.mock('@/renderer/pages/conversation/GroupedHistory/components/AgentSelectionModal', () => ({
-  default: (props: { visible: boolean; onClose: () => void; onSelect: (id: string) => void }) => {
-    mockAgentSelectionModalProps(props);
-    return props.visible ? (
-      <div data-testid='agent-selection-modal'>
-        <button data-testid='modal-close-btn' onClick={props.onClose}>
-          close
-        </button>
-      </div>
-    ) : null;
-  },
+  default: (props: { visible?: boolean }) => (props.visible ? <div data-testid='agent-selection-modal' /> : null),
 }));
 
 // Mock AgentDMGroup to avoid deep dependency rendering
@@ -311,74 +301,43 @@ describe('DM Section Header (WorkspaceGroupedHistory)', () => {
     expect(screen.queryByText('dispatch.sidebar.directMessagesSection')).toBeInTheDocument();
   });
 
-  // DM-002: AC-9 — "+" button is visible in DM section header when sidebar is expanded
-  it('DM-002 (AC-9): "+" button is present in DM section header when sidebar is expanded', () => {
+  // DM-002: S6 — DM section header does NOT have a "+" button (removed in S6)
+  it('DM-002 (S6): DM section header does NOT contain a "+" button after S6 restructure', () => {
     mockConversationsReturn.mockReturnValue(makeEmptyConversationsReturn());
     render(<WorkspaceGroupedHistory collapsed={false} />);
 
-    // The plus icon is rendered inside the DM section header clickable span
-    const plusIcons = screen.queryAllByTestId('icon-plus');
-    expect(plusIcons.length).toBeGreaterThan(0);
+    const dmHeader = screen.queryByText('dispatch.sidebar.directMessagesSection');
+    expect(dmHeader).toBeInTheDocument();
+
+    // The DM section header should NOT have a plus icon (removed in S6)
+    const headerContainer = dmHeader?.closest('.chat-history__section') ?? dmHeader?.parentElement;
+    const plusInHeader = headerContainer?.querySelector('[data-testid="icon-plus"]');
+    expect(plusInHeader).toBeNull();
   });
 
-  // DM-003: AC-2 — Clicking "+" opens AgentSelectionModal
-  it('DM-003 (AC-2): clicking the DM "+" button opens the AgentSelectionModal', () => {
+  // DM-003: S6 — AgentSelectionModal is NOT in the component tree
+  it('DM-003 (S6): AgentSelectionModal is not present after S6 removes it', () => {
     mockConversationsReturn.mockReturnValue(makeEmptyConversationsReturn());
     render(<WorkspaceGroupedHistory collapsed={false} />);
 
-    expect(screen.queryByTestId('agent-selection-modal')).not.toBeInTheDocument();
-
-    // Find the "+" button near the DM section header — it's the icon-plus near "directMessagesSection"
-    const dmHeader = screen.getByText('dispatch.sidebar.directMessagesSection');
-    const headerContainer = dmHeader.closest('.chat-history__section') ?? dmHeader.parentElement;
-    const plusBtn = headerContainer?.querySelector('[data-testid="icon-plus"]')?.parentElement;
-
-    expect(plusBtn).not.toBeNull();
-    fireEvent.click(plusBtn!);
-
-    expect(screen.getByTestId('agent-selection-modal')).toBeInTheDocument();
-  });
-
-  // DM-004: AC-2 — AgentSelectionModal closes when onClose is triggered
-  it('DM-004 (AC-2): AgentSelectionModal closes when its onClose callback is invoked', () => {
-    mockConversationsReturn.mockReturnValue(makeEmptyConversationsReturn());
-    render(<WorkspaceGroupedHistory collapsed={false} />);
-
-    // Open modal
-    const dmHeader = screen.getByText('dispatch.sidebar.directMessagesSection');
-    const headerContainer = dmHeader.closest('.chat-history__section') ?? dmHeader.parentElement;
-    const plusBtn = headerContainer?.querySelector('[data-testid="icon-plus"]')?.parentElement;
-    fireEvent.click(plusBtn!);
-
-    expect(screen.getByTestId('agent-selection-modal')).toBeInTheDocument();
-
-    // Close modal
-    fireEvent.click(screen.getByTestId('modal-close-btn'));
-
+    // AgentSelectionModal was removed in S6; it should not appear in DOM
     expect(screen.queryByTestId('agent-selection-modal')).not.toBeInTheDocument();
   });
 
-  // DM-005: AC-6 — onSelect in modal triggers navigation to /guid with prefillAgentId
-  it('DM-005 (AC-6): selecting an agent from modal navigates to /guid with prefillAgentId in state', () => {
+  // DM-004: S6 — newDirectMessage i18n key is NOT used (tooltip for "+" was removed)
+  it('DM-004 (S6): i18n key dispatch.sidebar.newDirectMessage is not rendered after S6', () => {
     mockConversationsReturn.mockReturnValue(makeEmptyConversationsReturn());
     render(<WorkspaceGroupedHistory collapsed={false} />);
 
-    // Open modal
-    const dmHeader = screen.getByText('dispatch.sidebar.directMessagesSection');
-    const headerContainer = dmHeader.closest('.chat-history__section') ?? dmHeader.parentElement;
-    const plusBtn = headerContainer?.querySelector('[data-testid="icon-plus"]')?.parentElement;
-    fireEvent.click(plusBtn!);
+    expect(screen.queryByText('dispatch.sidebar.newDirectMessage')).not.toBeInTheDocument();
+  });
 
-    // Manually invoke the onSelect prop from the mock
-    const lastCall = mockAgentSelectionModalProps.mock.calls[mockAgentSelectionModalProps.mock.calls.length - 1]?.[0] as
-      | { onSelect: (id: string) => void }
-      | undefined;
-    lastCall?.onSelect('claude');
+  // DM-005: S6 — navigate is NOT called when DM section renders (no modal trigger)
+  it('DM-005 (S6): navigate is not called when DM section renders (modal removed)', () => {
+    mockConversationsReturn.mockReturnValue(makeEmptyConversationsReturn());
+    render(<WorkspaceGroupedHistory collapsed={false} />);
 
-    expect(mockNavigate).toHaveBeenCalledWith(
-      '/guid',
-      expect.objectContaining({ state: expect.objectContaining({ prefillAgentId: 'claude' }) })
-    );
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   // DM-006: AC-10 — "No conversations yet" message when DMs empty and expanded

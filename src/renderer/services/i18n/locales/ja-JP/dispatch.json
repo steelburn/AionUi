@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}} タスク",
     "channelsSection": "チャンネル",
     "directMessagesSection": "ダイレクトメッセージ",
-    "generalAgentsSection": "汎用エージェント",
-    "assistantsSection": "アシスタント",
     "newConversation": "新規会話",
     "savedAssistant": "保存済みアシスタント",
     "noChannels": "チャンネルはまだありません",
     "collapseChannels": "チャンネルを折りたたむ",
     "expandChannels": "チャンネルを展開する",
-    "newDirectMessage": "新規ダイレクトメッセージ",
-    "noDirectMessages": "会話がまだありません",
-    "selectAgent": "エージェントを選択",
-    "searchAgents": "エージェントを検索...",
-    "permanentAgents": "保存済みアシスタント",
-    "temporaryAgents": "CLI エージェント",
-    "noAgentsFound": "エージェントが見つかりません",
-    "agentSourcePreset": "プリセット",
-    "agentSourceCustom": "カスタム",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "会話がまだありません"
   },
   "create": {
     "title": "グループチャットを作成",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "参照",
     "leaderAgentLabel": "リーダーエージェント / ペルソナ（任意）",
     "leaderAgentPlaceholder": "エージェントペルソナを選択...",
+    "adminLabel": "管理エージェント（必須）",
+    "adminPlaceholder": "管理エージェントを選択...",
     "modelLabel": "モデル（任意）",
     "modelPlaceholder": "デフォルトモデルを使用",
     "modelTooltip": "ディスパッチにはツール呼び出し（function calling）対応モデルが必要です",
     "advancedSettings": "詳細設定",
     "seedMessageLabel": "カスタムシステムプロンプト",
     "seedMessagePlaceholder": "オーケストレーターへの追加指示を入力...",
-    "seedMessageHint": "これらの指示はディスパッチシステムプロンプトに追加されます（最大2000文字）。"
+    "seedMessageHint": "これらの指示はディスパッチシステムプロンプトに追加されます（最大2000文字）。",
+    "teamConfigLabel": "チーム設定（任意）",
+    "teamConfigPlaceholder": "チームワークフロー設定を選択..."
   },
   "header": {
     "taskCount": "{{count}} タスク"
@@ -145,6 +138,65 @@
     "completed": "{{count}} 完了",
     "failed": "{{count}} 失敗",
     "pending": "{{count}} 保留中"
+  },
+  "memberBar": {
+    "addMember": "メンバーを追加"
+  },
+  "tabs": {
+    "groupChat": "グループチャット"
+  },
+  "profile": {
+    "baseAgent": "ベースエージェント",
+    "model": "モデル",
+    "rules": "ルール",
+    "skills": "スキル",
+    "currentInstruction": "現在の指示",
+    "currentTask": "現在のタスク",
+    "removeMember": "グループから削除",
+    "statusOnline": "オンライン",
+    "statusWorking": "作業中",
+    "statusIdle": "アイドル",
+    "statusError": "エラー",
+    "typeAdmin": "管理者",
+    "typePermanent": "常設メンバー",
+    "typeTemporary": "一時メンバー",
+    "noRules": "プリセットルールなし",
+    "elapsed": "{{time}} 経過",
+    "removeConfirmTitle": "メンバーを削除",
+    "removeConfirmContent": "「{{name}}」をグループから削除しますか？",
+    "modelChangeSuccess": "モデルが更新されました",
+    "modelChangeFailed": "モデルの更新に失敗しました"
+  },
+  "addMember": {
+    "title": "メンバーを追加",
+    "placeholder": "追加するエージェントを選択...",
+    "confirm": "追加",
+    "success": "メンバーを追加しました",
+    "error": "メンバーの追加に失敗しました",
+    "alreadyAdded": "既にグループ内"
+  },
+  "teammateView": {
+    "noTranscript": "トランスクリプトはまだありません",
+    "adminPrompt": "管理者",
+    "teammateResponse": "チームメイト"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "コスト追跡",
+    "tokens": "トークン",
+    "totalTokens": "合計トークン",
+    "totalCost": "推定コスト",
+    "memberColumn": "メンバー",
+    "tokensColumn": "トークン",
+    "modelColumn": "モデル",
+    "estimatedCostColumn": "推定コスト",
+    "adminTag": "管理者",
+    "notAvailable": "N/A",
+    "noData": "コストデータがありません",
+    "disclaimer": "コストは推定値であり、実際の料金と異なる場合があります。"
   },
   "memberSider": {
     "title": "メンバー",

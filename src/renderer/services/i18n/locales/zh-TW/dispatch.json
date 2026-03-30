@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}} 個任務",
     "channelsSection": "頻道",
     "directMessagesSection": "私訊",
-    "generalAgentsSection": "通用 Agent",
-    "assistantsSection": "助手",
     "newConversation": "新增對話",
     "savedAssistant": "已儲存的助手",
     "noChannels": "還沒有頻道",
     "collapseChannels": "收起頻道",
     "expandChannels": "展開頻道",
-    "newDirectMessage": "新增私訊",
-    "noDirectMessages": "暫無對話",
-    "selectAgent": "選擇助手",
-    "searchAgents": "搜尋助手...",
-    "permanentAgents": "已儲存的助手",
-    "temporaryAgents": "CLI 代理",
-    "noAgentsFound": "找不到助手",
-    "agentSourcePreset": "預設",
-    "agentSourceCustom": "自訂",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "暫無對話"
   },
   "create": {
     "title": "建立群聊",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "瀏覽",
     "leaderAgentLabel": "領導 Agent / 人設（選填）",
     "leaderAgentPlaceholder": "選擇一個 Agent 人設...",
+    "adminLabel": "管理 Agent（必填）",
+    "adminPlaceholder": "選擇管理 Agent...",
     "modelLabel": "模型（選填）",
     "modelPlaceholder": "使用預設模型",
     "modelTooltip": "調度需要支援工具呼叫（function calling）的模型",
     "advancedSettings": "進階設定",
     "seedMessageLabel": "自訂系統提示詞",
     "seedMessagePlaceholder": "為調度器新增額外指令...",
-    "seedMessageHint": "這些指令將附加到調度系統提示詞中（最多 2000 字元）。"
+    "seedMessageHint": "這些指令將附加到調度系統提示詞中（最多 2000 字元）。",
+    "teamConfigLabel": "團隊設定（選填）",
+    "teamConfigPlaceholder": "選擇團隊工作流程設定..."
   },
   "header": {
     "taskCount": "{{count}} 個任務"
@@ -145,6 +138,65 @@
     "completed": "{{count}} 個已完成",
     "failed": "{{count}} 個失敗",
     "pending": "{{count}} 個等待中"
+  },
+  "memberBar": {
+    "addMember": "新增成員"
+  },
+  "tabs": {
+    "groupChat": "群聊"
+  },
+  "profile": {
+    "baseAgent": "基礎 Agent",
+    "model": "模型",
+    "rules": "規則",
+    "skills": "技能",
+    "currentInstruction": "當前指令",
+    "currentTask": "當前任務",
+    "removeMember": "從群組移除",
+    "statusOnline": "線上",
+    "statusWorking": "工作中",
+    "statusIdle": "閒置",
+    "statusError": "錯誤",
+    "typeAdmin": "管理員",
+    "typePermanent": "固定成員",
+    "typeTemporary": "臨時成員",
+    "noRules": "無預設規則",
+    "elapsed": "已用時 {{time}}",
+    "removeConfirmTitle": "移除成員",
+    "removeConfirmContent": "確定將「{{name}}」從群組中移除？",
+    "modelChangeSuccess": "模型已更新",
+    "modelChangeFailed": "更新模型失敗"
+  },
+  "addMember": {
+    "title": "新增成員",
+    "placeholder": "選擇要新增的 Agent...",
+    "confirm": "新增",
+    "success": "成員新增成功",
+    "error": "新增成員失敗",
+    "alreadyAdded": "已在群組中"
+  },
+  "teammateView": {
+    "noTranscript": "暫無對話記錄",
+    "adminPrompt": "管理員",
+    "teammateResponse": "隊友"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "費用追蹤",
+    "tokens": "tokens",
+    "totalTokens": "總 Tokens",
+    "totalCost": "預估費用",
+    "memberColumn": "成員",
+    "tokensColumn": "Tokens",
+    "modelColumn": "模型",
+    "estimatedCostColumn": "預估費用",
+    "adminTag": "管理員",
+    "notAvailable": "N/A",
+    "noData": "暫無費用資料",
+    "disclaimer": "費用為預估值，可能與實際費用不符。"
   },
   "memberSider": {
     "title": "成員",

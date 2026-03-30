@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}} görev",
     "channelsSection": "Kanallar",
     "directMessagesSection": "Direkt Mesajlar",
-    "generalAgentsSection": "Genel Ajanlar",
-    "assistantsSection": "Asistanlar",
     "newConversation": "Yeni Sohbet",
     "savedAssistant": "Kayıtlı asistan",
     "noChannels": "Henüz kanal yok",
     "collapseChannels": "Kanalları daralt",
     "expandChannels": "Kanalları genişlet",
-    "newDirectMessage": "Yeni direkt mesaj",
-    "noDirectMessages": "Henüz konuşma yok",
-    "selectAgent": "Bir ajan seç",
-    "searchAgents": "Ajan ara...",
-    "permanentAgents": "Kayıtlı Asistanlar",
-    "temporaryAgents": "CLI Ajanları",
-    "noAgentsFound": "Ajan bulunamadı",
-    "agentSourcePreset": "Ön Ayar",
-    "agentSourceCustom": "Özel",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "Henüz konuşma yok"
   },
   "create": {
     "title": "Grup Sohbeti Oluştur",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "Göz At",
     "leaderAgentLabel": "Lider Ajan / Persona (isteğe bağlı)",
     "leaderAgentPlaceholder": "Bir ajan personası seçin...",
+    "adminLabel": "Yönetici Ajan (zorunlu)",
+    "adminPlaceholder": "Bir yönetici ajan seçin...",
     "modelLabel": "Model (isteğe bağlı)",
     "modelPlaceholder": "Varsayılan modeli kullan",
     "modelTooltip": "Dağıtım, araç çağırma (function calling) destekli bir model gerektirir",
     "advancedSettings": "Gelişmiş Ayarlar",
     "seedMessageLabel": "Özel Sistem Komutu",
     "seedMessagePlaceholder": "Orkestratör için ek talimatlar ekleyin...",
-    "seedMessageHint": "Bu talimatlar dağıtım sistem komutuna eklenecektir (maks. 2000 karakter)."
+    "seedMessageHint": "Bu talimatlar dağıtım sistem komutuna eklenecektir (maks. 2000 karakter).",
+    "teamConfigLabel": "Takım Yapılandırması (isteğe bağlı)",
+    "teamConfigPlaceholder": "Takım iş akışı yapılandırması seçin..."
   },
   "header": {
     "taskCount": "{{count}} görev"
@@ -145,6 +138,65 @@
     "completed": "{{count}} tamamlandı",
     "failed": "{{count}} başarısız",
     "pending": "{{count}} bekliyor"
+  },
+  "memberBar": {
+    "addMember": "\u00dcye ekle"
+  },
+  "tabs": {
+    "groupChat": "Grup Sohbeti"
+  },
+  "profile": {
+    "baseAgent": "Temel Ajan",
+    "model": "Model",
+    "rules": "Kurallar",
+    "skills": "Beceriler",
+    "currentInstruction": "Mevcut Talimat",
+    "currentTask": "Mevcut Görev",
+    "removeMember": "Gruptan kaldır",
+    "statusOnline": "Çevrimiçi",
+    "statusWorking": "Çalışıyor",
+    "statusIdle": "Boşta",
+    "statusError": "Hata",
+    "typeAdmin": "Yönetici",
+    "typePermanent": "Kalıcı Üye",
+    "typeTemporary": "Geçici Üye",
+    "noRules": "Önceden ayarlanmış kural yok",
+    "elapsed": "{{time}} geçti",
+    "removeConfirmTitle": "Üyeyi Kaldır",
+    "removeConfirmContent": "\"{{name}}\" gruptan kaldırılsın mı?",
+    "modelChangeSuccess": "Model güncellendi",
+    "modelChangeFailed": "Model güncellenemedi"
+  },
+  "addMember": {
+    "title": "Üye Ekle",
+    "placeholder": "Eklenecek bir ajan seçin...",
+    "confirm": "Ekle",
+    "success": "Üye başarıyla eklendi",
+    "error": "Üye eklenemedi",
+    "alreadyAdded": "Zaten grupta"
+  },
+  "teammateView": {
+    "noTranscript": "Henüz transkript mevcut değil",
+    "adminPrompt": "Yönetici",
+    "teammateResponse": "Takım Arkadaşı"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "Maliyet Takibi",
+    "tokens": "token",
+    "totalTokens": "Toplam Token",
+    "totalCost": "Tahmini Maliyet",
+    "memberColumn": "Üye",
+    "tokensColumn": "Token",
+    "modelColumn": "Model",
+    "estimatedCostColumn": "Tahmini Maliyet",
+    "adminTag": "Yönetici",
+    "notAvailable": "N/A",
+    "noData": "Maliyet verisi mevcut değil",
+    "disclaimer": "Maliyet tahminleri yaklaşıktır ve gerçek ücretleri yansıtmayabilir."
   },
   "memberSider": {
     "title": "Üyeler",

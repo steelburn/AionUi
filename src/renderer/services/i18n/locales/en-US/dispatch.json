@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}} task(s)",
     "channelsSection": "Channels",
     "directMessagesSection": "Direct Messages",
-    "generalAgentsSection": "General Agents",
-    "assistantsSection": "Assistants",
     "newConversation": "New Conversation",
     "savedAssistant": "Saved assistant",
     "noChannels": "No channels yet",
     "collapseChannels": "Collapse channels",
     "expandChannels": "Expand channels",
-    "newDirectMessage": "New direct message",
-    "noDirectMessages": "No conversations yet",
-    "selectAgent": "Select an agent",
-    "searchAgents": "Search agents...",
-    "permanentAgents": "Saved Assistants",
-    "temporaryAgents": "CLI Agents",
-    "noAgentsFound": "No agents found",
-    "agentSourcePreset": "Preset",
-    "agentSourceCustom": "Custom",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "No conversations yet"
   },
   "create": {
     "title": "Create Group Chat",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "Browse",
     "leaderAgentLabel": "Leader Agent / Persona (optional)",
     "leaderAgentPlaceholder": "Select an agent persona...",
+    "adminLabel": "Admin Agent (required)",
+    "adminPlaceholder": "Select an admin agent...",
     "modelLabel": "Model (optional)",
     "modelPlaceholder": "Use default model",
     "modelTooltip": "Dispatch requires a model with tool calling (function calling) support",
     "advancedSettings": "Advanced Settings",
     "seedMessageLabel": "Custom System Prompt",
     "seedMessagePlaceholder": "Add additional instructions for the orchestrator...",
-    "seedMessageHint": "These instructions will be appended to the dispatch system prompt (max 2000 chars)."
+    "seedMessageHint": "These instructions will be appended to the dispatch system prompt (max 2000 chars).",
+    "teamConfigLabel": "Team Config (optional)",
+    "teamConfigPlaceholder": "Select a team workflow config..."
   },
   "header": {
     "taskCount": "{{count}} task(s)"
@@ -145,6 +138,65 @@
     "completed": "{{count}} completed",
     "failed": "{{count}} failed",
     "pending": "{{count}} pending"
+  },
+  "memberBar": {
+    "addMember": "Add member"
+  },
+  "tabs": {
+    "groupChat": "Group Chat"
+  },
+  "profile": {
+    "baseAgent": "Base Agent",
+    "model": "Model",
+    "rules": "Rules",
+    "skills": "Skills",
+    "currentInstruction": "Current Instruction",
+    "currentTask": "Current Task",
+    "removeMember": "Remove from group",
+    "statusOnline": "Online",
+    "statusWorking": "Working",
+    "statusIdle": "Idle",
+    "statusError": "Error",
+    "typeAdmin": "Admin",
+    "typePermanent": "Permanent",
+    "typeTemporary": "Temporary",
+    "noRules": "No preset rules",
+    "elapsed": "{{time}} elapsed",
+    "removeConfirmTitle": "Remove Member",
+    "removeConfirmContent": "Remove \"{{name}}\" from the group?",
+    "modelChangeSuccess": "Model updated",
+    "modelChangeFailed": "Failed to update model"
+  },
+  "addMember": {
+    "title": "Add Member",
+    "placeholder": "Select an agent to add...",
+    "confirm": "Add",
+    "success": "Member added successfully",
+    "error": "Failed to add member",
+    "alreadyAdded": "Already in group"
+  },
+  "teammateView": {
+    "noTranscript": "No transcript available yet",
+    "adminPrompt": "Admin",
+    "teammateResponse": "Teammate"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "Cost Tracking",
+    "tokens": "tokens",
+    "totalTokens": "Total Tokens",
+    "totalCost": "Est. Cost",
+    "memberColumn": "Member",
+    "tokensColumn": "Tokens",
+    "modelColumn": "Model",
+    "estimatedCostColumn": "Est. Cost",
+    "adminTag": "Admin",
+    "notAvailable": "N/A",
+    "noData": "No cost data available",
+    "disclaimer": "Cost estimates are approximate and may not reflect actual charges."
   },
   "memberSider": {
     "title": "Members",

@@ -5,23 +5,12 @@
     "childTaskCount": "{{count}} 个任务",
     "channelsSection": "频道",
     "directMessagesSection": "私信",
-    "generalAgentsSection": "通用 Agent",
-    "assistantsSection": "助手",
     "newConversation": "新建对话",
     "savedAssistant": "已保存的助手",
     "noChannels": "还没有频道",
     "collapseChannels": "收起频道",
     "expandChannels": "展开频道",
-    "newDirectMessage": "新建私信",
-    "noDirectMessages": "暂无对话",
-    "selectAgent": "选择一个助手",
-    "searchAgents": "搜索助手...",
-    "permanentAgents": "已保存的助手",
-    "temporaryAgents": "CLI 代理",
-    "noAgentsFound": "未找到助手",
-    "agentSourcePreset": "预设",
-    "agentSourceCustom": "自定义",
-    "agentSourceCli": "CLI"
+    "noDirectMessages": "暂无对话"
   },
   "create": {
     "title": "创建群聊",
@@ -35,13 +24,17 @@
     "workspaceBrowse": "浏览",
     "leaderAgentLabel": "领导 Agent / 人设（可选）",
     "leaderAgentPlaceholder": "选择一个 Agent 人设...",
+    "adminLabel": "管理 Agent（必选）",
+    "adminPlaceholder": "选择管理 Agent...",
     "modelLabel": "模型（可选）",
     "modelPlaceholder": "使用默认模型",
     "modelTooltip": "调度需要支持工具调用（function calling）的模型",
     "advancedSettings": "高级设置",
     "seedMessageLabel": "自定义系统提示词",
     "seedMessagePlaceholder": "为调度器添加额外指令...",
-    "seedMessageHint": "这些指令将追加到调度系统提示词中（最多 2000 字符）。"
+    "seedMessageHint": "这些指令将追加到调度系统提示词中（最多 2000 字符）。",
+    "teamConfigLabel": "团队配置（可选）",
+    "teamConfigPlaceholder": "选择团队工作流配置..."
   },
   "header": {
     "taskCount": "{{count}} 个任务"
@@ -145,6 +138,65 @@
     "completed": "{{count}} 个已完成",
     "failed": "{{count}} 个失败",
     "pending": "{{count}} 个等待中"
+  },
+  "memberBar": {
+    "addMember": "添加成员"
+  },
+  "tabs": {
+    "groupChat": "群聊"
+  },
+  "profile": {
+    "baseAgent": "基础 Agent",
+    "model": "模型",
+    "rules": "规则",
+    "skills": "技能",
+    "currentInstruction": "当前指令",
+    "currentTask": "当前任务",
+    "removeMember": "从群组移除",
+    "statusOnline": "在线",
+    "statusWorking": "工作中",
+    "statusIdle": "空闲",
+    "statusError": "错误",
+    "typeAdmin": "管理员",
+    "typePermanent": "固定成员",
+    "typeTemporary": "临时成员",
+    "noRules": "无预设规则",
+    "elapsed": "已用时 {{time}}",
+    "removeConfirmTitle": "移除成员",
+    "removeConfirmContent": "确定将 \"{{name}}\" 从群组中移除？",
+    "modelChangeSuccess": "模型已更新",
+    "modelChangeFailed": "更新模型失败"
+  },
+  "addMember": {
+    "title": "添加成员",
+    "placeholder": "选择要添加的 Agent...",
+    "confirm": "添加",
+    "success": "成员添加成功",
+    "error": "添加成员失败",
+    "alreadyAdded": "已在群组中"
+  },
+  "teammateView": {
+    "noTranscript": "暂无对话记录",
+    "adminPrompt": "管理员",
+    "teammateResponse": "队友"
+  },
+  "progress": {
+    "overall": "{{percent}}%",
+    "phasePercent": "{{percent}}%"
+  },
+  "cost": {
+    "title": "费用追踪",
+    "tokens": "tokens",
+    "totalTokens": "总 Tokens",
+    "totalCost": "预估费用",
+    "memberColumn": "成员",
+    "tokensColumn": "Tokens",
+    "modelColumn": "模型",
+    "estimatedCostColumn": "预估费用",
+    "adminTag": "管理员",
+    "notAvailable": "N/A",
+    "noData": "暂无费用数据",
+    "disclaimer": "费用为预估值，可能与实际费用不符。"
   },
   "memberSider": {
     "title": "成员",

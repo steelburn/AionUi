@@ -7,7 +7,6 @@
 import type React from 'react';
 
 import type { TChatConversation } from '@/common/config/storage';
-import type { AgentIdentity } from '@/renderer/utils/model/agentIdentity';
 
 export type WorkspaceGroup = {
   workspace: string;
@@ -128,18 +127,6 @@ export type DragItem = {
   workspaceGroup?: WorkspaceGroup;
   sourceSection: 'pinned' | string;
   sourceWorkspace?: string;
-};
-
-/** Props for the AgentSelectionModal component */
-export type AgentSelectionModalProps = {
-  /** Whether the modal is visible */
-  visible: boolean;
-  /** All available agents from the registry */
-  agents: AgentIdentity[];
-  /** Callback when an agent is selected — receives the agent ID */
-  onSelect: (agentId: string) => void;
-  /** Callback to close the modal */
-  onClose: () => void;
 };
 
 /** Props for the ChannelSection component */
