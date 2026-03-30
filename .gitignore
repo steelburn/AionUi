@@ -204,8 +204,12 @@ dist-server/
 # Iteration design docs and process files (local only)
 iterations/
 
-# Claude team configs (local only)
+# Claude team configs and agent commands (local only)
 .claude/teams/
+.claude/commands/architect.md
+.claude/commands/dev.md
+.claude/commands/pm.md
+.claude/commands/tester.md
 
 # E2E test scripts (local only)
 tests/e2e/scripts/
@@ -213,3 +217,6 @@ tests/e2e/scripts/
 # Test files for dispatch (local iteration, not CI)
 tests/unit/dispatch/
 tests/integration/dispatch-*
+
+# Local design docs
+docs/feature/remote-agent/agent-management-prd-v1.md
