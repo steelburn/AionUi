@@ -9,7 +9,8 @@
 import type { IWorkerTaskManager } from '../IWorkerTaskManager';
 import type { DispatchSessionTracker } from './DispatchSessionTracker';
 import { DEFAULT_CONCURRENT_CHILDREN, MIN_CONCURRENT_CHILDREN, MAX_CONCURRENT_CHILDREN_LIMIT } from './dispatchTypes';
-import { mainLog } from '@process/utils/mainLogger';
+import { mainLog, mainWarn } from '@process/utils/mainLogger';
+import { cleanupWorktree } from './worktreeManager';
 
 /**
  * Phase 1 basic resource management for dispatch sessions.
@@ -104,13 +105,21 @@ export class DispatchResourceGuard {
 
   /**
    * Cascade kill: when dispatcher is killed, kill all children too.
+   * G2.1: Also cleans up worktrees for any children that had isolation='worktree'.
    * Triggered by: user closes group chat, dispatcher finishes, app exit.
    */
-  cascadeKill(parentId: string): void {
-    const childIds = this.tracker.getChildIds(parentId);
-    for (const childId of childIds) {
-      mainLog('[DispatchResourceGuard]', `Cascade killing child: ${childId}`);
-      this.taskManager.kill(childId);
+  cascadeKill(parentId: string, parentWorkspace?: string): void {
+    const children = this.tracker.getChildren(parentId);
+    for (const child of children) {
+      mainLog('[DispatchResourceGuard]', `Cascade killing child: ${child.sessionId}`);
+      this.taskManager.kill(child.sessionId);
+
+      // G2.1: Cleanup worktree if present
+      if (child.worktreePath && child.worktreeBranch && parentWorkspace) {
+        cleanupWorktree(parentWorkspace, child.worktreePath, child.worktreeBranch).catch((err) => {
+          mainWarn('[DispatchResourceGuard]', `Failed to cleanup worktree: ${child.worktreePath}`, err);
+        });
+      }
     }
     this.tracker.removeParent(parentId);
     this.taskManager.kill(parentId);
