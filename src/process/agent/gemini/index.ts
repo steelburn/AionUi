@@ -53,6 +53,38 @@ import {
 import path from 'path';
 import os from 'os';
 
+// Media file extensions that must be sent as inlineData in the user message,
+// not via tool responses (Gemini API rejects media in functionResponse)
+const MEDIA_EXTENSIONS = new Set([
+  '.ogg',
+  '.mp3',
+  '.wav',
+  '.flac',
+  '.aac',
+  '.wma',
+  '.m4a',
+  '.opus',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.webm',
+  '.flv',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+  '.bmp',
+  '.ico',
+  '.pdf',
+]);
+
+function hasMediaFiles(files: string[] | undefined): boolean {
+  if (!files || files.length === 0) return false;
+  return files.some((filePath) => MEDIA_EXTENSIONS.has(path.extname(filePath).toLowerCase()));
+}
+
 // Global registry for current agent instance (used by flashFallbackHandler)
 let currentGeminiAgent: GeminiAgent | null = null;
 
@@ -895,9 +927,10 @@ export class GeminiAgent {
       },
       messageId: Date.now(),
       signal: abortController.signal,
-      // 有 files 时启用懒加载：不立即读取文件内容
-      // Enable lazy loading only when files are provided
-      lazyFileLoading: !!(files && files.length > 0),
+      // Enable lazy loading for text files, but disable for media files (audio/video/image/pdf)
+      // because Gemini API requires media to be tokenized in the user message (inlineData),
+      // not in tool responses (functionResponse) — otherwise it errors with INVALID_ARGUMENT
+      lazyFileLoading: !!(files && files.length > 0) && !hasMediaFiles(files),
     });
 
     if (!shouldProceed || processedQuery === null || abortController.signal.aborted) {
