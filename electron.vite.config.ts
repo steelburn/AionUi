@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import { resolve } from 'path';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
@@ -57,6 +58,7 @@ const mainAliases = {
 };
 
 export default defineConfig(({ mode }) => {
+  const aionVersion = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf-8')).version as string;
   const isDevelopment = mode === 'development';
   const enableSentrySourceMaps = !isDevelopment && !!process.env.SENTRY_AUTH_TOKEN;
 
@@ -130,6 +132,7 @@ export default defineConfig(({ mode }) => {
         'process.env.NODE_ENV': JSON.stringify(mode),
         'process.env.env': JSON.stringify(process.env.env),
         'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
+        __AION_VERSION__: JSON.stringify(aionVersion),
       },
     },
 
