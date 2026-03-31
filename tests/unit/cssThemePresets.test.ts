@@ -181,6 +181,7 @@ describe('CssThemeSettings preset structure', () => {
     'retroma-y2k',
     'retroma-obsidian-book',
     'retroma-obsidian-book-2',
+    'retroma-obsidian-book-2-1-dark',
     'discourse-horizon',
     'glittering-input-field',
   ];
