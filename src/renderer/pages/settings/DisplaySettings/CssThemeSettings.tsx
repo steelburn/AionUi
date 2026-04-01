@@ -32,10 +32,10 @@ interface ThemePreviewPalette {
 
 const fallbackThemePreviewPaletteByMode: Record<'light' | 'dark', ThemePreviewPalette> = {
   light: {
-    appBg: '#f7f8fa',
+    appBg: '#f9fafb',
     headerBg: '#eef1f5',
     sideBg: '#eef1f5',
-    mainBg: '#f7f8fa',
+    mainBg: '#f9fafb',
     border: '#d9dde5',
     accent: '#3b82f6',
     textMuted: '#8b95a7',

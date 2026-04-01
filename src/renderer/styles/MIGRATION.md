@@ -7,7 +7,7 @@
 ```tsx
 // ✅ 背景色 - 简洁直观
 <div className="bg-base">     // 主背景 (白色/黑色)
-<div className="bg-1">        // 次级背景 (#F7F8FA)
+<div className="bg-1">        // 次级背景 (#F9FAFB)
 <div className="bg-2">        // 三级背景 (#F2F3F5)
 <div className="bg-brand">    // 品牌色背景 (#7583B2)
 
@@ -39,7 +39,7 @@
 | 旧值 (Hex) | UnoCSS 类                     | CSS 变量                | 说明            |
 | ---------- | ----------------------------- | ----------------------- | --------------- |
 | `#FFFFFF`  | `bg-base`                     | `var(--bg-base)`        | 主背景          |
-| `#F7F8FA`  | `bg-1`                        | `var(--bg-1)`           | 次级背景/填充色 |
+| `#F9FAFB`  | `bg-1`                        | `var(--bg-1)`           | 次级背景/填充色 |
 | `#F2F3F5`  | `bg-2`                        | `var(--bg-2)`           | 三级背景        |
 | `#E5E6EB`  | `bg-3` 或 `border-b-base`     | `var(--border-base)`    | 边框/分隔线     |
 | `#7583B2`  | `bg-brand` / `text-brand`     | `var(--brand)`          | 品牌色          |
@@ -80,7 +80,7 @@
 
 ```tsx
 // ❌ 不推荐
-<div className="bg-#F7F8FA text-#86909C border-#E5E6EB">
+<div className="bg-#F9FAFB text-#86909C border-#E5E6EB">
 
 // ✅ 推荐
 <div className="bg-1 text-t-secondary border-b-base">
