@@ -1,4 +1,4 @@
-import { ipcBridge } from '@/common';
+import { useApi } from '@renderer/api';
 import { ConfigStorage } from '@/common/config/storage';
 import { resolveLocaleKey } from '@/common/utils';
 import {
@@ -16,6 +16,7 @@ import useSWR from 'swr';
  * sorting, and tracking the active selection.
  */
 export const useAssistantList = () => {
+  const api = useApi();
   const { i18n } = useTranslation();
   const [assistants, setAssistants] = useState<AssistantListItem[]>([]);
   const [activeAssistantId, setActiveAssistantId] = useState<string | null>(null);
@@ -23,7 +24,7 @@ export const useAssistantList = () => {
 
   // Load extension-contributed assistants for Settings > Assistants list
   const { data: extensionAssistants } = useSWR('extensions.assistants', () =>
-    ipcBridge.extensions.getAssistants.invoke().catch(() => [] as Record<string, unknown>[])
+    api.request('extensions.get-assistants', undefined).catch(() => [] as Record<string, unknown>[])
   );
 
   const normalizedExtAssistants = React.useMemo<AssistantListItem[]>(

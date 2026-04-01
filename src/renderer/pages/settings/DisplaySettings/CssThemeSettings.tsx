@@ -5,7 +5,7 @@
  */
 
 import { ConfigStorage, type ICssTheme } from '@/common/config/storage.ts';
-import { ipcBridge } from '@/common';
+import { useApi } from '@renderer/api';
 import { uuid } from '@/common/utils';
 import { useThemeContext } from '@renderer/hooks/context/ThemeContext.tsx';
 import { resolveCssByActiveTheme, setExtensionThemesCache } from '@renderer/utils/theme/themeCssSync';
@@ -242,6 +242,7 @@ const dispatchCustomCssUpdated = (css: string) => {
  * 用于管理和切换 CSS 皮肤主题 / For managing and switching CSS skin themes
  */
 const CssThemeSettings: React.FC = () => {
+  const api = useApi();
   const { t } = useTranslation();
   const { theme: currentTheme } = useThemeContext();
   const [themes, setThemes] = useState<ICssTheme[]>([]);
@@ -277,7 +278,7 @@ const CssThemeSettings: React.FC = () => {
         // 加载扩展主题 / Load extension-contributed themes
         let extensionThemes: ICssTheme[] = [];
         try {
-          const loadedExtensionThemes = await ipcBridge.extensions.getThemes.invoke();
+          const loadedExtensionThemes = await api.request('extensions.get-themes', undefined);
           // Normalize extension asset URLs for current runtime (Electron/WebUI)
           extensionThemes = loadedExtensionThemes.map((theme) => ({
             ...theme,

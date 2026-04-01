@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ASSISTANT_PRESETS } from '@/common/config/presets/assistantPresets';
 import type { TChatConversation } from '@/common/config/storage';
 import { ConfigStorage } from '@/common/config/storage';
-import { ipcBridge } from '@/common';
+import { useApi } from '@renderer/api';
 import CoworkLogo from '@/renderer/assets/icons/cowork.svg';
 import { resolveExtensionAssetUrl } from '@/renderer/utils/platform';
 import useSWR from 'swr';
@@ -133,6 +133,7 @@ export function usePresetAssistantInfo(conversation: TChatConversation | undefin
   info: PresetAssistantInfo | null;
   isLoading: boolean;
 } {
+  const api = useApi();
   const { i18n } = useTranslation();
 
   // Fetch custom agents to support custom preset assistants
@@ -142,12 +143,12 @@ export function usePresetAssistantInfo(conversation: TChatConversation | undefin
 
   // Fetch extension-contributed assistants
   const { data: extensionAssistants, isLoading: isLoadingExtAssistants } = useSWR('extensions.assistants', () =>
-    ipcBridge.extensions.getAssistants.invoke().catch(() => [] as Record<string, unknown>[])
+    api.request('extensions.get-assistants', undefined).catch(() => [] as Record<string, unknown>[])
   );
 
   // Fetch extension-contributed ACP adapters (for ext:{extensionName}:{adapterId} conversations)
   const { data: extensionAcpAdapters, isLoading: isLoadingExtAdapters } = useSWR('extensions.acpAdapters', () =>
-    ipcBridge.extensions.getAcpAdapters.invoke().catch(() => [] as Record<string, unknown>[])
+    api.request('extensions.get-acp-adapters', undefined).catch(() => [] as Record<string, unknown>[])
   );
 
   // Fetch remote agents for remote conversations
@@ -155,7 +156,7 @@ export function usePresetAssistantInfo(conversation: TChatConversation | undefin
     conversation?.type === 'remote' ? (conversation.extra as { remoteAgentId?: string })?.remoteAgentId : undefined;
   const { data: remoteAgent, isLoading: isLoadingRemoteAgent } = useSWR(
     remoteAgentId ? `remote-agent.get.${remoteAgentId}` : null,
-    () => (remoteAgentId ? ipcBridge.remoteAgent.get.invoke({ id: remoteAgentId }) : null)
+    () => (remoteAgentId ? api.request('remote-agent.get', { id: remoteAgentId }) : null)
   );
 
   return useMemo(() => {

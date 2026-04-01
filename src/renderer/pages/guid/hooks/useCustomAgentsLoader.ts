@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ipcBridge } from '@/common';
 import { useApi } from '@renderer/api';
 import { ConfigStorage } from '@/common/config/storage';
 import type { AcpBackendConfig } from '../types';
@@ -40,7 +39,7 @@ export const useCustomAgentsLoader = ({
     let isActive = true;
     Promise.all([
       ConfigStorage.get('acp.customAgents'),
-      ipcBridge.extensions.getAssistants.invoke().catch(() => [] as Record<string, unknown>[]),
+      api.request('extensions.get-assistants', undefined).catch(() => [] as Record<string, unknown>[]),
     ])
       .then(([agents, extAssistants]) => {
         if (!isActive) return;

@@ -1,4 +1,3 @@
-import { ipcBridge } from '@/common';
 import { useApi } from '@renderer/api';
 import { useCallback, useEffect, useState } from 'react';
 import useSWR, { mutate } from 'swr';
@@ -13,7 +12,7 @@ export const useAssistantBackends = () => {
 
   // Load extension-contributed ACP adapters so they appear in the main agent dropdown
   const { data: extensionAcpAdapters } = useSWR('extensions.acpAdapters', () =>
-    ipcBridge.extensions.getAcpAdapters.invoke().catch(() => [] as Record<string, unknown>[])
+    api.request('extensions.get-acp-adapters', undefined).catch(() => [] as Record<string, unknown>[])
   );
 
   // Load available agent backends from ACP detector

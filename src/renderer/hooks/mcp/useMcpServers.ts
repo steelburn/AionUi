@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ConfigStorage } from '@/common/config/storage';
 import type { IMcpServer } from '@/common/config/storage';
-import { ipcBridge } from '@/common';
+import { useApi } from '@renderer/api';
 
 /**
  * MCP服务器状态管理Hook
@@ -9,6 +9,7 @@ import { ipcBridge } from '@/common';
  * 包含用户配置的 MCP servers 和扩展贡献的 MCP servers
  */
 export const useMcpServers = () => {
+  const api = useApi();
   const [mcpServers, setMcpServers] = useState<IMcpServer[]>([]);
   /** Extension-contributed MCP servers (read-only, from extensions) */
   const [extensionMcpServers, setExtensionMcpServers] = useState<IMcpServer[]>([]);
@@ -27,8 +28,8 @@ export const useMcpServers = () => {
       });
 
     // Load extension-contributed MCP servers
-    void ipcBridge.extensions.getMcpServers
-      .invoke()
+    void api
+      .request('extensions.get-mcp-servers', undefined)
       .then((extServers) => {
         if (extServers && extServers.length > 0) {
           const converted: IMcpServer[] = extServers.map((s) => ({
