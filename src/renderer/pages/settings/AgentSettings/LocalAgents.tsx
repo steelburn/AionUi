@@ -31,10 +31,7 @@ const LocalAgents: React.FC = () => {
   });
 
   // Custom agents
-  const {
-    data: customAgents,
-    mutate: mutateCustomAgents,
-  } = useSWR('acp.customAgents.settings', async () => {
+  const { data: customAgents, mutate: mutateCustomAgents } = useSWR('acp.customAgents.settings', async () => {
     const agents = await ConfigStorage.get('acp.customAgents');
     return ((agents || []) as AcpBackendConfig[]).filter((a) => !a.isPreset);
   });
@@ -57,7 +54,7 @@ const LocalAgents: React.FC = () => {
       setEditorVisible(false);
       setEditingAgent(null);
     },
-    [mutateCustomAgents],
+    [mutateCustomAgents]
   );
 
   const handleDeleteCustomAgent = useCallback(
@@ -67,7 +64,7 @@ const LocalAgents: React.FC = () => {
       await ConfigStorage.set('acp.customAgents', agents);
       await mutateCustomAgents();
     },
-    [mutateCustomAgents],
+    [mutateCustomAgents]
   );
 
   const handleToggleCustomAgent = useCallback(
@@ -81,7 +78,7 @@ const LocalAgents: React.FC = () => {
         await mutateCustomAgents();
       }
     },
-    [mutateCustomAgents],
+    [mutateCustomAgents]
   );
 
   // Gemini CLI first among detected agents
@@ -111,12 +108,8 @@ const LocalAgents: React.FC = () => {
                 }
               }}
             >
-              <Menu.Item key='market'>
-                {t('settings.agentManagement.installFromMarket')}
-              </Menu.Item>
-              <Menu.Item key='custom'>
-                {t('settings.agentManagement.detectCustomAgent')}
-              </Menu.Item>
+              <Menu.Item key='market'>{t('settings.agentManagement.installFromMarket')}</Menu.Item>
+              <Menu.Item key='custom'>{t('settings.agentManagement.detectCustomAgent')}</Menu.Item>
             </Menu>
           }
           position='bl'
