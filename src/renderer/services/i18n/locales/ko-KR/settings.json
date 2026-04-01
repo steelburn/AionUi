@@ -726,7 +726,7 @@
     "remoteAgents": "원격 에이전트",
     "localAgentsDescription": "Gemini CLI는 내장되어 있습니다. 다른 에이전트는 로컬 설치 후 자동으로 감지됩니다.",
     "localAgentsSetupLink": "설치 가이드",
-    "remoteAgentsDescription": "원격 서비스를 통해 연결된 에이전트",
+    "remoteAgentsDescription": "원격 서비스를 통해 연결된 에이전트 (현재 OpenClaw만 지원, 다른 에이전트는 개발 중)",
     "settings": "설정",
     "advancedConfig": "고급 설정",
     "settingsDisabledHint": "설정 기능이 곧 제공됩니다",

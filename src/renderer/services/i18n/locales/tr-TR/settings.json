@@ -724,7 +724,7 @@
     "remoteAgents": "Uzak Ajanlar",
     "localAgentsDescription": "Gemini CLI yerleşiktir. Diğer ajanlar yerel kurulumdan sonra otomatik olarak algılanır.",
     "localAgentsSetupLink": "Kurulum kılavuzu",
-    "remoteAgentsDescription": "Uzak hizmetler aracılığıyla bağlı ajanlar",
+    "remoteAgentsDescription": "Uzak hizmetler aracılığıyla bağlı ajanlar (şu anda yalnızca OpenClaw desteklenmektedir, diğer ajanlar geliştirme aşamasındadır)",
     "settings": "Ayarlar",
     "advancedConfig": "Gelişmiş Yapılandırma",
     "settingsDisabledHint": "Yapılandırma yakında gelecek",

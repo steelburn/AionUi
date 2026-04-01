@@ -724,7 +724,7 @@
     "remoteAgents": "Remote Agents",
     "localAgentsDescription": "Gemini CLI is built-in. Other agents are auto-detected after local installation.",
     "localAgentsSetupLink": "Setup guide",
-    "remoteAgentsDescription": "Agents connected via remote services",
+    "remoteAgentsDescription": "Agents connected via remote services (currently only OpenClaw is supported, other agents are in development)",
     "settings": "Settings",
     "advancedConfig": "Advanced Config",
     "settingsDisabledHint": "Configuration coming soon",
