@@ -9,6 +9,7 @@ import type { DragEvent } from 'react';
 import type { TFunction } from 'i18next';
 import { ipcBridge } from '@/common';
 import { FileService, MAX_UPLOAD_SIZE_MB } from '@/renderer/services/FileService';
+import { platformAdapter } from '@renderer/utils/platformAdapter';
 import type { MessageApi } from '../types';
 
 interface UseWorkspaceDragImportOptions {
@@ -132,15 +133,11 @@ export function useWorkspaceDragImport({
         for (let i = 0; i < dataTransfer.files.length; i++) {
           const file = dataTransfer.files[i];
 
-          // 使用 Electron webUtils.getPathForFile API 获取文件/目录的绝对路径
-          // Use Electron webUtils.getPathForFile API to get absolute path for file/directory
+          // Use platformAdapter to get absolute path for file/directory (Electron only)
           let filePath: string | undefined;
-          if (window.electronAPI?.getPathForFile) {
-            try {
-              filePath = window.electronAPI.getPathForFile(file);
-            } catch (err) {
-              console.warn('[WorkspaceDragImport] getPathForFile failed:', err);
-            }
+          const adapterPath = platformAdapter.getPathForFile(file);
+          if (adapterPath) {
+            filePath = adapterPath;
           }
 
           // 回退到 File.path 属性（旧版 Electron 或非 Electron 环境）

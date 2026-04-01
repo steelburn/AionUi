@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import { useTypingAnimation } from '@/renderer/hooks/chat/useTypingAnimation';
+import { isElectronDesktop } from '@renderer/utils/platform';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useScrollSyncTarget } from '../../hooks/useScrollSyncHelpers';
 import { generateInspectScript } from './htmlInspectScript';
@@ -201,7 +202,7 @@ const HTMLRenderer: React.FC<HTMLRendererProps> = ({
   });
 
   // 检测是否在 Electron 环境 / Detect if in Electron environment
-  const isElectron = useMemo(() => typeof window !== 'undefined' && window.electronAPI !== undefined, []);
+  const isElectron = useMemo(() => isElectronDesktop(), []);
 
   // 监听主题变化 / Monitor theme changes
   useEffect(() => {

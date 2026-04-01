@@ -5,8 +5,9 @@
  */
 
 import { WEBUI_DEFAULT_PORT } from '@/common/config/constants';
-import { shell, webui, type IWebUIStatus } from '@/common/adapter/ipcBridge';
+import type { IWebUIStatus } from '@aionui/protocol';
 import { ConfigStorage } from '@/common/config/storage';
+import { useApi } from '@renderer/api';
 import AionModal from '@/renderer/components/base/AionModal';
 import AionScrollArea from '@/renderer/components/base/AionScrollArea';
 import ChannelDingTalkLogo from '@/renderer/assets/channel-logos/dingtalk.svg';
@@ -68,6 +69,7 @@ const DESKTOP_WEBUI_ALLOW_REMOTE_KEY = 'webui.desktop.allowRemote';
  */
 const WebuiModalContent: React.FC = () => {
   const { t } = useTranslation();
+  const api = useApi();
   const viewMode = useSettingsViewMode();
   const isPageMode = viewMode === 'page';
   const [activeTab, setActiveTab] = useState<'webui' | 'channels'>('webui');
@@ -113,14 +115,8 @@ const WebuiModalContent: React.FC = () => {
 
       let result: { success: boolean; data?: IWebUIStatus } | null = null;
 
-      // 优先使用直接 IPC（Electron 环境）/ Prefer direct IPC (Electron environment)
-      if (window.electronAPI?.webuiGetStatus) {
-        result = await window.electronAPI.webuiGetStatus();
-      } else {
-        // 后备方案：使用 bridge（减少超时）/ Fallback: use bridge (reduced timeout)
-        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
-        result = await Promise.race([webui.getStatus.invoke(), timeoutPromise]);
-      }
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+      result = await Promise.race([api.request('webui.get-status', undefined), timeoutPromise]);
 
       if (result && result.success && result.data) {
         setStatus(result.data);
@@ -156,7 +152,7 @@ const WebuiModalContent: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     void loadStatus();
@@ -164,7 +160,7 @@ const WebuiModalContent: React.FC = () => {
 
   // 监听状态变更事件 / Listen to status change events
   useEffect(() => {
-    const unsubscribe = webui.statusChanged.on((data) => {
+    const unsubscribe = api.on('webui.status-changed', (data) => {
       if (data.running) {
         setStatus((prev) => ({
           ...(prev || { adminUsername: 'admin' }),
@@ -189,7 +185,7 @@ const WebuiModalContent: React.FC = () => {
 
   // 监听密码重置结果事件（Web 环境后备）/ Listen to password reset result events (Web environment fallback)
   useEffect(() => {
-    const unsubscribe = webui.resetPasswordResult.on((data) => {
+    const unsubscribe = api.on('webui.reset-password-result', (data) => {
       if (data.success && data.newPassword) {
         setCachedPassword(data.newPassword);
         setStatus((prev) => (prev ? { ...prev, initialPassword: data.newPassword } : null));
@@ -254,7 +250,7 @@ const WebuiModalContent: React.FC = () => {
 
         // 减少启动超时到3秒（服务器启动很快）/ Reduce start timeout to 3s (server starts quickly)
         const startResult = await Promise.race([
-          webui.start.invoke({ port, allowRemote: allowRemotePreference }),
+          api.request('webui.start', { port, allowRemote: allowRemotePreference }),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ]);
 
@@ -299,7 +295,7 @@ const WebuiModalContent: React.FC = () => {
         setStatus((prev) => (prev ? { ...prev, running: false } : null));
         await ConfigStorage.set(DESKTOP_WEBUI_ENABLED_KEY, false);
         Message.success(t('settings.webui.stopSuccess'));
-        webui.stop.invoke().catch((err) => console.error('WebUI stop error:', err));
+        api.request('webui.stop', undefined).catch((err) => console.error('WebUI stop error:', err));
       }
     } catch (error) {
       // 回滚 UI 状态 / Rollback UI state
@@ -327,14 +323,17 @@ const WebuiModalContent: React.FC = () => {
       try {
         // 1. 先停止服务器 / First stop the server
         try {
-          await Promise.race([webui.stop.invoke(), new Promise((resolve) => setTimeout(resolve, 1500))]);
+          await Promise.race([
+            api.request('webui.stop', undefined),
+            new Promise((resolve) => setTimeout(resolve, 1500)),
+          ]);
         } catch (err) {
           console.error('WebUI stop error:', err);
         }
 
         // 2. 立即重新启动（服务器停止很快）/ Restart immediately (server stops quickly)
         const startResult = await Promise.race([
-          webui.start.invoke({ port, allowRemote: checked }),
+          api.request('webui.start', { port, allowRemote: checked }),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
         ]);
 
@@ -362,15 +361,10 @@ const WebuiModalContent: React.FC = () => {
         } else {
           // 响应为空或失败，但服务器可能已启动，检查状态
           // Response is null or failed, but server might have started, check status
-          let statusResult: { success: boolean; data?: IWebUIStatus } | null = null;
-          if (window.electronAPI?.webuiGetStatus) {
-            statusResult = await window.electronAPI.webuiGetStatus();
-          } else {
-            statusResult = await Promise.race([
-              webui.getStatus.invoke(),
-              new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
-            ]);
-          }
+          const statusResult = await Promise.race([
+            api.request('webui.get-status', undefined),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+          ]);
 
           if (statusResult?.success && statusResult?.data?.running) {
             // 服务器实际上已启动 / Server actually started
@@ -404,12 +398,10 @@ const WebuiModalContent: React.FC = () => {
         // 获取 IP 用于显示 / Get IP for display
         let newIP: string | undefined;
         try {
-          if (window.electronAPI?.webuiGetStatus) {
-            const result = await window.electronAPI.webuiGetStatus();
-            if (result?.success && result?.data?.lanIP) {
-              newIP = result.data.lanIP;
-              setCachedIP(newIP);
-            }
+          const result = await api.request('webui.get-status', undefined);
+          if (result?.success && result?.data?.lanIP) {
+            newIP = result.data.lanIP;
+            setCachedIP(newIP);
           }
         } catch {
           // ignore
@@ -460,17 +452,9 @@ const WebuiModalContent: React.FC = () => {
       const values = await form.validate();
       setPasswordLoading(true);
 
-      let result: { success: boolean; msg?: string };
-
-      // 优先使用直接 IPC（Electron 环境）/ Prefer direct IPC (Electron environment)
-      if (window.electronAPI?.webuiChangePassword) {
-        result = await window.electronAPI.webuiChangePassword(values.newPassword);
-      } else {
-        // 后备方案：使用 bridge / Fallback: use bridge
-        result = await webui.changePassword.invoke({
-          newPassword: values.newPassword,
-        });
-      }
+      const result = await api.request('webui.change-password', {
+        newPassword: values.newPassword,
+      });
 
       if (result.success) {
         Message.success(t('settings.webui.passwordChanged'));
@@ -508,15 +492,9 @@ const WebuiModalContent: React.FC = () => {
       const values = await usernameForm.validate();
       setUsernameLoading(true);
 
-      let result: { success: boolean; msg?: string; data?: { username: string } };
-
-      if (window.electronAPI?.webuiChangeUsername) {
-        result = await window.electronAPI.webuiChangeUsername(values.newUsername);
-      } else {
-        result = await webui.changeUsername.invoke({
-          newUsername: values.newUsername,
-        });
-      }
+      const result = await api.request('webui.change-username', {
+        newUsername: values.newUsername,
+      });
 
       const nextUsername = result.data?.username ?? values.newUsername.trim();
       if (result.success) {
@@ -541,19 +519,7 @@ const WebuiModalContent: React.FC = () => {
 
     setQrLoading(true);
     try {
-      // 优先使用直接 IPC（Electron 环境）/ Prefer direct IPC (Electron environment)
-      let result: {
-        success: boolean;
-        data?: { token: string; expiresAt: number; qrUrl: string };
-        msg?: string;
-      } | null = null;
-
-      if (window.electronAPI?.webuiGenerateQRToken) {
-        result = await window.electronAPI.webuiGenerateQRToken();
-      } else {
-        // 后备方案：使用 bridge / Fallback: use bridge
-        result = await webui.generateQRToken.invoke();
-      }
+      const result = await api.request('webui.generate-qr-token', undefined);
 
       if (result && result.success && result.data) {
         setQrUrl(result.data.qrUrl);
@@ -580,7 +546,7 @@ const WebuiModalContent: React.FC = () => {
     } finally {
       setQrLoading(false);
     }
-  }, [status?.running, t]);
+  }, [api, status?.running, t]);
 
   // 当服务器启动且允许远程访问时自动生成二维码 / Auto-generate QR code when server starts and remote access is allowed
   useEffect(() => {
@@ -713,7 +679,7 @@ const WebuiModalContent: React.FC = () => {
               <div className='flex items-center gap-8px min-w-0'>
                 <button
                   className='text-14px text-primary font-mono hover:underline cursor-pointer bg-transparent border-none p-0 truncate'
-                  onClick={() => shell.openExternal.invoke(getDisplayUrl()).catch(console.error)}
+                  onClick={() => api.request('open-external', getDisplayUrl()).catch(console.error)}
                 >
                   {getDisplayUrl()}
                 </button>
@@ -739,8 +705,8 @@ const WebuiModalContent: React.FC = () => {
                 <button
                   className='text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-12px'
                   onClick={() =>
-                    shell.openExternal
-                      .invoke('https://github.com/iOfficeAI/AionUi/wiki/Remote-Internet-Access-Guide')
+                    api
+                      .request('open-external', 'https://github.com/iOfficeAI/AionUi/wiki/Remote-Internet-Access-Guide')
                       .catch(console.error)
                   }
                 >

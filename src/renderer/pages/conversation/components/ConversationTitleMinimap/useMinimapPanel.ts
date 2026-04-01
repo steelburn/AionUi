@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import { dispatchChatMessageJump } from '@/renderer/utils/chat/chatMinimapEvents';
+import { isElectronDesktop } from '@renderer/utils/platform';
 import type { RefInputType } from '@arco-design/web-react/es/Input/interface';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { MinimapVisualStyle, TurnPreviewItem } from './minimapTypes';
@@ -285,7 +286,7 @@ export const useMinimapPanel = (conversationId?: string): UseMinimapPanelReturn 
       const isCmdOrCtrl = event.metaKey || event.ctrlKey;
       if (!isCmdOrCtrl || event.shiftKey || key !== 'f' || event.altKey) return;
       // Keep browser/native find behavior in WebUI; intercept only desktop runtime.
-      if (typeof window !== 'undefined' && !window.electronAPI) return;
+      if (!isElectronDesktop()) return;
       event.preventDefault();
       openSearchPanel();
     };

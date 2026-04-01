@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { withCsrfToken, hasValidCsrfToken, clearCookie } from '@process/webserver/middleware/csrfClient';
 import { CSRF_COOKIE_NAME } from '@process/webserver/config/constants';
+import { isElectronDesktop } from '@renderer/utils/platform';
 
 type AuthStatus = 'checking' | 'authenticated' | 'unauthenticated';
 
@@ -44,7 +45,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const AUTH_USER_ENDPOINT = '/api/auth/user';
 
-const isDesktopRuntime = typeof window !== 'undefined' && Boolean(window.electronAPI);
+const isDesktopRuntime = isElectronDesktop();
 
 // Clear expired auth cache including cookies and localStorage
 // 清除过期的认证缓存，包括 Cookie 和 localStorage

@@ -9,12 +9,14 @@
  * 平台检测工具函数
  */
 
+import { platformAdapter } from './platformAdapter';
+
 /**
  * Check if running in Electron desktop environment
  * 检测是否运行在 Electron 桌面环境
  */
 export const isElectronDesktop = (): boolean => {
-  return typeof window !== 'undefined' && Boolean(window.electronAPI);
+  return platformAdapter.isElectron();
 };
 
 /**

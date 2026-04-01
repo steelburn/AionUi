@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import type { IMessageSearchItem } from '@/common/types/database';
+import { isElectronDesktop } from '@renderer/utils/platform';
 import AionModal from '@/renderer/components/base/AionModal';
 import { usePresetAssistantInfo } from '@/renderer/hooks/agent/usePresetAssistantInfo';
 import { useOptionalConversationTabs } from '@/renderer/pages/conversation/hooks/ConversationTabsContext';
@@ -333,7 +334,7 @@ const ConversationSearchPopover: React.FC<ConversationSearchPopoverProps> = ({
       const isCmdOrCtrl = event.metaKey || event.ctrlKey;
       if (!isCmdOrCtrl || !event.shiftKey || key !== 'f' || event.altKey) return;
       // Preserve browser behavior in WebUI; only intercept in the desktop runtime.
-      if (typeof window !== 'undefined' && !window.electronAPI) return;
+      if (!isElectronDesktop()) return;
       event.preventDefault();
       handleOpen();
     };

@@ -6,6 +6,8 @@
 
 import type { IChannelPairingRequest, IChannelPluginStatus, IChannelUser } from '@process/channels/types';
 import { acpConversation, channel } from '@/common/adapter/ipcBridge';
+import { useApi } from '@renderer/api';
+import { isElectronDesktop } from '@renderer/utils/platform';
 import { ConfigStorage } from '@/common/config/storage';
 import GeminiModelSelector from '@/renderer/pages/conversation/platforms/gemini/GeminiModelSelector';
 import type { GeminiModelSelection } from '@/renderer/pages/conversation/platforms/gemini/useGeminiModelSelection';
@@ -57,6 +59,7 @@ const formatTime = (timestamp: number) => new Date(timestamp).toLocaleString();
 
 const WeixinConfigForm: React.FC<WeixinConfigFormProps> = ({ pluginStatus, modelSelection, onStatusChange }) => {
   const { t } = useTranslation();
+  const api = useApi();
 
   const [loginState, setLoginState] = useState<LoginState>(
     pluginStatus?.hasToken && pluginStatus?.enabled ? 'connected' : 'idle'
@@ -327,7 +330,7 @@ const WeixinConfigForm: React.FC<WeixinConfigFormProps> = ({ pluginStatus, model
   };
 
   const handleLogin = async () => {
-    if (!window.electronAPI?.weixinLoginStart) {
+    if (!isElectronDesktop()) {
       handleLoginWebUI();
       return;
     }
@@ -335,26 +338,19 @@ const WeixinConfigForm: React.FC<WeixinConfigFormProps> = ({ pluginStatus, model
     setLoginState('loading_qr');
     setQrcodeDataUrl(null);
 
-    const unsubQR =
-      window.electronAPI.weixinLoginOnQR?.(({ qrcodeUrl: dataUrl }: { qrcodeUrl: string }) => {
-        setQrcodeDataUrl(dataUrl);
-        setLoginState('showing_qr');
-      }) ?? (() => {});
-    const unsubScanned =
-      window.electronAPI.weixinLoginOnScanned?.(() => {
-        setLoginState('scanned');
-      }) ?? (() => {});
-    const unsubDone =
-      window.electronAPI.weixinLoginOnDone?.(() => {
-        // credentials come from the Promise resolve — not this event
-      }) ?? (() => {});
+    const unsubQR = api.on('weixin.login-qr', ({ qrcodeUrl: dataUrl }) => {
+      setQrcodeDataUrl(dataUrl);
+      setLoginState('showing_qr');
+    });
+    const unsubScanned = api.on('weixin.login-scanned', () => {
+      setLoginState('scanned');
+    });
+    const unsubDone = api.on('weixin.login-done', () => {
+      // credentials come from the Promise resolve — not this event
+    });
 
     try {
-      const result = await window.electronAPI.weixinLoginStart();
-      const { accountId, botToken } = result as {
-        accountId: string;
-        botToken: string;
-      };
+      const { accountId, botToken } = await api.request('weixin.login-start', undefined);
       await enableWeixinPlugin(accountId, botToken);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -548,6 +548,9 @@ export type EndpointMap = {
   'extensions.get-permissions': { request: { name: string }; response: IExtensionPermissionSummary[] };
   'extensions.get-risk-level': { request: { name: string }; response: string };
 
+  // === Weixin (Electron WeChat login flow) ===
+  'weixin.login-start': { request: void; response: { accountId: string; botToken: string } };
+
   // === Channel ===
   'channel.get-plugin-status': { request: void; response: IBridgeResponse<IChannelPluginStatus[]> };
   'channel.enable-plugin': {
@@ -653,6 +656,11 @@ export type EventMap = {
 
   // === Extensions ===
   'extensions.state-changed': { name: string; enabled: boolean; reason?: string };
+
+  // === Weixin ===
+  'weixin.login-qr': { qrcodeUrl: string };
+  'weixin.login-scanned': Record<string, never>;
+  'weixin.login-done': Record<string, never>;
 
   // === Channel ===
   'channel.pairing-requested': IChannelPairingRequest;
