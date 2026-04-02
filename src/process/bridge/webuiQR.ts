@@ -10,7 +10,7 @@
 import crypto from 'crypto';
 import { AuthService } from '@server/http/auth/service/AuthService';
 import { UserRepository } from '@server/http/auth/repository/UserRepository';
-import { WebuiService } from './services/WebuiService';
+import { WebuiService } from '@server/services/WebuiService';
 
 // QR Token 存储 (内存中，有效期短) / QR Token store (in-memory, short-lived)
 // 增加 allowLocalOnly 标志，限制本地模式下只能从本地网络使用

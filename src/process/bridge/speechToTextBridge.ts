@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import { SpeechToTextService } from './services/SpeechToTextService';
+import { SpeechToTextService } from '@server/services/SpeechToTextService';
 
 export function initSpeechToTextBridge(): void {
   ipcBridge.speechToText.transcribe.provider(async (request) => {

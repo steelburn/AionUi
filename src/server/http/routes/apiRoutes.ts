@@ -14,7 +14,7 @@ import { getDatabase } from '@server/services/database';
 import { getSystemDir } from '@server/utils/initStorage';
 import { TokenMiddleware } from '@server/http/auth/middleware/TokenMiddleware';
 import { ExtensionRegistry } from '@server/extensions';
-import { SpeechToTextService } from '@process/bridge/services/SpeechToTextService';
+import { SpeechToTextService } from '@server/services/SpeechToTextService';
 import { isActivePreviewPort } from '@process/bridge/pptPreviewBridge';
 import { isActiveOfficeWatchPort } from '@process/bridge/officeWatchBridge';
 import { AIONUI_TIMESTAMP_SEPARATOR } from '@/common/config/constants';

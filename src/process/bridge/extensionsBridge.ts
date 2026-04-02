@@ -9,7 +9,7 @@ import type { IExtensionAgentActivitySnapshot } from '@/common/adapter/ipcBridge
 import { ExtensionRegistry } from '@server/extensions';
 import type { IConversationRepository } from '@server/services/database/IConversationRepository';
 import type { IWorkerTaskManager } from '@server/task/IWorkerTaskManager';
-import { ActivitySnapshotBuilder } from './services/ActivitySnapshotBuilder';
+import { ActivitySnapshotBuilder } from '@server/services/ActivitySnapshotBuilder';
 
 const ACTIVITY_SNAPSHOT_TTL_MS = 3000;
 

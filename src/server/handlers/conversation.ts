@@ -27,7 +27,7 @@ import { refreshTrayMenu } from '@electron/lifecycle/tray';
 import { copyFilesToDirectory, readDirectoryRecursive } from '@server/utils';
 import { computeOpenClawIdentityHash } from '@server/utils/openclawUtils';
 import { migrateConversationToDatabase } from '@process/bridge/migrationUtils';
-import { ConversationSideQuestionService } from '@process/bridge/services/ConversationSideQuestionService';
+import { ConversationSideQuestionService } from '@server/services/ConversationSideQuestionService';
 
 const refreshTrayMenuSafely = async (): Promise<void> => {
   try {

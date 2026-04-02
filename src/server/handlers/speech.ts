@@ -5,7 +5,7 @@
  */
 
 import type { WsRouter } from '../router/WsRouter';
-import { SpeechToTextService } from '@process/bridge/services/SpeechToTextService';
+import { SpeechToTextService } from '@server/services/SpeechToTextService';
 
 /**
  * Register speech-to-text endpoint handlers on the WsRouter.

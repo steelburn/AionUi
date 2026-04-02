@@ -6,7 +6,7 @@
 
 import type { WsRouter } from '../router/WsRouter';
 import { SERVER_CONFIG } from '@server/http/config/constants';
-import { WebuiService } from '@process/bridge/services/WebuiService';
+import { WebuiService } from '@server/services/WebuiService';
 import { generateQRLoginUrlDirect, verifyQRTokenDirect } from '@process/bridge/webuiQR';
 import { startWebServerWithInstance } from '@server/http/index';
 import { cleanupWebAdapter } from '@server/http/adapter';
