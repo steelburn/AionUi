@@ -1,6 +1,6 @@
 /**
  * Standalone renderer build config — no Electron dependency.
- * Used by `bun run build:renderer:web` for server/container deployments.
+ * Used by `bun run build:renderer` for server/container deployments.
  * Outputs to out/renderer/ (same location as electron-vite build).
  */
 import { defineConfig } from 'vite';
