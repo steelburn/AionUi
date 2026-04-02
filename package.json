@@ -12,7 +12,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "dev:server": "bun src/server/index.ts",
+    "dev:server": "bun src/server.ts",
     "dev:renderer": "bunx vite dev --config vite.renderer.config.ts",
     "build": "bun run build:server && electron-vite build",
     "build:server": "node scripts/build-server.mjs",
