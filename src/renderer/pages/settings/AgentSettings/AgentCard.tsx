@@ -26,6 +26,7 @@ type AgentCardProps =
       agent: DetectedAgent;
       onSettings?: () => void;
       settingsDisabled?: boolean;
+      variant?: 'row' | 'grid';
     }
   | {
       type: 'custom';
@@ -39,8 +40,9 @@ const AgentCard: React.FC<AgentCardProps> = (props) => {
   const { t } = useTranslation();
 
   if (props.type === 'detected') {
-    const { agent, onSettings, settingsDisabled = true } = props;
+    const { agent, onSettings, settingsDisabled = true, variant = 'row' } = props;
     const extensionAvatar = resolveExtensionAssetUrl(agent.isExtension ? agent.avatar : undefined);
+    const gridSettingsButtonClassName = '!w-full !justify-center !rounded-10px !text-12px';
     const logo =
       extensionAvatar ||
       resolveAgentLogo({
@@ -48,6 +50,43 @@ const AgentCard: React.FC<AgentCardProps> = (props) => {
         customAgentId: agent.customAgentId,
         isExtension: agent.isExtension,
       });
+
+    if (variant === 'grid') {
+      const settingsButton = (
+        <Button
+          size='small'
+          type='secondary'
+          icon={<Setting theme='outline' size='14' />}
+          onClick={settingsDisabled ? undefined : onSettings}
+          disabled={settingsDisabled}
+          className={gridSettingsButtonClassName}
+          style={settingsDisabled ? { color: 'var(--color-text-4)' } : undefined}
+        >
+          {t('settings.agentManagement.settings')}
+        </Button>
+      );
+
+      return (
+        <div className='flex min-h-[154px] flex-col rounded-12px border border-solid border-[var(--color-border-2)] bg-[var(--color-bg-2)] p-12px transition-colors hover:border-[var(--color-border-3)]'>
+          <div className='mb-10px flex justify-center'>
+            <Avatar size={40} shape='square' style={{ flexShrink: 0, backgroundColor: 'transparent' }}>
+              {logo ? <img src={logo} alt={agent.name} className='h-full w-full object-contain' /> : '🤖'}
+            </Avatar>
+          </div>
+
+          <div className='mb-10px flex-1 text-center'>
+            <Typography.Text className='block text-13px font-medium leading-18px line-clamp-2'>
+              {agent.name}
+            </Typography.Text>
+            <Typography.Text className='mt-4px block text-11px text-t-secondary'>
+              {t('settings.agentManagement.detected')}
+            </Typography.Text>
+          </div>
+
+          {settingsButton}
+        </div>
+      );
+    }
 
     return (
       <div className='flex items-center justify-between px-16px py-10px rd-8px bg-aou-1 hover:bg-aou-2'>
