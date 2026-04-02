@@ -108,7 +108,7 @@ vi.mock('fs/promises', async (importOriginal) => {
 });
 
 async function setupProviders() {
-  const { initFsBridge } = await import('@process/bridge/fsBridge');
+  const { initFsBridge } = await import('@server/bridge/fsBridge');
   initFsBridge();
 }
 

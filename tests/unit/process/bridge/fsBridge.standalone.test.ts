@@ -80,12 +80,12 @@ describe('fsBridge standalone compatibility', () => {
 
   it('imports without requiring electron', async () => {
     // If this import succeeds, the module has no top-level Electron dependency
-    const mod = await import('@process/bridge/fsBridge');
+    const mod = await import('@server/bridge/fsBridge');
     expect(mod.initFsBridge).toBeTypeOf('function');
   });
 
   it('initFsBridge() registers all providers without throwing', async () => {
-    const { initFsBridge } = await import('@process/bridge/fsBridge');
+    const { initFsBridge } = await import('@server/bridge/fsBridge');
     expect(() => initFsBridge()).not.toThrow();
   });
 });

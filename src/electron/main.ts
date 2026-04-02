@@ -22,7 +22,7 @@ import { pathToFileURL } from 'url';
 import { initMainAdapterWithWindow } from '@/common/adapter/main';
 import { ipcBridge } from '@/common';
 import { AION_ASSET_PROTOCOL } from '@server/extensions';
-import { initializeProcess } from '../process';
+import { initializeProcess } from './init/initProcess';
 import { ProcessConfig } from '@server/utils/initStorage';
 import { loadShellEnvironmentAsync, logEnvironmentDiagnostics, mergePaths } from '@server/utils/shellEnv';
 import { acpDetector } from '@server/agent/acp/AcpDetector';
@@ -420,7 +420,8 @@ const handleAppReady = async (): Promise<void> => {
     createWindow();
     mark('createWindow');
 
-    acpDetector.initialize()
+    acpDetector
+      .initialize()
       .then(() => mark('initializeAcpDetector'))
       .catch((error) => console.error('[ACP] Detection failed:', error));
 

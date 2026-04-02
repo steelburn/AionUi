@@ -12,7 +12,7 @@ import './common/platform/register-node';
 // Must follow registration — calls bridge.adapter() at module load time
 import './common/adapter/standalone';
 
-import { initBridgeStandalone } from './process/utils/initBridgeStandalone';
+import { initBridgeStandalone } from '@server/bridge/initBridgeStandalone';
 import { startWebServerWithInstance } from './server/http';
 import initStorage from '@server/utils/initStorage';
 import { ExtensionRegistry } from '@server/extensions';

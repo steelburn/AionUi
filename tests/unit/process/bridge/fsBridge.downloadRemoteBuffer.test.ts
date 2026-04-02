@@ -87,7 +87,7 @@ describe('downloadRemoteBuffer URL validation (ELECTRON-77)', () => {
   beforeEach(async () => {
     vi.resetModules();
     // Re-import to register providers fresh
-    const mod = await import('@process/bridge/fsBridge');
+    const mod = await import('@server/bridge/fsBridge');
     mod.initFsBridge();
   });
 

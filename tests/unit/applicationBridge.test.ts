@@ -105,7 +105,7 @@ describe('applicationBridge CDP functionality', () => {
 
   describe('initApplicationBridge', () => {
     it('should initialize without errors', async () => {
-      const { initApplicationBridge } = await import('@process/bridge/applicationBridge');
+      const { initApplicationBridge } = await import('@server/bridge/applicationBridge');
 
       const taskMgr = makeTaskManager();
       expect(() => initApplicationBridge(taskMgr)).not.toThrow();
@@ -114,7 +114,7 @@ describe('applicationBridge CDP functionality', () => {
 
   describe('CDP IPC handlers', () => {
     it('should register getCdpStatus handler', async () => {
-      const mod = await import('@process/bridge/applicationBridge');
+      const mod = await import('@server/bridge/applicationBridge');
       expect(mod.initApplicationBridge).toBeTypeOf('function');
     });
   });

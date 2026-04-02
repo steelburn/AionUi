@@ -17,7 +17,6 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@process/*": ["./src/process/*"],
       "@electron/*": ["./src/electron/*"],
       "@renderer/*": ["./src/renderer/*"],
       "@worker/*": ["./src/server/worker/*"],

@@ -3,7 +3,7 @@ import path from 'path';
 
 const aliases = {
   '@/': path.resolve(__dirname, './src') + '/',
-  '@process/': path.resolve(__dirname, './src/process') + '/',
+  '@electron/': path.resolve(__dirname, './src/electron') + '/',
   '@renderer/': path.resolve(__dirname, './src/renderer') + '/',
   '@server/': path.resolve(__dirname, './src/server') + '/',
   '@worker/': path.resolve(__dirname, './src/server/worker') + '/',

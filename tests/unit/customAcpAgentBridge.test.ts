@@ -14,7 +14,7 @@ vi.mock('@server/agent/acp/AcpConnection', () => ({
 }));
 
 import { execFileSync } from 'child_process';
-import { testCustomAgentConnection } from '@process/bridge/testCustomAgentConnection';
+import { testCustomAgentConnection } from '@server/bridge/testCustomAgentConnection';
 
 describe('testCustomAgentConnection', () => {
   beforeEach(() => {

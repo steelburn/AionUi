@@ -17,8 +17,8 @@ if (app.isPackaged) {
   process.env.PREBUILDS_ONLY = '1';
 }
 import initStorage from '@server/utils/initStorage';
-import './utils/initBridge';
-import './services/i18n'; // Initialize i18n for main process
+import '@server/bridge/initBridge';
+import '@server/services/i18n'; // Initialize i18n for main process
 import { getChannelManager } from '@server/channels';
 import { ExtensionRegistry } from '@server/extensions';
 
