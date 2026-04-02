@@ -6,7 +6,7 @@
 
 import { autoUpdater } from 'electron-updater';
 import type { ProgressInfo, UpdateInfo } from 'electron-updater';
-import { app } from 'electron';
+import { electronApp } from '@/common/electronSafe';
 import log from 'electron-log';
 import { EventEmitter } from 'events';
 
@@ -312,7 +312,7 @@ class AutoUpdaterService extends EventEmitter {
     // to let Squirrel receive the install signal.
     autoUpdater.quitAndInstall(true, true);
     setTimeout(() => {
-      app.exit(0);
+      electronApp?.exit(0) ?? process.exit(0);
     }, 1000);
   }
 

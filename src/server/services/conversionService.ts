@@ -7,7 +7,6 @@
 import type { ConversionResult, ExcelWorkbookData, PPTJsonData } from '@/common/types/conversion';
 import { DOMParser } from '@xmldom/xmldom';
 import { Document as DocxDocument, Packer, Paragraph, TextRun } from 'docx';
-import type { BrowserWindow } from 'electron';
 import { electronBrowserWindow as BrowserWindowCtor } from '@/common/electronSafe';
 import fs from 'fs/promises';
 import mammoth from 'mammoth';
@@ -558,7 +557,7 @@ class ConversionService {
         error: 'PDF export is not available in standalone mode',
       };
     }
-    let win: BrowserWindow | null = null;
+    let win: InstanceType<NonNullable<typeof BrowserWindowCtor>> | null = null;
     try {
       win = new BrowserWindowCtor({
         show: false,

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { BrowserWindow } from 'electron';
-import { BrowserWindow as ElectronBrowserWindow } from 'electron';
+import { electronBrowserWindow as ElectronBrowserWindow } from '@/common/electronSafe';
 import { startLogin } from './WeixinLogin';
 import type { LoginHandle } from './WeixinLogin';
 
@@ -16,10 +15,14 @@ import type { LoginHandle } from './WeixinLogin';
 export class WeixinLoginHandler {
   private loginHandle: LoginHandle | null = null;
 
-  constructor(private readonly getWindow: () => BrowserWindow | null) {}
+  constructor(private readonly getWindow: () => InstanceType<NonNullable<typeof ElectronBrowserWindow>> | null) {}
 
   private renderQRPage(pageUrl: string): Promise<string> {
     return new Promise((resolve, reject) => {
+      if (!ElectronBrowserWindow) {
+        reject(new Error('WeChat login is not available in standalone mode'));
+        return;
+      }
       const hidden = new ElectronBrowserWindow({
         width: 300,
         height: 300,
