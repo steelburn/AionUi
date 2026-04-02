@@ -4,6 +4,9 @@ import os from 'os';
 import path from 'path';
 import type { IPlatformServices, IWorkerProcess } from './IPlatformServices';
 
+const isDev = process.env.NODE_ENV === 'development';
+const dataDirSuffix = isDev ? '-dev' : '';
+
 class NodeWorkerProcess implements IWorkerProcess {
   constructor(private readonly cp: ChildProcess) {}
 
@@ -35,10 +38,10 @@ const _pkg = (() => {
 
 export class NodePlatformServices implements IPlatformServices {
   paths = {
-    getDataDir: () => process.env.DATA_DIR ?? path.join(os.homedir(), '.aionui-server'),
+    getDataDir: () => process.env.DATA_DIR ?? path.join(os.homedir(), `.aionui${dataDirSuffix}`),
     getTempDir: () => os.tmpdir(),
     getHomeDir: () => os.homedir(),
-    getLogsDir: () => process.env.LOGS_DIR ?? path.join(os.homedir(), '.aionui-server', 'logs'),
+    getLogsDir: () => process.env.LOGS_DIR ?? path.join(os.homedir(), `.aionui${dataDirSuffix}`, 'logs'),
     getAppPath: (): string | null => process.cwd(),
     isPackaged: () => process.env.IS_PACKAGED === 'true',
     getSystemPath: (_name: 'desktop' | 'home' | 'downloads'): string | null => null,
