@@ -132,11 +132,15 @@ git checkout bot/fix-pr-<PR_NUMBER>
 git merge --no-ff --no-edit FETCH_HEAD
 ```
 
-**All paths — symlink node_modules:**
+**All paths — symlink node_modules and rebuild native modules:**
 
 ```bash
 ln -s "$REPO_ROOT/node_modules" "$WORKTREE_DIR/node_modules"
+cd "$WORKTREE_DIR"
+npm rebuild better-sqlite3 2>/dev/null || true
 ```
+
+The `npm rebuild` step recompiles native modules (e.g., `better-sqlite3`) against the current Node version, which may differ from the version used when `node_modules` was originally installed.
 
 ### Step 5 — Fix Issues
 
