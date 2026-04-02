@@ -124,6 +124,9 @@ Write the review in **Chinese**. Review dimensions:
 - **性能** — Unnecessary re-renders, large loops, blocking calls
 - **代码质量** — Function length, nesting depth, naming clarity
 - **遗留 console.log** — Debug logs in production code
+- **数据库变更** — If PR touches migration files or database schema: (1) migration must be correct (column types, constraints, index, default values, reversibility); (2) changes must be reasonable and match the PR's stated purpose; (3) no data loss risk on existing records; (4) migration order and dependencies are correct. Flag incorrect migrations as CRITICAL.
+- **IPC bridge / preload** — If PR touches `src/preload.ts` or IPC channel definitions: (1) no unnecessary Node.js APIs exposed to renderer; (2) all exposed APIs have proper input validation; (3) renderer cannot trigger privileged operations without authorization. Exposing unsafe APIs is CRITICAL.
+- **Electron 安全配置** — If PR touches `electron-builder.yml`, `entitlements.plist`, or Electron config in `electron.vite.config.ts`: (1) sandbox/nodeIntegration/contextIsolation settings not weakened; (2) entitlements not over-granted; (3) signing and notarization not broken. Security regression is CRITICAL.
 - **测试** — Missing tests for new features, outdated tests, coverage gaps
 - **可测试性** — Can the code be independently tested? Dependencies mockable?
 
