@@ -64,8 +64,10 @@ export const useGeminiInitialMessage = ({
 
     if (!currentModelId) return;
 
-    // Clear immediately to prevent duplicate sends
-    sessionStorage.removeItem(storageKey);
+    // Prevent duplicate sends on component remount while sendMessage is pending
+    const processedKey = `gemini_initial_processed_${conversationId}`;
+    if (sessionStorage.getItem(processedKey)) return;
+    sessionStorage.setItem(processedKey, 'true');
 
     const sendInitialMessage = async () => {
       try {
@@ -100,12 +102,16 @@ export const useGeminiInitialMessage = ({
         });
         assertBridgeSuccess(result, 'Failed to send initial message to Gemini');
 
+        // Safe to remove storage key after successful send
+        sessionStorage.removeItem(storageKey);
         emitter.emit('chat.history.refresh');
         if (files && files.length > 0) {
           emitter.emit('gemini.workspace.refresh');
         }
       } catch (error) {
         console.error('Failed to send initial message:', error);
+        // Allow retry on next mount
+        sessionStorage.removeItem(processedKey);
       }
     };
 

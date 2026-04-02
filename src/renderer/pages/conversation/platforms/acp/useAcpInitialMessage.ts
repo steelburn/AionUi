@@ -31,12 +31,13 @@ export const useAcpInitialMessage = ({
 }: UseAcpInitialMessageParams): void => {
   useEffect(() => {
     const storageKey = `acp_initial_message_${conversationId}`;
+    const processedKey = `acp_initial_processed_${conversationId}`;
+
     const storedMessage = sessionStorage.getItem(storageKey);
-
     if (!storedMessage) return;
-
-    // Clear immediately to prevent duplicate sends (e.g., if component remounts while sendMessage is pending)
-    sessionStorage.removeItem(storageKey);
+    // Prevent duplicate sends on component remount while sendMessage is pending
+    if (sessionStorage.getItem(processedKey)) return;
+    sessionStorage.setItem(processedKey, 'true');
 
     const sendInitialMessage = async () => {
       try {
@@ -61,11 +62,14 @@ export const useAcpInitialMessage = ({
         });
 
         if (result && result.success === true) {
-          // Initial message sent successfully
+          // Initial message sent successfully — safe to remove storage key now
+          sessionStorage.removeItem(storageKey);
           emitter.emit('chat.history.refresh');
         } else {
           // Handle send failure
           console.error('[ACP-FRONTEND] Failed to send initial message:', result);
+          // Allow retry on next mount
+          sessionStorage.removeItem(processedKey);
           // Create error message in UI
           const errorMessage: TMessage = {
             id: uuid(),
@@ -84,6 +88,8 @@ export const useAcpInitialMessage = ({
         }
       } catch (error) {
         console.error('Error sending initial message:', error);
+        // Allow retry on next mount
+        sessionStorage.removeItem(processedKey);
         setAiProcessing(false); // Stop loading state on error
       }
     };
