@@ -78,7 +78,7 @@ export function registerAcpConversationHandlers(router: WsRouter, workerTaskMana
   });
 
   router.handle('acp.test-custom-agent', async (params) => {
-    const { testCustomAgentConnection } = await import('@process/bridge/testCustomAgentConnection');
+    const { testCustomAgentConnection } = await import('@server/services/testCustomAgentConnection');
     return testCustomAgentConnection(params);
   });
 

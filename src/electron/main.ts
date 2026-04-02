@@ -27,7 +27,7 @@ import { ProcessConfig } from '@server/utils/initStorage';
 import { loadShellEnvironmentAsync, logEnvironmentDiagnostics, mergePaths } from '@server/utils/shellEnv';
 import { acpDetector } from '@server/agent/acp/AcpDetector';
 import { registerWindowMaximizeListeners } from '@electron/handlers/windowControls';
-import { onCloseToTrayChanged, onLanguageChanged } from '@process/bridge/systemSettingsBridge';
+import { onCloseToTrayChanged, onLanguageChanged } from '@server/handlers/systemSettings';
 import { setInitialLanguage } from '@server/services/i18n';
 import { workerTaskManager } from '@server/task/workerTaskManagerSingleton';
 import { setupApplicationMenu } from './lifecycle/appMenu';

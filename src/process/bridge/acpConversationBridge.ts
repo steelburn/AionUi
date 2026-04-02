@@ -77,7 +77,7 @@ export function initAcpConversationBridge(workerTaskManager: IWorkerTaskManager)
 
   // Test custom agent connection - validates CLI exists and ACP handshake works
   ipcBridge.acpConversation.testCustomAgent.provider(async (params) => {
-    const { testCustomAgentConnection } = await import('./testCustomAgentConnection');
+    const { testCustomAgentConnection } = await import('@server/services/testCustomAgentConnection');
     return testCustomAgentConnection(params);
   });
 
