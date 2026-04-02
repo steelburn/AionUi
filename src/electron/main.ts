@@ -25,7 +25,8 @@ import { AION_ASSET_PROTOCOL } from '@server/extensions';
 import { initializeProcess } from '../process';
 import { ProcessConfig } from '@server/utils/initStorage';
 import { loadShellEnvironmentAsync, logEnvironmentDiagnostics, mergePaths } from '@server/utils/shellEnv';
-import { initializeAcpDetector, registerWindowMaximizeListeners } from '@process/bridge';
+import { acpDetector } from '@server/agent/acp/AcpDetector';
+import { registerWindowMaximizeListeners } from '@electron/handlers/windowControls';
 import { onCloseToTrayChanged, onLanguageChanged } from '@process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@server/services/i18n';
 import { workerTaskManager } from '@server/task/workerTaskManagerSingleton';
@@ -419,7 +420,7 @@ const handleAppReady = async (): Promise<void> => {
     createWindow();
     mark('createWindow');
 
-    initializeAcpDetector()
+    acpDetector.initialize()
       .then(() => mark('initializeAcpDetector'))
       .catch((error) => console.error('[ACP] Detection failed:', error));
 
@@ -479,7 +480,7 @@ const handleAppReady = async (): Promise<void> => {
 
   // WebUI mode also needs ACP detection for remote agent access
   if (isWebUIMode) {
-    await initializeAcpDetector();
+    await acpDetector.initialize();
   }
 
   if (!isResetPasswordMode) {

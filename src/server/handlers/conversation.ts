@@ -26,7 +26,7 @@ import { prepareFirstMessage } from '@server/task/agentUtils';
 import { refreshTrayMenu } from '@electron/lifecycle/tray';
 import { copyFilesToDirectory, readDirectoryRecursive } from '@server/utils';
 import { computeOpenClawIdentityHash } from '@server/utils/openclawUtils';
-import { migrateConversationToDatabase } from '@process/bridge/migrationUtils';
+import { migrateConversationToDatabase } from '@server/services/migrationUtils';
 import { ConversationSideQuestionService } from '@server/services/ConversationSideQuestionService';
 
 const refreshTrayMenuSafely = async (): Promise<void> => {

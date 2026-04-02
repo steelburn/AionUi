@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateQRLoginUrlDirect, verifyQRTokenDirect } from '../webuiQR';
+import { generateQRLoginUrlDirect, verifyQRTokenDirect } from '@server/services/webuiQR';
 
 describe('generateQRLoginUrlDirect', () => {
   it('returns a qrUrl and expiresAt', () => {
