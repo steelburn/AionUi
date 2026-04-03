@@ -14,9 +14,17 @@
  */
 
 import { execFile, execFileSync } from 'child_process';
-import { accessSync, existsSync, readdirSync } from 'fs';
+import { existsSync } from 'fs';
 import os from 'os';
 import path from 'path';
+
+// Conditional import to avoid Electron dependency in worker processes
+let appModule: typeof import('electron') | null = null;
+try {
+  appModule = require('electron');
+} catch {
+  // Running in worker process where electron is not available
+}
 
 /** Enable ACP performance diagnostics via ACP_PERF=1 */
 const PERF_LOG = process.env.ACP_PERF === '1';
@@ -214,6 +222,49 @@ export function mergePaths(path1?: string, path2?: string): string {
 }
 
 /**
+ * Get the directory containing the bundled bun binary.
+ * Returns the path to `resources/bundled-bun/<platform>-<arch>/` which contains
+ * the bun executable. Returns null if the directory doesn't exist.
+ */
+export function getBundledBunDir(): string | null {
+  const isPackaged = !!process.resourcesPath || (appModule && appModule.app && appModule.app.isPackaged);
+  const resourcesPath = isPackaged
+    ? process.resourcesPath || ''
+    : path.join(process.cwd(), 'resources');
+  const platform = process.platform === 'win32' ? 'win32' : process.platform;
+  const arch = process.arch;
+  const bunDir = path.join(resourcesPath, 'bundled-bun', `${platform}-${arch}`);
+  return existsSync(bunDir) ? bunDir : null;
+}
+
+/**
+ * Get the path to the user's bun global bin directory.
+ * - macOS/Linux: ~/.bun/bin
+ * - Windows: %USERPROFILE%\.bun\bin
+ */
+export function getBunGlobalBinDir(): string {
+  return path.join(os.homedir(), '.bun', 'bin');
+}
+
+/**
+ * Scan well-known POSIX tool installation directories and return any that exist
+ * but are not already in the current PATH.
+ */
+function getPosixExtraToolPaths(): string[] {
+  if (process.platform === 'win32') return [];
+  const homeDir = os.homedir();
+  const currentPath = process.env.PATH || '';
+  const candidates = [
+    getBunGlobalBinDir(),
+    path.join(homeDir, '.cargo', 'bin'),
+    path.join(homeDir, 'go', 'bin'),
+    path.join(homeDir, '.deno', 'bin'),
+    path.join(homeDir, '.local', 'bin'),
+  ];
+  return candidates.filter((p) => existsSync(p) && !currentPath.includes(p));
+}
+
+/**
  * Scan well-known Windows tool installation directories and return any that exist
  * but are not already in the current PATH.
  *
@@ -234,6 +285,8 @@ function getWindowsExtraToolPaths(): string[] {
   const currentPath = process.env.PATH || '';
 
   const candidates = [
+    // Bun global bin directory
+    getBunGlobalBinDir(),
     // npm global packages (most common - installed with Node.js)
     path.join(appData, 'npm'),
     // Node.js official installer
@@ -284,6 +337,7 @@ function getWindowsExtraToolPaths(): string[] {
  */
 export function getEnhancedEnv(customEnv?: Record<string, string>): Record<string, string> {
   const shellEnv = loadShellEnvironment();
+  const separator = process.platform === 'win32' ? ';' : ':';
 
   // Merge PATH from both sources (shell env may miss nvm/fnm paths in dev mode)
   // 合并两个来源的 PATH（开发模式下 shell 环境可能缺少 nvm/fnm 路径）
@@ -296,6 +350,18 @@ export function getEnhancedEnv(customEnv?: Record<string, string>): Record<strin
     mergedPath = mergePaths(mergedPath, winExtraPaths.join(';'));
   }
 
+  // On macOS/Linux, append well-known global bin directories (bun, cargo, go, etc.)
+  const posixExtraPaths = getPosixExtraToolPaths();
+  if (posixExtraPaths.length > 0) {
+    mergedPath = mergePaths(mergedPath, posixExtraPaths.join(':'));
+  }
+
+  // Prepend bundled bun directory (highest priority)
+  const bundledBunDir = getBundledBunDir();
+  if (bundledBunDir) {
+    mergedPath = `${bundledBunDir}${separator}${mergedPath}`;
+  }
+
   return {
     ...process.env,
     ...shellEnv,
@@ -306,86 +372,6 @@ export function getEnhancedEnv(customEnv?: Record<string, string>): Record<strin
   } as Record<string, string>;
 }
 
-/**
- * Scan well-known Node.js version manager directories to find a Node binary
- * that satisfies the minimum version requirement.
- * Supports nvm, fnm, and volta.
- *
- * @returns Absolute path to the bin directory containing a suitable `node`, or null.
- */
-export function findSuitableNodeBin(minMajor: number, minMinor: number): string | null {
-  const homeDir = os.homedir();
-  const isWin = process.platform === 'win32';
-  const isMac = process.platform === 'darwin';
-
-  const searchPaths: Array<{ base: string; binSuffix: string }> = [];
-
-  // nvm: ~/.nvm/versions/node/v20.10.0/bin/
-  const nvmDir = process.env.NVM_DIR || path.join(homeDir, '.nvm');
-  searchPaths.push({
-    base: path.join(nvmDir, 'versions', 'node'),
-    binSuffix: 'bin',
-  });
-
-  // fnm (macOS): ~/Library/Application Support/fnm/node-versions/v20.10.0/installation/bin/
-  // fnm (Linux): ~/.local/share/fnm/node-versions/v20.10.0/installation/bin/
-  if (isMac) {
-    searchPaths.push({
-      base: path.join(homeDir, 'Library', 'Application Support', 'fnm', 'node-versions'),
-      binSuffix: path.join('installation', 'bin'),
-    });
-  } else if (!isWin) {
-    searchPaths.push({
-      base: path.join(homeDir, '.local', 'share', 'fnm', 'node-versions'),
-      binSuffix: path.join('installation', 'bin'),
-    });
-  }
-
-  // volta: ~/.volta/tools/image/node/20.10.0/bin/
-  searchPaths.push({
-    base: path.join(homeDir, '.volta', 'tools', 'image', 'node'),
-    binSuffix: 'bin',
-  });
-
-  const candidates: Array<{
-    major: number;
-    minor: number;
-    patch: number;
-    binDir: string;
-  }> = [];
-
-  for (const { base, binSuffix } of searchPaths) {
-    try {
-      for (const entry of readdirSync(base)) {
-        const vStr = entry.replace(/^v/, '');
-        const m = vStr.match(/^(\d+)\.(\d+)\.(\d+)/);
-        if (!m) continue;
-
-        const maj = parseInt(m[1], 10);
-        const min = parseInt(m[2], 10);
-        const pat = parseInt(m[3], 10);
-        if (maj < minMajor || (maj === minMajor && min < minMinor)) continue;
-
-        const binDir = path.join(base, entry, binSuffix);
-        const nodeBin = path.join(binDir, isWin ? 'node.exe' : 'node');
-        try {
-          accessSync(nodeBin);
-          candidates.push({ major: maj, minor: min, patch: pat, binDir });
-        } catch {
-          /* binary not accessible, skip */
-        }
-      }
-    } catch {
-      /* directory doesn't exist, skip */
-    }
-  }
-
-  if (candidates.length === 0) return null;
-
-  // Pick the latest suitable version
-  candidates.sort((a, b) => b.major - a.major || b.minor - a.minor || b.patch - a.patch);
-  return candidates[0].binDir;
-}
 
 /**
  * Parse `env` command output into a key-value map.
@@ -426,69 +412,6 @@ export function getWindowsShellExecutionOptions(): {
   return process.platform === 'win32' ? { shell: true, windowsHide: true } : {};
 }
 
-/**
- * Resolve a modern npx binary (npm >= 7) from the same directory as the
- * active node binary.  Old standalone npx packages (npm v5/v6 era) don't
- * understand `@scope/package` syntax and fail with
- * "ERROR: You must supply a command."
- *
- * @param env - Environment to use for locating node/npx (should include shell PATH)
- * @returns Absolute path to a modern npx, or bare `npx`/`npx.cmd` as fallback
- */
-export function resolveNpxPath(env: Record<string, string | undefined>): string {
-  const isWindows = process.platform === 'win32';
-  const npxName = isWindows ? 'npx.cmd' : 'npx';
-  try {
-    const whichCmd = isWindows ? 'where' : 'which';
-    const nodePath = execFileSync(whichCmd, ['node'], {
-      env,
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      ...getWindowsShellExecutionOptions(),
-    })
-      .trim()
-      .split(/\r?\n/)[0]; // `where` on Windows may return multiple lines
-    const npxCandidate = path.join(path.dirname(nodePath), npxName);
-
-    let versionOutput = '';
-    if (isWindows) {
-      // Packaged Windows builds may resolve a bundled node.exe whose sibling
-      // npx.cmd exists, but its bundled npm JS files are missing. Probe the
-      // npm entrypoint JS directly so we only trust a complete Node+npm install.
-      const npmBinDir = path.join(path.dirname(nodePath), 'node_modules', 'npm', 'bin');
-      const npmPrefixJs = path.join(npmBinDir, 'npm-prefix.js');
-      const npxCliJs = path.join(npmBinDir, 'npx-cli.js');
-      if (!existsSync(npxCandidate) || !existsSync(npmPrefixJs) || !existsSync(npxCliJs)) {
-        throw new Error('Node-adjacent npx.cmd or bundled npm scripts are missing');
-      }
-      versionOutput = execFileSync(nodePath, [npxCliJs, '--version'], {
-        env,
-        encoding: 'utf-8',
-        timeout: 5000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-      }).trim();
-    } else {
-      // Verify the candidate exists AND is modern (npm >= 7 bundles npx >= 7)
-      versionOutput = execFileSync(npxCandidate, ['--version'], {
-        env,
-        encoding: 'utf-8',
-        timeout: 5000,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      }).trim();
-    }
-
-    const majorVersion = parseInt(versionOutput.split('.')[0], 10);
-    if (majorVersion >= 7) {
-      return npxCandidate;
-    }
-    console.warn(`[ShellEnv] npx at ${npxCandidate} is v${versionOutput} (too old), falling back to PATH lookup`);
-  } catch {
-    // which/node/npx resolution failed
-  }
-  return npxName;
-}
 
 /** Separate cache for full (unfiltered) shell environment */
 let cachedFullShellEnv: Record<string, string> | null = null;
@@ -556,28 +479,3 @@ export function logEnvironmentDiagnostics(): void {
   console.log(`${tag} Enhanced PATH (first 500): ${enhanced.PATH.substring(0, 500)}`);
 }
 
-/**
- * Return the platform-specific path to the npm _npx cache directory.
- *
- * - Windows: %LOCALAPPDATA%\npm-cache\_npx
- * - POSIX:   ~/.npm/_npx
- */
-export function getNpxCacheDir(): string {
-  const explicitCacheDir = process.env.npm_config_cache || process.env.NPM_CONFIG_CACHE;
-  if (explicitCacheDir) {
-    return path.join(explicitCacheDir, '_npx');
-  }
-
-  if (process.platform === 'win32') {
-    const npmCacheBase = path.join(
-      process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'),
-      'npm-cache'
-    );
-    return path.join(npmCacheBase, '_npx');
-  }
-
-  const homeDir = os.homedir();
-  const posixCacheCandidates = [path.join(homeDir, '.npm-cache'), path.join(homeDir, '.npm')];
-  const npmCacheBase = posixCacheCandidates.find((candidate) => existsSync(candidate)) || posixCacheCandidates[0];
-  return path.join(npmCacheBase, '_npx');
-}

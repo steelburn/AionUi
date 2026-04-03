@@ -14,7 +14,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { getEnhancedEnv, getNpxCacheDir, resolveNpxPath } from '@/process/utils/shellEnv';
+import { getEnhancedEnv } from '@/process/utils/shellEnv';
 
 /**
  * MCP源类型 - 包括所有ACP后端和AionUi内置
@@ -211,12 +211,24 @@ export abstract class AbstractMcpAgent implements IMcpProtocol {
         TERM: 'dumb',
         NO_COLOR: '1',
       };
-      // Resolve bare 'npx' to a modern npx to avoid old standalone npx (pre npm 7)
-      const command = transport.command === 'npx' ? resolveNpxPath(enhancedEnv) : transport.command;
+
+      // Transform npx command to use bundled bun
+      let command: string;
+      let args: string[];
+      if (transport.command === 'npx') {
+        command = 'bun';
+        // Transform npx args: remove --yes/-y, prepend 'x'
+        const originalArgs = transport.args || [];
+        const filteredArgs = originalArgs.filter((arg) => arg !== '--yes' && arg !== '-y');
+        args = ['x', '--bun', ...filteredArgs];
+      } else {
+        command = transport.command;
+        args = transport.args || [];
+      }
 
       const stdioTransport = new StdioClientTransport({
         command,
-        args: transport.args || [],
+        args,
         env: enhancedEnv,
         // Prevent child process stderr from inheriting parent's TTY.
         // Default 'inherit' causes `zsh: suspended (tty output)` when the
@@ -283,23 +295,7 @@ export abstract class AbstractMcpAgent implements IMcpProtocol {
         };
       }
 
-      // 检测 npm 缓存问题并自动修复
-      if (errorMessage.includes('ENOTEMPTY') && retryCount < 1) {
-        try {
-          // 清理 npm 缓存并重试
-          await Promise.race([
-            safeExec('npm cache clean --force').then(() => fs.rm(getNpxCacheDir(), { recursive: true, force: true })),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cleanup timeout')), 10000)),
-          ]);
-
-          return await this.testStdioConnection(transport, retryCount + 1);
-        } catch (cleanupError) {
-          return {
-            success: false,
-            error: `npm cache corruption detected. Auto-cleanup failed, please manually run: npm cache clean --force`,
-          };
-        }
-      }
+      // bun x handles its own caching; ENOTEMPTY is not expected
 
       // Detect timeout errors
       // 检测超时错误

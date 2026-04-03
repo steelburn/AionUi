@@ -23,11 +23,8 @@ import {
   CODEX_ACP_NPX_PACKAGE,
 } from '@/common/types/acpTypes';
 import {
-  findSuitableNodeBin,
   getEnhancedEnv,
-  getNpxCacheDir,
   getWindowsShellExecutionOptions,
-  resolveNpxPath,
 } from '@process/utils/shellEnv';
 import { mainLog, mainWarn } from '@process/utils/mainLogger';
 
@@ -132,71 +129,6 @@ export function prepareCleanEnv(): Record<string, string | undefined> {
   return cleanEnv;
 }
 
-/**
- * Pre-check Node.js version and auto-correct PATH if too old.
- * Requires Node >= minMajor.minMinor for ACP backends.
- * Mutates cleanEnv.PATH when auto-correction is needed.
- */
-export function ensureMinNodeVersion(
-  cleanEnv: Record<string, string | undefined>,
-  minMajor: number,
-  minMinor: number,
-  backendLabel: string
-): void {
-  const isWindows = process.platform === 'win32';
-  let versionTooOld = false;
-  let detectedVersion = '';
-
-  try {
-    detectedVersion = execFileSync(isWindows ? 'node.exe' : 'node', ['--version'], {
-      env: cleanEnv,
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
-
-    const match = detectedVersion.match(/^v(\d+)\.(\d+)\./);
-    if (match) {
-      const major = parseInt(match[1], 10);
-      const minor = parseInt(match[2], 10);
-      if (major < minMajor || (major === minMajor && minor < minMinor)) {
-        versionTooOld = true;
-      }
-    }
-  } catch {
-    // node not found — let spawn attempt handle it
-    console.warn('[ACP] Node.js version check skipped: node not found in PATH');
-  }
-
-  if (versionTooOld) {
-    const suitableBinDir = findSuitableNodeBin(minMajor, minMinor);
-    if (suitableBinDir) {
-      const sep = isWindows ? ';' : ':';
-      cleanEnv.PATH = suitableBinDir + sep + (cleanEnv.PATH || '');
-
-      // Verify the corrected PATH actually resolves to a good node (npx uses the same PATH)
-      try {
-        const correctedVersion = execFileSync(isWindows ? 'node.exe' : 'node', ['--version'], {
-          env: cleanEnv,
-          encoding: 'utf-8',
-          timeout: 5000,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        }).trim();
-        console.log(
-          `[ACP] Node.js ${detectedVersion} is below v${minMajor}.${minMinor}.0 — auto-corrected to ${correctedVersion} from: ${suitableBinDir}`
-        );
-      } catch {
-        console.warn(`[ACP] PATH corrected with ${suitableBinDir} but node verification failed — proceeding anyway`);
-      }
-    } else {
-      throw new Error(
-        `Node.js ${detectedVersion} is too old for ${backendLabel}. ` +
-          `Minimum required: v${minMajor}.${minMinor}.0. ` +
-          `Please upgrade Node.js: https://nodejs.org/`
-      );
-    }
-  }
-}
 
 // ── Generic spawn config ────────────────────────────────────────────
 
@@ -231,8 +163,8 @@ export function createGenericSpawnConfig(
   if (cliPath.startsWith('npx ')) {
     // For "npx @package/name [extra-args]", split into command and arguments
     const parts = cliPath.split(' ').filter(Boolean);
-    spawnCommand = resolveNpxPath(env);
-    spawnArgs = [...parts.slice(1), ...effectiveAcpArgs];
+    spawnCommand = 'bun';
+    spawnArgs = ['x', '--bun', ...parts.slice(1), ...effectiveAcpArgs];
   } else if (isWindows) {
     // On Windows with shell: true, let cmd.exe handle the full command string.
     // This correctly supports paths with spaces (e.g., "C:\Program Files\agent.exe")
@@ -269,37 +201,36 @@ export function createGenericSpawnConfig(
 
 export type SpawnResult = { child: ChildProcess; isDetached: boolean };
 
-/** Return type for npx backend prepare functions (prepareClaude, prepareCodex, prepareCodebuddy). */
-export type NpxPrepareResult = {
+/** Return type for bun backend prepare functions (prepareClaude, prepareCodex, prepareCodebuddy). */
+export type BunPrepareResult = {
   cleanEnv: Record<string, string | undefined>;
-  npxCommand: string;
+  bunCommand: string;
   extraArgs?: string[];
 };
 
 // ── Backend-specific connectors ─────────────────────────────────────
 
 /**
- * Spawn an npx-based ACP backend package.
+ * Spawn a bun-based ACP backend package.
  * Used by Claude, Codex, and CodeBuddy connectors.
  */
-export function spawnNpxBackend(
+export function spawnBunBackend(
   backend: string,
-  npxPackage: string,
-  npxCommand: string,
+  bunPackage: string,
+  bunCommand: string,
   cleanEnv: Record<string, string | undefined>,
   workingDir: string,
   isWindows: boolean,
-  preferOffline: boolean,
   { extraArgs = [], detached = false }: { extraArgs?: string[]; detached?: boolean } = {}
 ): SpawnResult {
-  const spawnArgs = ['--yes', ...(preferOffline ? ['--prefer-offline'] : []), npxPackage, ...extraArgs];
+  const spawnArgs = ['x', '--bun', bunPackage, ...extraArgs];
 
   const spawnStart = Date.now();
   // detached: true creates a new session (setsid) so the child has no controlling terminal.
   // Required for backends (e.g. CodeBuddy) that write to /dev/tty — without it, SIGTTOU
   // would suspend the entire Electron process group and freeze the UI.
   // On Windows, prefix with chcp 65001 to switch console to UTF-8, preventing GBK garbling.
-  const effectiveCommand = isWindows ? `chcp 65001 >nul && "${npxCommand}"` : npxCommand;
+  const effectiveCommand = isWindows ? `chcp 65001 >nul && "${bunCommand}"` : bunCommand;
   const child = spawn(effectiveCommand, spawnArgs, {
     cwd: workingDir,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -312,23 +243,21 @@ export function spawnNpxBackend(
     child.unref();
   }
   if (ACP_PERF_LOG) {
-    console.log(`[ACP-PERF] ${backend}: process spawned ${Date.now() - spawnStart}ms (preferOffline=${preferOffline})`);
+    console.log(`[ACP-PERF] ${backend}: process spawned ${Date.now() - spawnStart}ms`);
   }
 
   return { child, isDetached: detached };
 }
 
-/** Prepare clean env + resolve npx for Claude ACP bridge. */
-function prepareClaude(): NpxPrepareResult {
+/** Prepare clean env for Claude ACP bridge. */
+function prepareClaude(): BunPrepareResult {
   const cleanEnv = prepareCleanEnv();
-  ensureMinNodeVersion(cleanEnv, 20, 10, 'Claude ACP bridge');
-  return { cleanEnv, npxCommand: resolveNpxPath(cleanEnv) };
+  return { cleanEnv, bunCommand: 'bun' };
 }
 
-/** Prepare clean env + resolve npx + run diagnostics for Codex ACP bridge. */
-async function prepareCodex(codexAcpPackage: string = CODEX_ACP_NPX_PACKAGE): Promise<NpxPrepareResult> {
+/** Prepare clean env and run diagnostics for Codex ACP bridge. */
+async function prepareCodex(codexAcpPackage: string = CODEX_ACP_NPX_PACKAGE): Promise<BunPrepareResult> {
   const cleanEnv = prepareCleanEnv();
-  ensureMinNodeVersion(cleanEnv, 20, 10, 'Codex ACP bridge');
 
   const codexCommand = process.platform === 'win32' ? 'codex.cmd' : 'codex';
   const codexExecOptions = {
@@ -371,63 +300,16 @@ async function prepareCodex(codexAcpPackage: string = CODEX_ACP_NPX_PACKAGE): Pr
   }
 
   mainLog('[ACP codex]', 'Runtime diagnostics', diagnostics);
-  return { cleanEnv, npxCommand: resolveNpxPath(cleanEnv) };
+  return { cleanEnv, bunCommand: 'bun' };
 }
 
-async function resolveCachedCodexAcpBinary(): Promise<{ binaryPath: string; packageSpecifier: string } | null> {
-  const packageName = resolveCodexAcpPlatformPackage();
-  if (!packageName) {
-    return null;
-  }
+// Cached binary resolution is no longer needed with bundled bun.
+// bun x uses its own global cache with stable paths; we don't need to
+// scan npm's _npx directory for platform-specific binaries.
 
-  const packageDirName = packageName.replace('@zed-industries/', '');
-  const binaryName = process.platform === 'win32' ? 'codex-acp.exe' : 'codex-acp';
-  const npxCacheDir = getNpxCacheDir();
-
-  let entries: string[] = [];
-  try {
-    entries = await fs.readdir(npxCacheDir);
-  } catch {
-    return null;
-  }
-
-  let selectedBinaryPath: string | null = null;
-  let selectedMtimeMs = -1;
-
-  for (const entry of entries) {
-    const candidatePath = path.join(
-      npxCacheDir,
-      entry,
-      'node_modules',
-      '@zed-industries',
-      packageDirName,
-      'bin',
-      binaryName
-    );
-
-    try {
-      const stat = await fs.stat(candidatePath);
-      if (stat.isFile() && stat.mtimeMs > selectedMtimeMs) {
-        selectedBinaryPath = candidatePath;
-        selectedMtimeMs = stat.mtimeMs;
-      }
-    } catch {
-      // Ignore cache entries that do not contain this package.
-    }
-  }
-
-  return selectedBinaryPath
-    ? {
-        binaryPath: selectedBinaryPath,
-        packageSpecifier: resolveCodexAcpPlatformPackageSpecifier(packageName),
-      }
-    : null;
-}
-
-/** Prepare clean env + resolve npx + load MCP config for CodeBuddy. */
-async function prepareCodebuddy(): Promise<NpxPrepareResult> {
+/** Prepare clean env and load MCP config for CodeBuddy. */
+async function prepareCodebuddy(): Promise<BunPrepareResult> {
   const cleanEnv = prepareCleanEnv();
-  ensureMinNodeVersion(cleanEnv, 20, 10, 'CodeBuddy ACP');
 
   // Load user's MCP config if available (~/.codebuddy/mcp.json)
   // CodeBuddy CLI in --acp mode does not auto-load mcp.json, so we pass it explicitly
@@ -441,14 +323,13 @@ async function prepareCodebuddy(): Promise<NpxPrepareResult> {
     mainWarn('[ACP]', 'No CodeBuddy MCP config found, starting without MCP servers');
   }
 
-  return { cleanEnv, npxCommand: resolveNpxPath(cleanEnv), extraArgs };
+  return { cleanEnv, bunCommand: 'bun', extraArgs };
 }
 
 /**
- * Spawn a generic ACP backend with clean env and Node version check.
- * Many generic backends are Node.js CLIs (#!/usr/bin/env node) that break
- * when Electron's inherited env resolves to an old Node version.
- * Safe for native binaries too — they ignore NODE_OPTIONS and Node version checks.
+ * Spawn a generic ACP backend with clean env.
+ * Generic backends may be Node.js CLIs or native binaries; prepareCleanEnv()
+ * removes Electron-inherited NODE_OPTIONS so they don't interfere with Node-based agents.
  */
 export async function spawnGenericBackend(
   backend: string,
@@ -467,7 +348,6 @@ export async function spawnGenericBackend(
   if (customEnv) {
     Object.assign(cleanEnv, customEnv);
   }
-  ensureMinNodeVersion(cleanEnv, 18, 17, `${backend} ACP`);
 
   const spawnStart = Date.now();
   const detached = process.platform !== 'win32';
@@ -485,34 +365,33 @@ export async function spawnGenericBackend(
 }
 
 /** Callbacks for wiring a spawned child into the AcpConnection instance. */
-export type NpxConnectHooks = {
+export type BunConnectHooks = {
   /** Wire the spawned child into the connection (e.g. attach protocol handlers). */
   setup: (result: SpawnResult) => Promise<void>;
-  /** Terminate a failed Phase-1 child before retrying. */
+  /** Terminate a failed child before retrying. */
   cleanup: () => Promise<void>;
 };
 
 /**
- * Connect to an npx-based ACP backend with Phase 1/2 retry strategy.
- * Phase 1: --prefer-offline for fast startup (~1-2s).
- * Phase 2: fresh registry lookup on failure (~3-5s).
+ * Connect to a bun-based ACP backend.
+ * bun x has stable caching and doesn't require --prefer-offline retry logic.
  */
-async function connectNpxBackend(config: {
+async function connectBunBackend(config: {
   backend: string;
-  npxPackage: string;
-  prepareFn: () => NpxPrepareResult | Promise<NpxPrepareResult>;
+  bunPackage: string;
+  prepareFn: () => BunPrepareResult | Promise<BunPrepareResult>;
   workingDir: string;
   /** Wire the spawned child into the connection (e.g. attach protocol handlers). */
   setup: (result: SpawnResult) => Promise<void>;
-  /** Terminate a failed Phase-1 child before retrying. */
+  /** Terminate a failed child before retrying. */
   cleanup: () => Promise<void>;
   extraArgs?: string[];
   detached?: boolean;
 }): Promise<void> {
-  const { backend, npxPackage, prepareFn, workingDir, setup, cleanup } = config;
+  const { backend, bunPackage, prepareFn, workingDir, setup } = config;
 
   const envStart = Date.now();
-  const { cleanEnv, npxCommand, extraArgs: prepExtraArgs = [] } = await prepareFn();
+  const { cleanEnv, bunCommand, extraArgs: prepExtraArgs = [] } = await prepareFn();
   if (ACP_PERF_LOG) console.log(`[ACP-PERF] ${backend}: env prepared ${Date.now() - envStart}ms`);
 
   const isWindows = process.platform === 'win32';
@@ -521,29 +400,16 @@ async function connectNpxBackend(config: {
     detached: config.detached ?? false,
   };
 
-  // Phase 1: Try with --prefer-offline for fast startup
-  try {
-    await setup(spawnNpxBackend(backend, npxPackage, npxCommand, cleanEnv, workingDir, isWindows, true, opts));
-  } catch (firstError) {
-    // Phase 2: Retry without --prefer-offline to refresh stale cache
-    console.warn(
-      `[ACP] ${backend} --prefer-offline failed, retrying with fresh registry lookup:`,
-      firstError instanceof Error ? firstError.message : String(firstError)
-    );
-
-    await cleanup();
-
-    await setup(spawnNpxBackend(backend, npxPackage, npxCommand, cleanEnv, workingDir, isWindows, false, opts));
-  }
+  await setup(spawnBunBackend(backend, bunPackage, bunCommand, cleanEnv, workingDir, isWindows, opts));
 }
 
 // ── Exported per-backend connect functions ───────────────────────────
 
-/** Connect to Claude ACP bridge via npx. */
-export function connectClaude(workingDir: string, hooks: NpxConnectHooks): Promise<void> {
-  return connectNpxBackend({
+/** Connect to Claude ACP bridge via bundled bun. */
+export function connectClaude(workingDir: string, hooks: BunConnectHooks): Promise<void> {
+  return connectBunBackend({
     backend: 'claude',
-    npxPackage: CLAUDE_ACP_NPX_PACKAGE,
+    bunPackage: CLAUDE_ACP_NPX_PACKAGE,
     prepareFn: prepareClaude,
     workingDir,
     ...hooks,
@@ -551,37 +417,9 @@ export function connectClaude(workingDir: string, hooks: NpxConnectHooks): Promi
   });
 }
 
-/** Connect to Codex ACP bridge via npx. */
-export function connectCodex(workingDir: string, hooks: NpxConnectHooks): Promise<void> {
+/** Connect to Codex ACP bridge via bundled bun. */
+export function connectCodex(workingDir: string, hooks: BunConnectHooks): Promise<void> {
   return (async () => {
-    const cachedBinary = await resolveCachedCodexAcpBinary();
-    if (cachedBinary) {
-      try {
-        const { cleanEnv } = await prepareCodex(cachedBinary.packageSpecifier);
-        const config = createGenericSpawnConfig(
-          cachedBinary.binaryPath,
-          workingDir,
-          [],
-          undefined,
-          cleanEnv as Record<string, string>
-        );
-        const child = spawn(config.command, config.args, config.options);
-        mainLog('[ACP codex]', 'Using cached platform binary', {
-          binaryPath: cachedBinary.binaryPath,
-          bridgePackage: cachedBinary.packageSpecifier,
-        });
-        await hooks.setup({ child, isDetached: false });
-        return;
-      } catch (error) {
-        await hooks.cleanup();
-        mainWarn(
-          '[ACP codex]',
-          `Cached platform binary failed, falling back to package resolution: ${cachedBinary.packageSpecifier}`,
-          error instanceof Error ? error.message : String(error)
-        );
-      }
-    }
-
     const codexPlatformPackage = resolvePreferredCodexAcpPlatformPackage();
     const preferDirectPackage = codexPlatformPackage !== null && shouldPreferDirectCodexAcpPackage();
     const codexPackageCandidates = preferDirectPackage
@@ -590,12 +428,12 @@ export function connectCodex(workingDir: string, hooks: NpxConnectHooks): Promis
 
     let lastError: Error | null = null;
 
-    for (const [index, npxPackage] of codexPackageCandidates.entries()) {
+    for (const [index, bunPackage] of codexPackageCandidates.entries()) {
       try {
-        await connectNpxBackend({
+        await connectBunBackend({
           backend: 'codex',
-          npxPackage,
-          prepareFn: () => prepareCodex(npxPackage),
+          bunPackage,
+          prepareFn: () => prepareCodex(bunPackage),
           workingDir,
           ...hooks,
         });
@@ -611,7 +449,7 @@ export function connectCodex(workingDir: string, hooks: NpxConnectHooks): Promis
           index === 0 &&
           !preferDirectPackage &&
           codexPlatformPackage !== null &&
-          npxPackage === CODEX_ACP_NPX_PACKAGE &&
+          bunPackage === CODEX_ACP_NPX_PACKAGE &&
           isCodexMetaPackageOptionalDependencyError(lastError.message);
         const hasRemainingCandidates = index < codexPackageCandidates.length - 1;
 
@@ -633,7 +471,7 @@ export function connectCodex(workingDir: string, hooks: NpxConnectHooks): Promis
         if (hasRemainingCandidates) {
           mainWarn(
             '[ACP codex]',
-            `Bridge package failed, retrying alternate package: ${npxPackage}`,
+            `Bridge package failed, retrying alternate package: ${bunPackage}`,
             lastError.message
           );
           continue;
@@ -647,11 +485,11 @@ export function connectCodex(workingDir: string, hooks: NpxConnectHooks): Promis
   })();
 }
 
-/** Connect to CodeBuddy ACP via npx. */
-export function connectCodebuddy(workingDir: string, hooks: NpxConnectHooks): Promise<void> {
-  return connectNpxBackend({
+/** Connect to CodeBuddy ACP via bundled bun. */
+export function connectCodebuddy(workingDir: string, hooks: BunConnectHooks): Promise<void> {
+  return connectBunBackend({
     backend: 'codebuddy',
-    npxPackage: CODEBUDDY_ACP_NPX_PACKAGE,
+    bunPackage: CODEBUDDY_ACP_NPX_PACKAGE,
     prepareFn: prepareCodebuddy,
     workingDir,
     ...hooks,

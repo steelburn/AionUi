@@ -29,7 +29,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { mainLog } from '@process/utils/mainLogger';
-import { getEnhancedEnv, resolveNpxPath } from '@process/utils/shellEnv';
+import { getEnhancedEnv } from '@process/utils/shellEnv';
 import { AcpConnection } from './AcpConnection';
 import { AcpApprovalStore, createAcpApprovalKey } from './ApprovalStore';
 import {
@@ -1617,8 +1617,8 @@ export class AcpAgent {
       if (this.extra.cliPath.startsWith('npx ')) {
         // For "npx @qwen-code/qwen-code" or "npx @anthropic-ai/claude-code"
         const parts = this.extra.cliPath.split(' ');
-        command = resolveNpxPath(cleanEnv);
-        args = [...parts.slice(1), loginArg];
+        command = 'bun';
+        args = ['x', '--bun', ...parts.slice(1), loginArg];
       } else {
         // For regular paths like '/usr/local/bin/qwen' or '/usr/local/bin/claude'
         command = this.extra.cliPath;

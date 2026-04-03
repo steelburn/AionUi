@@ -197,6 +197,9 @@ docs/superpowers/
 resources/bundled-bun
 resources/bundled-aionrs
 
+# Team iterations (dev-tester loop artifacts)
+iterations/
+
 # Server build output
 dist-server/
 .omc/

@@ -393,76 +393,45 @@ describe('getEnhancedEnv Windows extra paths (cross-platform mock)', () => {
   });
 });
 
-describe('resolveNpxPath', () => {
-  const originalPlatform = process.platform;
+// resolveNpxPath was removed — bun x is now used for all package execution
 
+// -------------------------------------------------------------------
+// 4.5. Test getBundledBunDir
+// -------------------------------------------------------------------
+describe('getBundledBunDir', () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
-  afterEach(() => {
-    Object.defineProperty(process, 'platform', { value: originalPlatform });
-  });
-
-  it('verifies Windows npx via the bundled npm entrypoint JS', async () => {
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-
-    const execFileSync = vi
-      .fn()
-      .mockReturnValueOnce(`${path.join('/tooling', 'node.exe')}\n`)
-      .mockReturnValueOnce('10.9.0\n');
-
+  it('returns the bundled bun directory path when it exists', async () => {
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs');
       return {
         ...actual,
-        existsSync: vi.fn(() => true),
+        existsSync: vi.fn(() => true), // Pretend bundled-bun dir exists
       };
     });
 
-    vi.doMock('child_process', () => ({
-      execFileSync,
-      execFile: vi.fn(),
-    }));
+    const { getBundledBunDir } = await import('@process/utils/shellEnv');
+    const result = getBundledBunDir();
 
-    const { resolveNpxPath } = await import('@process/utils/shellEnv');
-    const result = resolveNpxPath({ PATH: '/tooling' });
-    const npxCandidate = path.join('/tooling', 'npx.cmd');
-    const npxCliJs = path.join('/tooling', 'node_modules', 'npm', 'bin', 'npx-cli.js');
-
-    expect(result).toBe(npxCandidate);
-    expect(execFileSync).toHaveBeenNthCalledWith(
-      2,
-      path.join('/tooling', 'node.exe'),
-      [npxCliJs, '--version'],
-      expect.objectContaining({
-        env: { PATH: '/tooling' },
-        windowsHide: true,
-      })
-    );
+    expect(result).toBeTruthy();
+    expect(result).toContain('bundled-bun');
   });
 
-  it('falls back to PATH lookup when bundled npm scripts are missing on Windows', async () => {
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-
-    const execFileSync = vi.fn().mockReturnValueOnce(`${path.join('/tooling', 'node.exe')}\n`);
-
+  it('returns null when bundled bun directory does not exist', async () => {
     vi.doMock('fs', async () => {
       const actual = await vi.importActual<typeof import('fs')>('fs');
       return {
         ...actual,
-        existsSync: vi.fn((target: string) => target === path.join('/tooling', 'npx.cmd')),
+        existsSync: vi.fn(() => false),
       };
     });
 
-    vi.doMock('child_process', () => ({
-      execFileSync,
-      execFile: vi.fn(),
-    }));
+    const { getBundledBunDir } = await import('@process/utils/shellEnv');
+    const result = getBundledBunDir();
 
-    const { resolveNpxPath } = await import('@process/utils/shellEnv');
-
-    expect(resolveNpxPath({ PATH: '/tooling' })).toBe('npx.cmd');
+    expect(result).toBeNull();
   });
 });
 
