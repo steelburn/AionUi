@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -193,7 +194,7 @@ describe('HubInstaller', () => {
 
     it('should fail when manifest is missing in existing directory', async () => {
       mockedExistsSync.mockImplementation((p) => {
-        return String(p) === '/ext-install-dir/broken-ext';
+        return String(p) === path.join('/ext-install-dir', 'broken-ext');
       });
 
       await expect(hubInstaller.retryInstall('broken-ext')).rejects.toThrow('manifest missing');
@@ -220,7 +221,7 @@ describe('HubInstaller', () => {
       mocks.getExtensionResult = makeExtInfo('retry-mark-ext', true);
       mockedExistsSync.mockImplementation((p) => {
         const s = String(p);
-        if (s === '/ext-install-dir/retry-mark-ext') return true;
+        if (s === path.join('/ext-install-dir', 'retry-mark-ext')) return true;
         if (s.includes('aion-extension.json')) return true;
         return false;
       });

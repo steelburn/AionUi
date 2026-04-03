@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: { isPackaged: false, getPath: vi.fn(() => '/tmp') },
@@ -16,13 +17,13 @@ vi.mock('@process/utils', () => ({
 
 // Must import after mocks
 import {
-  getUserExtensionsDir,
+  EXTENSION_MANIFEST_FILE,
   getAppDataExtensionsDir,
   getEnvExtensionsDirs,
   getExtensionScanSources,
-  getInstallTargetDir,
   getHubResourcesDir,
-  EXTENSION_MANIFEST_FILE,
+  getInstallTargetDir,
+  getUserExtensionsDir,
   HUB_REMOTE_URLS,
 } from '../../src/process/extensions/constants';
 
@@ -42,13 +43,13 @@ describe('extension constants', () => {
 
   describe('getUserExtensionsDir', () => {
     it('should return data path + extensions', () => {
-      expect(getUserExtensionsDir()).toBe('/home/user/.aionui-dev/extensions');
+      expect(getUserExtensionsDir()).toBe(path.join('/home/user/.aionui-dev', 'extensions'));
     });
   });
 
   describe('getAppDataExtensionsDir', () => {
     it('should return appData path + extensions', () => {
-      expect(getAppDataExtensionsDir()).toBe('/appdata/extensions');
+      expect(getAppDataExtensionsDir()).toBe(path.join('/appdata', 'extensions'));
     });
   });
 
