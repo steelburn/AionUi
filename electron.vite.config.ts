@@ -172,7 +172,11 @@ export default defineConfig(({ mode }) => {
         chunkSizeWarningLimit: 1500,
         cssCodeSplit: true,
         rollupOptions: {
-          input: { index: resolve('src/renderer/index.html') },
+          input: {
+            index: resolve('src/renderer/index.html'),
+            pet: resolve('src/renderer/pet/pet.html'),
+            'pet-hit': resolve('src/renderer/pet/pet-hit.html'),
+          },
           external: ['node:crypto', 'crypto'],
           onwarn(warning, warn) {
             if (warning.code === 'EVAL') return;
