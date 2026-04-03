@@ -216,7 +216,8 @@ class AcpDetector {
   private deduplicate(agents: DetectedAgent[]): DetectedAgent[] {
     const seen = new Set<string>();
     const result: DetectedAgent[] = [];
-
+    // console.debug(`[AcpDetector] Deduplicating ${agents.length} agents: [ ${agents.map((a) => a.name).join(', ')} ]`);
+    // console.debug(`[AcpDetector] Deduplicating ${agents.length} agents: [ ${agents.map((a) => JSON.stringify(a)).join('\n')} ]`);
     for (const agent of agents) {
       if (agent.cliPath) {
         if (seen.has(agent.cliPath)) continue;
