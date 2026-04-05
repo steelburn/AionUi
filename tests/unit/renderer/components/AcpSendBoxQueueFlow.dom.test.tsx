@@ -6,6 +6,7 @@ import { clearAcpRuntimeDiagnosticsSnapshot } from '@/renderer/pages/conversatio
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const responseListeners = new Set<(message: unknown) => void>();
+let mockMessageList: unknown[] = [];
 
 const mockConversationGetInvoke = vi.fn();
 const mockConversationStopInvoke = vi.fn();
@@ -274,6 +275,7 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', async () => {
 
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
   useAddOrUpdateMessage: () => mockAddOrUpdateMessage,
+  useMessageList: () => mockMessageList,
 }));
 
 vi.mock('@/renderer/pages/conversation/platforms/assertBridgeSuccess', () => ({
@@ -393,6 +395,7 @@ vi.mock('react-i18next', () => ({
 describe('AcpSendBox queue flow', () => {
   beforeEach(() => {
     responseListeners.clear();
+    mockMessageList = [];
     window.sessionStorage.clear();
     vi.clearAllMocks();
 

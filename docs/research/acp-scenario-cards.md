@@ -1331,3 +1331,40 @@ Reviewer adjustment:
   - 不能把 hydrated `running` 和 fresh `waiting` 混成同一种 phase。
   - 新的 thread-level warmup row 不能和 inline `thinking` 叠加成双重 loading。
   - 修复 reviewer 指出的 remount 回归后，必须有自动化保护，不接受只靠人工记忆。
+
+## SC-034 Hydrated Running ACP Threads Must Preserve Waiting Until Assistant Activity Exists
+
+- Goal:
+  - 让 `hydrated running` 的 ACP 线程在重开/切回时，不再一刀切成 `streaming`。
+  - 如果当前活跃 turn 其实还没首包，线程应继续保留 waiting cue；只有已经出现 assistant-side activity 时，才进入 streaming。
+- User action:
+  - 用户发出一条 ACP 消息后立刻切到别的线程，再很快切回来。
+  - 或者用户重开一个当前仍处于 `running` 的 ACP 历史线程。
+- Current failure:
+  - `SC-033` 为了避免 mid-turn 误报 `Connecting to ...`，把 hydrated `running` 全部降成 `streaming`。
+  - 这样虽然修掉了“mid-turn 假 warmup”，但也顺手丢掉了“首包前切回线程仍应继续等待”的正确过渡。
+  - 如果简单把消息列表依赖挂进主 hydration/reset effect，又会让普通消息列表更新触发整段 ACP 状态清空，打坏 live diagnostics。
+- Expected UI state:
+  - hydrated `running` 且最后一条可见 timeline 消息仍是 user-side：
+    - 线程继续显示 waiting pulse / warmup row
+  - hydrated `running` 且已经有 assistant-side activity：
+    - 线程直接视为 streaming
+    - 不再错误显示 `Connecting to ...`
+  - 后续消息列表继续 hydrate 时：
+    - 可以轻量重分流 waiting / streaming
+    - 不能重跑整段 ACP reset，也不能清掉 live diagnostics / terminal status
+- Automation plan:
+  - `useAcpMessage` 读取当前线程的 message list，按“最后一条可见 timeline 消息”判断 hydrated running 是 waiting 还是 streaming
+  - 只在轻量 phase reclassification effect 中监听 message list 变化
+  - 主 hydration/reset effect 不引入 `messageList` 依赖
+  - 补齐自动化：
+    - `useAcpMessage.dom.test.ts`
+    - `AcpSendBoxFlow.dom.test.tsx`
+- Exit criteria:
+  - “发完立刻切走再切回，但还没首包”的线程仍然有等待态。
+  - “已经开始流式输出的 running 线程”不会回到 `Connecting to ...`。
+  - message list 变化不会清空 live diagnostics / ACP status。
+- Reviewer focus:
+  - 不能靠旧的 `running => streaming` 一刀切偷懒。
+  - 更不能把 `messageList` 带进主 hydration/reset effect 依赖，导致普通列表更新触发全量 reset。
+  - 必须补一条“message list 变化不清空 live diagnostics”的自动化合同。

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const CONVERSATION_ID = 'conv-acp-flow';
 
 const responseListeners = new Set<(message: unknown) => void>();
+const messageListListeners = new Set<() => void>();
 
 const mockConversationGetInvoke = vi.fn();
 const mockConversationStopInvoke = vi.fn();
@@ -26,10 +27,18 @@ const mockSetSendBoxHandler = vi.fn();
 const mockClearFiles = vi.fn();
 const mockQueueResetActiveExecution = vi.fn();
 const mockArcoError = vi.fn();
+let mockMessageList: unknown[] = [];
 
 const emitAcpResponse = (message: unknown) => {
   for (const listener of responseListeners) {
     listener(message);
+  }
+};
+
+const setMockMessageList = (nextMessageList: unknown[]): void => {
+  mockMessageList = nextMessageList;
+  for (const listener of messageListListeners) {
+    listener();
   }
 };
 
@@ -248,9 +257,24 @@ vi.mock('@/renderer/hooks/ui/useLatestRef', async () => {
   };
 });
 
-vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
-  useAddOrUpdateMessage: () => mockAddOrUpdateMessage,
-}));
+vi.mock('@/renderer/pages/conversation/Messages/hooks', async () => {
+  const ReactModule = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useAddOrUpdateMessage: () => mockAddOrUpdateMessage,
+    useMessageList: () =>
+      ReactModule.useSyncExternalStore(
+        (listener: () => void) => {
+          messageListListeners.add(listener);
+          return () => {
+            messageListListeners.delete(listener);
+          };
+        },
+        () => mockMessageList,
+        () => mockMessageList
+      ),
+  };
+});
 
 vi.mock('@/renderer/pages/conversation/platforms/useConversationCommandQueue', () => ({
   shouldEnqueueConversationCommand: vi.fn(() => false),
@@ -431,6 +455,7 @@ vi.mock('react-i18next', () => ({
 describe('AcpSendBox live ACP flow', () => {
   beforeEach(() => {
     responseListeners.clear();
+    setMockMessageList([]);
     clearAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID);
     vi.clearAllMocks();
 
@@ -518,6 +543,17 @@ describe('AcpSendBox live ACP flow', () => {
   });
 
   it('does not show the warmup indicator when reopening a running ACP conversation mid-turn', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-mid-turn',
+        type: 'text',
+        msg_id: 'assistant-mid-turn',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Assistant content is already streaming' },
+      },
+    ]);
+
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,
       type: 'acp',
@@ -537,6 +573,39 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
     expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+  });
+
+  it('shows the warmup indicator when reopening a running ACP conversation before the first response arrives', async () => {
+    setMockMessageList([
+      {
+        id: 'user-before-first-response',
+        type: 'text',
+        msg_id: 'user-before-first-response',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'User message still waiting for ACP' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Processing');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
   });
 
   it('switches the sendbox placeholder to processing while ACP is busy', async () => {

@@ -8,7 +8,7 @@ import { ipcBridge } from '@/common';
 import { transformMessage, type TMessage } from '@/common/chat/chatLib';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import type { TokenUsageData } from '@/common/config/storage';
-import { useAddOrUpdateMessage } from '@/renderer/pages/conversation/Messages/hooks';
+import { useAddOrUpdateMessage, useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import type { ThoughtData } from '@/renderer/components/chat/ThoughtDisplay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -66,6 +66,37 @@ export const sanitizeAcpTimelineMessages = (messages: TMessage[]): TMessage[] =>
 
     return !isLegacyAcpInfrastructureTip(message);
   });
+};
+
+const HYDRATED_RUNNING_ASSISTANT_ACTIVITY_TYPES = new Set<TMessage['type']>([
+  'tool_group',
+  'thinking',
+  'available_commands',
+  'skill_suggest',
+  'cron_trigger',
+]);
+
+const shouldHydratedRunningEnterWaitingPhase = (conversationId: string, messages: TMessage[]): boolean => {
+  const sanitizedMessages = sanitizeAcpTimelineMessages(
+    messages.filter((message) => message.conversation_id === conversationId)
+  );
+
+  for (let index = sanitizedMessages.length - 1; index >= 0; index -= 1) {
+    const message = sanitizedMessages[index];
+    if (message.hidden) {
+      continue;
+    }
+
+    if (message.position === 'right') {
+      return true;
+    }
+
+    if (message.position === 'left' || HYDRATED_RUNNING_ASSISTANT_ACTIVITY_TYPES.has(message.type)) {
+      return false;
+    }
+  }
+
+  return true;
 };
 
 const isTerminalAcpStatus = (
@@ -135,6 +166,7 @@ type UseAcpMessageOptions = {
 
 export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOptions = {}): UseAcpMessageReturn => {
   const addOrUpdateMessage = useAddOrUpdateMessage();
+  const messageList = useMessageList();
   const [running, setRunning] = useState(false);
   const [hasHydratedRunningState, setHasHydratedRunningState] = useState(false);
   const [thought, setThought] = useState<ThoughtData>({
@@ -691,6 +723,20 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
 
   // Reset state when conversation changes and restore actual running status
   useEffect(() => {
+    if (!hasHydratedRunningState || hasLiveAcpActivityRef.current || !runningRef.current) {
+      return;
+    }
+
+    const shouldWaitForFirstResponse = shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
+    if (aiProcessingRef.current === shouldWaitForFirstResponse) {
+      return;
+    }
+
+    setAiProcessing(shouldWaitForFirstResponse);
+    aiProcessingRef.current = shouldWaitForFirstResponse;
+  }, [hasHydratedRunningState, messageList]);
+
+  useEffect(() => {
     let cancelled = false;
 
     setThought({ subject: '', description: '' });
@@ -735,11 +781,10 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
         const isRunning = res.status === 'running';
         setRunning(isRunning);
         runningRef.current = isRunning;
-        // Hydrated running means the thread is already mid-turn, not that it is
-        // still waiting for its first response. Keep the turn busy via `running`
-        // but avoid re-entering the send-time warmup phase.
-        setAiProcessing(false);
-        aiProcessingRef.current = false;
+        const shouldWaitForFirstResponse =
+          isRunning && shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
+        setAiProcessing(shouldWaitForFirstResponse);
+        aiProcessingRef.current = shouldWaitForFirstResponse;
       }
       setHasHydratedRunningState(true);
 

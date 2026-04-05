@@ -745,7 +745,9 @@ Zed 领先点已经比较稳定，可归纳为：
 - 右上角 runtime status dot 进入 waiting pulse
 - 在线程底部、输入框上方出现一条 `Processing / Connecting to {agent}` warmup row
 - 如果 ACP 在首包前先发出 inline `thinking`，则由 inline `thinking` 接管这一段等待提示，避免双重过渡 UI
-- 如果切回的是一个已经 hydrated 的 `running` 会话，则保持 busy/stop 语义，但不会错误回到 `Connecting to {agent}`
+- 如果切回的是一个已经 hydrated 的 `running` 会话：
+  - 当最后一条可见 timeline 消息仍是 user-side 时，waiting cue 会继续保留
+  - 当已经出现 assistant-side activity 时，保持 busy/stop 语义，但不会错误回到 `Connecting to {agent}`
 
 当前用户不会看到：
 

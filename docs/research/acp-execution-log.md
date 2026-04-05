@@ -2039,3 +2039,73 @@
 - Next:
   - 继续评估是否需要把当前 warmup row 再向 Zed 的 generating row 靠近，例如更显式的 elapsed / token / tool waiting 语义
   - 在保持当前 correctness 合同不退化的前提下，继续推进更底层 `queue / busy` runtime contract 收束
+
+### 2026-04-06 / Batch 31
+
+- 对应 SC:
+  - `SC-034`
+- Goal:
+  - 让 hydrated `running` 的 ACP 线程在重开/切回时，不再全部被压成 `streaming`。
+  - 如果最后一条可见 timeline 消息仍是 user-side，线程应继续保留 waiting cue；如果已经出现 assistant-side activity，则直接视为 streaming。
+- Root cause:
+  - `SC-033` 为了修掉“mid-turn 假 `Connecting to ...`”，把 hydrated `running` 全部改成了 `aiProcessing=false`。
+  - 这虽然避免了误报，但也让“发完立刻切走、再切回来、还没首包”的线程重新变得过于安静。
+  - 第一次实现时我试图用 `messageList` 驱动整个 hydration effect，reviewer 指出这会让普通消息列表更新重跑 ACP reset，清掉 live diagnostics / status。
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 读取当前线程 message list，并按最后一条可见 timeline 消息判断 hydrated `running` 应进入：
+      - `waiting`
+      - `streaming`
+    - 判断规则：
+      - 最后一条可见消息仍是 user-side => `waiting`
+      - 已有 assistant-side activity => `streaming`
+    - list-driven reclassification 只放在轻量 effect 中
+    - 主 hydration/reset effect 不再依赖 `messageList`
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 新增合同：
+      - hydrated `running` + user-side latest message => `waiting`
+      - hydrated `running` + assistant-side latest message => `streaming`
+      - 消息列表后续变化可把 waiting 轻量切到 streaming
+      - message list 变化不会清空 live diagnostics / terminal status
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增合同：
+      - reopen 一个“还没首包”的 running ACP 会话时，thread warmup indicator 仍可见
+      - reopen mid-turn streaming ACP 会话时，warmup indicator 仍不可见
+  - `tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 测试桩补齐 `useMessageList`，保证 ACP unit 套件继续完整通过
+- Reviewer:
+  - reviewer：`Boole`
+  - 第一轮 finding：
+    - `messageList` 被放进主 hydration/reset effect 依赖，会让普通消息列表更新重跑 ACP reset，清空 live diagnostics
+  - 修复后复审结论：
+    - `no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 结果：`37 passed`
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`32 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test:acp:unit`
+    - 结果：`402 passed | 1 skipped`
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`402 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - ACP 的 send-time 过渡更接近真实语义了：
+    - 不是所有 hydrated `running` 都一样
+    - “还没首包”和“已经开始流”的线程终于被区分开
+  - 这让“发完立刻切走再切回”的体感更接近 Zed：
+    - 不再因为 remount 丢掉等待态
+    - 也不会重新把 mid-turn 错说成 `Connecting to ...`
+  - reviewer 抓出的 reset 风险也被实打实挡住了：
+    - message list 更新只会轻量重分相位
+    - 不会清空 live diagnostics / ACP terminal status
+- Next:
+  - 继续评估是否要把当前 warmup row 再向更完整的 generating affordance 靠近，例如加入更明确的 elapsed / waiting meta
+  - 在不退化这批 hydrated-running 合同的前提下，继续推进更底层 `queue / busy` runtime contract 收束

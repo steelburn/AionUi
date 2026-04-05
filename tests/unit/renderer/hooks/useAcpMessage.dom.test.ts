@@ -6,6 +6,15 @@ import {
 } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 
 let capturedResponseListener: ((message: unknown) => void) | null = null;
+let mockMessageList: unknown[] = [];
+const messageListListeners = new Set<() => void>();
+
+const setMockMessageList = (nextMessageList: unknown[]): void => {
+  mockMessageList = nextMessageList;
+  for (const listener of messageListListeners) {
+    listener();
+  }
+};
 
 const mockConversationGetInvoke = vi.fn();
 const mockAddOrUpdateMessage = vi.fn();
@@ -34,9 +43,24 @@ vi.mock('@/common/chat/chatLib', () => ({
   transformMessage: vi.fn((message: unknown) => message),
 }));
 
-vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
-  useAddOrUpdateMessage: vi.fn(() => mockAddOrUpdateMessage),
-}));
+vi.mock('@/renderer/pages/conversation/Messages/hooks', async () => {
+  const ReactModule = await vi.importActual<typeof import('react')>('react');
+
+  return {
+    useAddOrUpdateMessage: vi.fn(() => mockAddOrUpdateMessage),
+    useMessageList: () =>
+      ReactModule.useSyncExternalStore(
+        (listener: () => void) => {
+          messageListListeners.add(listener);
+          return () => {
+            messageListListeners.delete(listener);
+          };
+        },
+        () => mockMessageList,
+        () => mockMessageList
+      ),
+  };
+});
 
 import { sanitizeAcpTimelineMessages, useAcpMessage } from '@/renderer/pages/conversation/platforms/acp/useAcpMessage';
 
@@ -55,6 +79,7 @@ const createDeferred = <T>() => {
 describe('useAcpMessage', () => {
   beforeEach(() => {
     capturedResponseListener = null;
+    setMockMessageList([]);
     mockAddOrUpdateMessage.mockReset();
     clearAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID);
     mockConversationGetInvoke.mockResolvedValue({
@@ -70,6 +95,17 @@ describe('useAcpMessage', () => {
   });
 
   it('marks the conversation disconnected and clears loading state on agent_status disconnected', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-mid-stream-before-disconnect',
+        type: 'text',
+        msg_id: 'assistant-mid-stream-before-disconnect',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Streaming response already started' },
+      },
+    ]);
+
     const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
 
     await waitFor(() => {
@@ -108,6 +144,84 @@ describe('useAcpMessage', () => {
         status: 'disconnected',
         disconnectCode: 42,
         disconnectSignal: null,
+      })
+    );
+  });
+
+  it('does not reset live ACP diagnostics when the message list changes after a terminal status arrives', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-mid-stream-before-terminal',
+        type: 'text',
+        msg_id: 'assistant-mid-stream-before-terminal',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Streaming response already started' },
+      },
+    ]);
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      capturedResponseListener?.({
+        type: 'agent_status',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'status-disconnected-before-message-list-update',
+        data: {
+          backend: 'claude',
+          status: 'disconnected',
+          disconnectCode: 7,
+          disconnectSignal: 'SIGTERM',
+        },
+      });
+    });
+
+    expect(result.current.acpStatus).toBe('disconnected');
+    expect(result.current.acpLogs[0]).toEqual(
+      expect.objectContaining({
+        status: 'disconnected',
+        disconnectCode: 7,
+        disconnectSignal: 'SIGTERM',
+      })
+    );
+
+    act(() => {
+      setMockMessageList([
+        {
+          id: 'assistant-mid-stream-before-terminal',
+          type: 'text',
+          msg_id: 'assistant-mid-stream-before-terminal',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: { content: 'Streaming response already started' },
+        },
+        {
+          id: 'assistant-late-history',
+          type: 'thinking',
+          msg_id: 'assistant-late-history',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: {
+            content: 'Thinking patch landed in the list',
+            status: 'thinking',
+          },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.acpStatus).toBe('disconnected');
+    });
+
+    expect(result.current.acpLogs[0]).toEqual(
+      expect.objectContaining({
+        status: 'disconnected',
+        disconnectCode: 7,
+        disconnectSignal: 'SIGTERM',
       })
     );
   });
@@ -189,7 +303,95 @@ describe('useAcpMessage', () => {
     });
   });
 
-  it('hydrates a running ACP conversation as streaming instead of re-entering the warmup phase', async () => {
+  it('keeps a hydrated running ACP conversation in waiting when the latest visible timeline message is still user-side', async () => {
+    setMockMessageList([
+      {
+        id: 'user-turn-1',
+        type: 'text',
+        msg_id: 'user-turn-1',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'User message before first ACP response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.running).toBe(true);
+    expect(result.current.aiProcessing).toBe(true);
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+        hasThinkingMessage: false,
+      })
+    );
+  });
+
+  it('ignores stale message-list entries from a different conversation when classifying a hydrated running ACP thread', async () => {
+    setMockMessageList([
+      {
+        id: 'stale-assistant-from-other-conversation',
+        type: 'text',
+        msg_id: 'stale-assistant-from-other-conversation',
+        position: 'left',
+        conversation_id: 'other-conversation',
+        content: { content: 'Other thread is already streaming' },
+      },
+      {
+        id: 'current-user-message',
+        type: 'text',
+        msg_id: 'current-user-message',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Current thread is still waiting for the first response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.running).toBe(true);
+    expect(result.current.aiProcessing).toBe(true);
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+      })
+    );
+  });
+
+  it('hydrates a running ACP conversation as streaming instead of re-entering the warmup phase once assistant-side activity exists', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-turn-1',
+        type: 'text',
+        msg_id: 'assistant-turn-1',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Assistant content already streaming' },
+      },
+    ]);
+
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,
       type: 'acp',
@@ -209,6 +411,65 @@ describe('useAcpMessage', () => {
       expect.objectContaining({
         activityPhase: 'streaming',
         hasThinkingMessage: false,
+      })
+    );
+  });
+
+  it('reclassifies a hydrated running ACP conversation from waiting to streaming when assistant-side history finishes hydrating', async () => {
+    setMockMessageList([
+      {
+        id: 'user-turn-2',
+        type: 'text',
+        msg_id: 'user-turn-2',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Still waiting for first response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.aiProcessing).toBe(true);
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+      })
+    );
+
+    act(() => {
+      setMockMessageList([
+        {
+          id: 'assistant-turn-2',
+          type: 'thinking',
+          msg_id: 'assistant-turn-2',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: {
+            content: 'Thinking through the request',
+            status: 'thinking',
+          },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.aiProcessing).toBe(false);
+    });
+
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'streaming',
       })
     );
   });
