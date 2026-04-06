@@ -6,14 +6,17 @@
 
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
+import i18n from '@process/services/i18n';
 import { PetStateMachine } from './petStateMachine';
 import { PetIdleTicker } from './petIdleTicker';
 import { PetEventBridge } from './petEventBridge';
 import { setPetNotifyHook } from '../../common/adapter/main';
 import type { PetSize, PetState } from './petTypes';
 
-const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
-const RENDERER_DIR = path.join(__dirname, '..', 'renderer', 'pet');
+// petManager is dynamically imported → rollup places it in out/main/chunks/,
+// so __dirname is out/main/chunks/ and we need '../..' to reach out/.
+const PRELOAD_DIR = path.join(__dirname, '..', '..', 'preload');
+const RENDERER_DIR = path.join(__dirname, '..', '..', 'renderer', 'pet');
 
 let petWindow: BrowserWindow | null = null;
 let petHitWindow: BrowserWindow | null = null;
@@ -269,9 +272,10 @@ function registerIpcHandlers(): void {
   ipcMain.on('pet:context-menu', () => {
     if (!petHitWindow || petHitWindow.isDestroyed()) return;
 
+    const sizeKeys = { 200: 'pet.sizeSmall', 280: 'pet.sizeMedium', 360: 'pet.sizeLarge' } as const;
     const menu = Menu.buildFromTemplate([
       {
-        label: 'Pat',
+        label: i18n.t('pet.pat'),
         click: () => {
           if (stateMachine && idleTicker) {
             idleTicker.resetIdle();
@@ -281,9 +285,9 @@ function registerIpcHandlers(): void {
       },
       { type: 'separator' },
       {
-        label: 'Size',
+        label: i18n.t('pet.size'),
         submenu: ([200, 280, 360] as PetSize[]).map((size) => ({
-          label: `${size === 200 ? 'Small' : size === 280 ? 'Medium' : 'Large'} (${size}px)`,
+          label: i18n.t(sizeKeys[size], { px: size }),
           type: 'radio' as const,
           checked: currentSize === size,
           click: () => resizePet(size),
@@ -291,7 +295,7 @@ function registerIpcHandlers(): void {
       },
       { type: 'separator' },
       {
-        label: 'Do Not Disturb',
+        label: i18n.t('pet.dnd'),
         type: 'checkbox',
         checked: stateMachine?.getDnd() ?? false,
         click: (menuItem) => {
@@ -300,11 +304,11 @@ function registerIpcHandlers(): void {
       },
       { type: 'separator' },
       {
-        label: 'Reset Position',
+        label: i18n.t('pet.resetPosition'),
         click: () => resetPosition(),
       },
       {
-        label: 'Hide',
+        label: i18n.t('pet.hide'),
         click: () => hidePetWindow(),
       },
     ]);

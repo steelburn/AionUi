@@ -18,6 +18,8 @@
         width: 100%;
         height: 100%;
         cursor: grab;
+        /* Needs a non-transparent background for macOS to deliver pointer events */
+        background: rgba(255, 255, 255, 0.01);
       }
       #hit.dragging {
         cursor: grabbing;
