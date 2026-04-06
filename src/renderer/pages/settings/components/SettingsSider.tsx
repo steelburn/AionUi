@@ -212,7 +212,7 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
   const siderTooltipProps = getSiderTooltipProps(tooltipEnabled);
   return (
     <div
-      className={classNames('flex-1 min-h-0 settings-sider flex flex-col gap-2px overflow-y-auto overflow-x-hidden', {
+      className={classNames('h-full settings-sider flex flex-col gap-2px overflow-y-auto overflow-x-hidden', {
         'settings-sider--collapsed': collapsed,
       })}
     >
