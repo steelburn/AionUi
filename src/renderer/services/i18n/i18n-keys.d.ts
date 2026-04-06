@@ -43,6 +43,7 @@ export type I18nKey =
   | 'acp.warmup.awaitingFirstResponse'
   | 'acp.warmup.awaitingInline'
   | 'acp.warmup.connectingInline'
+  | 'acp.warmup.respondingInline'
   | 'agent.health.autoSwitching'
   | 'agent.health.available'
   | 'agent.health.bestMatch'

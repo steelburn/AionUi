@@ -30,7 +30,8 @@
   "warmup": {
     "awaitingFirstResponse": "{{agent}} からの最初の応答を待っています...",
     "connectingInline": "{{agent}} に接続しています...",
-    "awaitingInline": "{{agent}} の応答を待っています..."
+    "awaitingInline": "{{agent}} の応答を待っています...",
+    "respondingInline": "{{agent}} が応答しています..."
   },
   "logs": {
     "title": "ACP ログ",

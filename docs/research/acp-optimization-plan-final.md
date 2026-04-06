@@ -936,11 +936,11 @@ Zed 也有 ACP logs，但它是：
 当前剩余的主要差距更偏产品化：
 
 - AionUi 已将 `ACP logs` 收到二级入口，但 diagnostics status dot 仍比 Zed 更直接暴露在主线程 header 中
-- AionUi 的 send-time waiting affordance 已经从“单一 Connecting”推进到“Connecting -> Waiting for first response”的分段语义，但仍没有 Zed 那种更完整的 thread-level generating row / elapsed meta
+- AionUi 已补上轻量的 thread-level generating row / elapsed meta，并覆盖了 cold waiting 与普通 streaming；但它仍没有 Zed 那种更完整的 turn stats / token meta / tool-aware differentiation
 - AionUi 的 streaming reveal 已有最小版，但离 Zed 更细腻的观感调优仍有空间
 
 因此后续优先级应继续是：
 
-1. 再决定是否需要引入更明确的 thread-level generating affordance
-2. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
+1. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
+2. 再决定是否需要把现有 generating row 继续扩成更完整的 turn stats / tool-aware affordance
 3. 再决定是否进入更大的连接拓扑 / runtime 托管阶段

@@ -315,6 +315,97 @@ describe('useAcpMessage', () => {
     });
   });
 
+  it('keeps the runtime activity start timestamp stable across waiting to streaming and clears it on finish', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID, { backend: 'claude', agentName: 'Claude' }));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      capturedResponseListener?.({
+        type: 'request_trace',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'request-trace-stable-start',
+        data: {
+          backend: 'Claude',
+          modelId: 'sonnet-4.6',
+          timestamp: 1000,
+        },
+      });
+      capturedResponseListener?.({
+        type: 'start',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'start-stable-start',
+        data: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'waiting',
+          activityStartedAt: 1000,
+        })
+      );
+    });
+
+    act(() => {
+      capturedResponseListener?.({
+        type: 'content',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'content-stable-start',
+        data: {
+          content: 'hello',
+        },
+      });
+      setMockMessageList([
+        {
+          id: 'assistant-stable-start',
+          type: 'text',
+          msg_id: 'content-stable-start',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: { content: 'hello' },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'streaming',
+          activityStartedAt: 1000,
+        })
+      );
+    });
+
+    act(() => {
+      capturedResponseListener?.({
+        type: 'finish',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'finish-stable-start',
+        data: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'idle',
+          activityStartedAt: null,
+        })
+      );
+    });
+  });
+
   it('does not let mount hydration clear a pending first-response wait state', async () => {
     const deferredConversationGet = createDeferred<{
       id: string;

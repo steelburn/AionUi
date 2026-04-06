@@ -7,6 +7,7 @@ import AcpWarmupIndicator from '@/renderer/pages/conversation/platforms/acp/AcpW
 import AcpSendBox from '@/renderer/pages/conversation/platforms/acp/AcpSendBox';
 import {
   clearAcpRuntimeDiagnosticsSnapshot,
+  publishAcpRuntimeDiagnosticsSnapshot,
   setAcpRuntimeUiWarmupPending,
 } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -479,6 +480,8 @@ vi.mock('react-i18next', () => ({
           return `Connecting ${agent}...`;
         case 'acp.warmup.awaitingInline':
           return `Waiting for ${agent}...`;
+        case 'acp.warmup.respondingInline':
+          return `${agent} is responding...`;
         case 'conversation.chat.processing':
           return 'Processing';
         case 'common.retry':
@@ -650,7 +653,7 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting Claude...');
   });
 
-  it('keeps the thread warmup cue visible until assistant-side activity becomes visible in the timeline', async () => {
+  it('keeps a lightweight ACP activity row visible as waiting turns into streaming', async () => {
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,
       type: 'acp',
@@ -711,11 +714,12 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Claude is responding...');
     });
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveAttribute('data-activity-phase', 'streaming');
   });
 
-  it('does not show the warmup indicator when reopening a running ACP conversation mid-turn', async () => {
+  it('shows a lightweight ACP activity row when reopening a running conversation mid-turn', async () => {
     setMockMessageList([
       {
         id: 'assistant-mid-turn',
@@ -744,7 +748,8 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
     });
 
-    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Claude is responding...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveAttribute('data-activity-phase', 'streaming');
     expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
   });
 
@@ -784,7 +789,8 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
     });
 
-    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Claude is responding...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveAttribute('data-activity-phase', 'streaming');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
@@ -989,7 +995,8 @@ describe('AcpSendBox live ACP flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
     });
-    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Claude is responding...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveAttribute('data-activity-phase', 'streaming');
 
     act(() => {
       emitAcpResponse({
@@ -1003,6 +1010,64 @@ describe('AcpSendBox live ACP flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Send message to Claude...');
     });
+    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+  });
+
+  it('shows elapsed meta on the ACP activity row without resetting when waiting turns into streaming', () => {
+    vi.useFakeTimers();
+
+    try {
+      const startTime = new Date('2026-04-06T12:00:00.000Z').getTime();
+      vi.setSystemTime(startTime);
+
+      render(<AcpWarmupIndicator conversationId={CONVERSATION_ID} backend='claude' agentName='Claude' />);
+
+      act(() => {
+        publishAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID, {
+          status: null,
+          statusSource: null,
+          statusRevision: 0,
+          activityPhase: 'waiting',
+          activityStartedAt: startTime,
+          pendingFirstResponseMode: 'cold',
+          hasThinkingMessage: false,
+          logs: [],
+        });
+      });
+
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
+      expect(screen.queryByTestId('acp-warmup-indicator-elapsed')).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      expect(screen.getByTestId('acp-warmup-indicator-elapsed')).toHaveTextContent('2s');
+
+      act(() => {
+        publishAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID, {
+          status: 'session_active',
+          statusSource: 'live',
+          statusRevision: 1,
+          activityPhase: 'streaming',
+          activityStartedAt: startTime,
+          pendingFirstResponseMode: null,
+          hasThinkingMessage: false,
+          logs: [],
+        });
+      });
+
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Claude is responding...');
+      expect(screen.getByTestId('acp-warmup-indicator-elapsed')).toHaveTextContent('2s');
+
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByTestId('acp-warmup-indicator-elapsed')).toHaveTextContent('3s');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets inline ACP thinking replace the thread warmup indicator before the first content arrives', async () => {

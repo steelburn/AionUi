@@ -219,6 +219,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const [slashCommandsRevision, setSlashCommandsRevision] = useState(0);
   const [acpLogs, setAcpLogs] = useState<AcpLogEntry[]>([]);
   const [aiProcessing, setAiProcessingValue] = useState(false);
+  const [activityStartedAt, setActivityStartedAt] = useState<number | null>(null);
   const [pendingFirstResponseMode, setPendingFirstResponseModeValue] = useState<AcpPendingFirstResponseMode>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const [contextLimit, setContextLimit] = useState<number>(0);
@@ -344,14 +345,16 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
         return;
       }
 
+      const nextStartTime = trace.timestamp ?? Date.now();
       requestTraceRef.current = {
-        startTime: trace.timestamp ?? Date.now(),
+        startTime: nextStartTime,
         backend: trace.backend,
         modelId: 'unknown',
         sessionMode: trace.sessionMode,
         agentName: trace.agentName,
         source: 'fallback',
       };
+      setActivityStartedAt(nextStartTime);
     },
     []
   );
@@ -362,6 +365,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     }
 
     requestTraceRef.current = null;
+    setActivityStartedAt(null);
     return true;
   }, []);
 
@@ -521,14 +525,18 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
           turnFinishedRef.current = false;
           hasContentInTurnRef.current = false;
           if (!requestTraceRef.current) {
+            const nextStartTime = Date.now();
             requestTraceRef.current = {
-              startTime: Date.now(),
+              startTime: nextStartTime,
               backend: options.backend || 'unknown',
               modelId: 'unknown',
               sessionMode: options.sessionMode,
               agentName: options.agentName,
               source: 'fallback',
             };
+            setActivityStartedAt(nextStartTime);
+          } else {
+            setActivityStartedAt((currentValue) => currentValue ?? requestTraceRef.current?.startTime ?? null);
           }
           setRunning(true);
           runningRef.current = true;
@@ -554,6 +562,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
             hasContentInTurnRef.current = false;
             hasThinkingMessageRef.current = false;
             setHasThinkingMessage(false);
+            setActivityStartedAt(null);
             // Log request completion
             if (requestTraceRef.current) {
               const duration = Date.now() - requestTraceRef.current.startTime;
@@ -648,6 +657,9 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
               });
               requestTraceRef.current = null;
             }
+            if (isTerminalAcpStatus(agentData.status)) {
+              setActivityStartedAt(null);
+            }
             appendAcpLog({
               kind: 'status',
               level: isTerminalAcpStatus(agentData.status) ? 'error' : 'info',
@@ -720,6 +732,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
               agentName: options.agentName,
               source: 'trace',
             };
+            setActivityStartedAt(traceTimestamp);
             if (shouldAppendStartedLog) {
               appendAcpLog({
                 kind: 'request_started',
@@ -746,6 +759,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
           setRunning(false);
           runningRef.current = false;
           clearPendingFirstResponse();
+          setActivityStartedAt(null);
           addOrUpdateMessage(transformedMessage);
           // Log request error
           if (requestTraceRef.current) {
@@ -815,6 +829,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
       statusSource: acpStatusSource,
       statusRevision: acpStatusRevision,
       activityPhase,
+      activityStartedAt,
       pendingFirstResponseMode,
       hasThinkingMessage,
       logs: acpLogs,
@@ -824,6 +839,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     acpStatus,
     acpStatusRevision,
     acpStatusSource,
+    activityStartedAt,
     aiProcessing,
     conversation_id,
     messageList,
@@ -876,6 +892,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     setPendingFirstResponseMode(null);
     setTokenUsage(null);
     setContextLimit(0);
+    setActivityStartedAt(null);
     hasContentInTurnRef.current = false;
     turnFinishedRef.current = false;
     hasThinkingMessageRef.current = false;

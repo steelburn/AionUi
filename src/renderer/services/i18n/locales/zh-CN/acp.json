@@ -30,7 +30,8 @@
   "warmup": {
     "awaitingFirstResponse": "正在等待 {{agent}} 给出首个响应...",
     "connectingInline": "正在连接 {{agent}}...",
-    "awaitingInline": "正在等待 {{agent}} 响应..."
+    "awaitingInline": "正在等待 {{agent}} 响应...",
+    "respondingInline": "{{agent}} 正在响应..."
   },
   "logs": {
     "title": "ACP 日志",

@@ -30,7 +30,8 @@
   "warmup": {
     "awaitingFirstResponse": "{{agent}} için ilk yanıt bekleniyor...",
     "connectingInline": "{{agent}} bağlanıyor...",
-    "awaitingInline": "{{agent}} yanıtı bekleniyor..."
+    "awaitingInline": "{{agent}} yanıtı bekleniyor...",
+    "respondingInline": "{{agent}} yanıt veriyor..."
   },
   "logs": {
     "title": "ACP Günlükleri",

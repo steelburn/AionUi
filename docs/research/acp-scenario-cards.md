@@ -2241,3 +2241,68 @@ Reviewer adjustment:
   - 不能为了收 dot 而让 dropdown / popover 点击冲突
   - 不能退回成“视觉上又分成两个分离胶囊”
   - 不能重新引入依赖负边距或覆盖文字的临时方案
+
+## SC-053 ACP Should Surface A Lightweight Generating Row With Elapsed Meta
+
+- Goal:
+  - 继续追平 Zed 的线程级 generating affordance，不再让 ACP 只在 header dot 上表达“还在生成”。
+  - 当 turn 已经发出并处于 waiting / streaming，但线程里还没有更强的 tool/thinking UI 接管时：
+    - 在 sendbox 上方持续显示一条轻量的 agent activity row
+    - row 语义要覆盖冷启动 waiting 和普通 streaming
+    - row 要带简洁 elapsed meta，避免用户只能靠体感判断“卡了多久”
+- User action:
+  - 用户打开一个 ACP 会话，发送一条新消息。
+  - 在首包到来前观察 sendbox 上方。
+  - 在模型已经开始吐正文、但还没有其他 thinking/tool UI 时继续观察这一行。
+  - 用户也会在模型完成后确认这条 row 会自动消失。
+- Current failure:
+  - 当前 ACP 的 thread-level affordance 只覆盖 cold waiting：
+    - 首包前有一条 `Connecting / Waiting for {{agent}}...`
+    - 一旦进入 streaming，就只剩 header dot 和 sendbox loading
+  - 这导致“正在生成中”缺少稳定的线程级表达：
+    - 用户只能盯着右上角小点
+    - 不够像 Zed 那种列表底部一直存在的 generating row
+  - 当前也没有 elapsed meta：
+    - 用户无法快速感知这一轮已经等了多久
+    - 体验上仍比 Zed 更“没底”
+- Expected UI state:
+  - 对 cold waiting：
+    - 继续显示轻量单行 agent row
+    - 文案仍区分 `Connecting {{agent}}...` / `Waiting for {{agent}}...`
+    - 当 elapsed 足够长时，在行尾显示简洁时间，例如 `8s`
+  - 对普通 streaming：
+    - 若当前线程里还没有 thinking/tool UI 接管，则继续显示轻量 agent row
+    - 文案切成更像生成中的语义，例如 `{{agent}} is responding...`
+    - elapsed 继续沿用同一轮 turn 的开始时间，不要重置
+  - 对 warm-session waiting：
+    - 继续保持前几轮固定的“不要重放 reconnect-style thread banner”合同
+    - 不因为这轮补 generating row 而回退成更重的 reconnect 体感
+  - 对 finish / error / stop / terminal ACP status：
+    - activity row 及时消失
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 为 runtime snapshot 增加本轮 activity 的开始时间，作为 elapsed meta 的统一真相源
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 从 request trace / fallback trace 发布 turn started timestamp
+    - finish / error / terminal clear 时清掉该时间
+    - 不能让 hydrated stale data 误保留 elapsed
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 扩成轻量 agent activity row：
+      - cold waiting 继续显示
+      - streaming 且无更强线程活动 UI 时继续显示
+      - warm waiting 仍 suppress
+    - 在 row 内追加 elapsed meta
+  - i18n：
+    - 如新增 streaming 文案，补所有 locale
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+- Exit criteria:
+  - ACP 在 cold waiting 和普通 streaming 阶段都有线程级 activity row
+  - activity row 会显示简洁 elapsed meta，且 waiting -> streaming 不重置时间
+  - warm-session waiting 语义不退化
+  - finish / error / stop 后 row 会及时消失
+- Reviewer focus:
+  - 不能把 warm waiting 又做回 reconnect-style banner
+  - elapsed 必须绑定真实 turn start，而不是每次 render 重新起表
+  - 不能让 stale hydration 把历史 elapsed 错误带进新会话

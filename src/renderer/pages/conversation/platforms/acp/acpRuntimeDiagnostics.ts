@@ -51,6 +51,7 @@ export type AcpRuntimeDiagnosticsSnapshot = {
   statusSource: AcpRuntimeStatusSource | null;
   statusRevision: number;
   activityPhase: AcpRuntimeActivityPhase;
+  activityStartedAt?: number | null;
   pendingFirstResponseMode: AcpPendingFirstResponseMode;
   uiWarmupPending?: boolean;
   hasThinkingMessage?: boolean;
@@ -62,6 +63,7 @@ const EMPTY_ACP_RUNTIME_DIAGNOSTICS_SNAPSHOT: AcpRuntimeDiagnosticsSnapshot = Ob
   statusSource: null,
   statusRevision: 0,
   activityPhase: 'idle',
+  activityStartedAt: null,
   pendingFirstResponseMode: null,
   uiWarmupPending: false,
   hasThinkingMessage: false,
@@ -100,6 +102,7 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
 ): void => {
   const nextSnapshot: AcpRuntimeDiagnosticsSnapshot = {
     ...snapshot,
+    activityStartedAt: snapshot.activityStartedAt ?? null,
     uiWarmupPending: acpRuntimeWarmupPendingStore.get(conversationId) ?? false,
   };
   const currentSnapshot = acpRuntimeDiagnosticsStore.get(conversationId);
@@ -109,6 +112,7 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
     currentSnapshot.statusSource === nextSnapshot.statusSource &&
     currentSnapshot.statusRevision === nextSnapshot.statusRevision &&
     currentSnapshot.activityPhase === nextSnapshot.activityPhase &&
+    currentSnapshot.activityStartedAt === nextSnapshot.activityStartedAt &&
     currentSnapshot.pendingFirstResponseMode === nextSnapshot.pendingFirstResponseMode &&
     currentSnapshot.uiWarmupPending === nextSnapshot.uiWarmupPending &&
     Boolean(currentSnapshot.hasThinkingMessage) === Boolean(nextSnapshot.hasThinkingMessage) &&
@@ -122,6 +126,7 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
     nextSnapshot.statusSource === null &&
     nextSnapshot.statusRevision === 0 &&
     nextSnapshot.activityPhase === 'idle' &&
+    nextSnapshot.activityStartedAt === null &&
     nextSnapshot.pendingFirstResponseMode === null &&
     !nextSnapshot.uiWarmupPending &&
     !nextSnapshot.hasThinkingMessage &&
@@ -159,6 +164,7 @@ export const setAcpRuntimeUiWarmupPending = (conversationId: string, pending: bo
       nextSnapshot.statusSource === null &&
       nextSnapshot.statusRevision === 0 &&
       nextSnapshot.activityPhase === 'idle' &&
+      nextSnapshot.activityStartedAt === null &&
       nextSnapshot.pendingFirstResponseMode === null &&
       !nextSnapshot.uiWarmupPending &&
       !nextSnapshot.hasThinkingMessage &&

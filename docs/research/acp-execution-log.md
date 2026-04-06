@@ -3492,3 +3492,97 @@
   - 按当前与 Zed 的差距复盘，下一优先级建议：
     - 第一优先：继续往更底层 runtime / queue-busy ownership 收口
     - 第二优先：评估是否补更完整的 generating affordance，而不是继续在 header status 微调
+
+### 2026-04-06 / Batch 50
+
+- 对应 SC:
+  - `SC-053`
+- Goal:
+  - 把 ACP 与 Zed 仍然明显可感知的一条差距补上：
+    - AionUi 之前只有 cold waiting row，没有更稳定的 thread-level generating row
+    - 用户在 streaming 阶段仍主要只能靠 header dot 和 sendbox loading 判断“还在生成”
+  - 为 ACP 增加一条轻量、持续、带 elapsed meta 的 activity row：
+    - cold waiting 继续显示
+    - 普通 streaming 也显示
+    - warm-session waiting 继续 suppress，不回退 reconnect 体感
+- Root cause:
+  - 当前 renderer 的 runtime contract 只区分了 `waiting / streaming / idle`，但线程级 UI 只消费了 cold waiting：
+    - 一旦进入 streaming，thread-level affordance 直接消失
+    - elapsed 也没有统一真相源，只能靠组件本地临时计时或完全不显示
+  - 这让 AionUi 虽然已经不再“逻辑错误”，但在“这一轮到底还活着多久”这件事上仍没有 Zed 那种更稳定的底部 generating row 观感
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-053 ACP Should Surface A Lightweight Generating Row With Elapsed Meta`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - runtime snapshot 新增 `activityStartedAt`
+    - 作为 ACP turn-level elapsed meta 的统一真相源
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 从 fallback trace / request_trace / live start 发布 `activityStartedAt`
+    - finish / error / terminal ACP status / fallback clear 时及时清空
+    - `waiting -> streaming` 期间保持同一轮 start time，不重置
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 从“只服务 cold waiting 的 warmup row”扩成轻量 `activity row`
+    - cold waiting:
+      - 继续显示 `Connecting {{agent}}...` / `Waiting for {{agent}}...`
+    - 普通 streaming:
+      - 显示 `{{agent}} is responding...`
+    - 行尾新增简洁 elapsed meta，如 `2s` / `1m 8s`
+    - warm-session waiting 仍 suppress；thinking takeover 仍 suppress
+  - `src/renderer/services/i18n/locales/*/acp.json`
+    - 新增 `acp.warmup.respondingInline`
+  - `src/renderer/services/i18n/i18n-keys.d.ts`
+    - 由 `bun run i18n:types` 自动更新
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 更新 reopen / streaming / placeholder 相关回归
+    - 新增 elapsed meta 不在 `waiting -> streaming` 间重置的断言
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 新增 runtime snapshot 中 `activityStartedAt` 的稳定性回归
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-053` 固定：
+    - warm-session waiting 不能因为补 generating row 而退回 reconnect-style banner
+    - elapsed 必须绑定真实 turn start，不能是组件 mount 时间
+    - 不能让 stale hydration 把旧 elapsed 错带进新 turn
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 结果：`99 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - `31` 条 unknown literal i18n key warning 仍为仓库既有 warning-only 基线
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`440 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 通过
+    - 结果：`3238 passed | 17 skipped (3255 tests)`
+- Product judgement:
+  - 这轮补的是 Zed 对照里一条真正用户可见的剩余差距，而不是底层洁癖式重构。
+  - 现在 ACP 不再只有“首包前有 row，开始吐字后只剩 header dot”这一种断裂感：
+    - cold waiting 和普通 streaming 之间有了连续的 thread-level activity row
+    - elapsed meta 也让用户第一次能直接看见“这轮已经走了多久”
+  - 同时 warm-session waiting 的克制感没有被打坏，之前刚收掉的假 reconnect 体感没有回归。
+- Open risks:
+  - 当前 activity row 已经补上，但仍是 AionUi 自己的轻量版：
+    - 还没有 Zed 那种更丰富的 turn stats / token meta / blocked-on-tool differentiation
+  - diagnostics status dot 仍然比 Zed 更直接暴露在 header 主区域
+  - 更深层的 runtime / queue-busy ownership 仍未回收到最终单一真相源
+- Plan review:
+  - 本轮已回看并更新 `docs/research/acp-optimization-plan-final.md`
+  - 调整点：
+    - 不再把“缺 thread-level generating row / elapsed meta”保留为默认现状
+    - 改写为“已补轻量 generating row，但仍未达到 Zed 更完整的 turn stats / tool-aware row”
+- Next:
+  - 下一优先级按当前代码事实重排为：
+    - 第一优先：继续评估 diagnostics 入口是否还能更下沉、更克制
+    - 第二优先：决定是否继续把 generating row 做到更完整的 turn stats / tool-aware 语义
+    - 第三优先：再进入更深层 runtime / queue-busy ownership 收口
