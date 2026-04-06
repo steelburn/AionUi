@@ -470,8 +470,13 @@ const CommandQueuePanel: React.FC<CommandQueuePanelProps> = ({
 
     const didUpdate = onUpdate(editingId, draftInput);
     if (didUpdate) {
+      const shouldResumeAfterEdit = resumeAfterEditRef.current;
+      setEditingId(null);
+      setDraftInput('');
       resumeAfterEditRef.current = false;
-      handleCancelEdit();
+      if (shouldResumeAfterEdit) {
+        onResume();
+      }
     }
   };
 

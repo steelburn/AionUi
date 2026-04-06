@@ -33,7 +33,7 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
 
 async function launchAppWithoutExtensions(): Promise<ElectronApplication> {
   const projectRoot = path.resolve(__dirname, '../../..');
-  const launchArgs = ['.'];
+  const launchArgs = [projectRoot];
   if (process.platform === 'linux' && process.env.CI) {
     launchArgs.push('--no-sandbox');
   }

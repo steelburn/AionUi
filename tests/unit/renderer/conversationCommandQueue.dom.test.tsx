@@ -322,13 +322,14 @@ describe('useConversationCommandQueue', () => {
     );
     expect(JSON.parse(window.sessionStorage.getItem(storageKey) ?? '{}')).toMatchObject({
       isPaused: true,
+      pauseReason: 'execute_failed',
       items: [{ input: 'broken command', files: ['broken.txt'] }],
     });
 
     errorSpy.mockRestore();
   });
 
-  it('resumes a paused queue after the blocked command is edited', async () => {
+  it('keeps a manually paused queue paused after the blocked command is edited', async () => {
     const conversationId = createConversationId();
     const onExecute = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
@@ -346,7 +347,45 @@ describe('useConversationCommandQueue', () => {
         files: [],
       });
       commandId = queuedItem?.id ?? '';
-      result.current.pause();
+      result.current.pause('manual');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPaused).toBe(true);
+      expect(result.current.items).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.update(commandId, {
+        input: 'blocked command fixed',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPaused).toBe(true);
+      expect(result.current.items[0]?.input).toBe('blocked command fixed');
+    });
+  });
+
+  it('resumes an execution-failed queue after the blocked command is edited', async () => {
+    const conversationId = createConversationId();
+    const onExecute = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useConversationCommandQueue({
+        conversationId,
+        isBusy: true,
+        onExecute,
+      })
+    );
+
+    let commandId = '';
+    act(() => {
+      const queuedItem = result.current.enqueue({
+        input: 'blocked command',
+        files: [],
+      });
+      commandId = queuedItem?.id ?? '';
+      result.current.pause('execute_failed');
     });
 
     await waitFor(() => {
@@ -366,7 +405,7 @@ describe('useConversationCommandQueue', () => {
     });
   });
 
-  it('reorders queued commands and clears the paused state', async () => {
+  it('keeps a manually paused queue paused after reordering commands', async () => {
     const conversationId = createConversationId();
     const onExecute = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
@@ -386,7 +425,45 @@ describe('useConversationCommandQueue', () => {
         input: 'second queued',
         files: [],
       });
-      result.current.pause();
+      result.current.pause('manual');
+    });
+
+    await waitFor(() => {
+      expect(result.current.items).toHaveLength(2);
+      expect(result.current.isPaused).toBe(true);
+    });
+
+    act(() => {
+      result.current.reorder(result.current.items[1]!.id, result.current.items[0]!.id);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPaused).toBe(true);
+      expect(result.current.items.map((item) => item.input)).toEqual(['second queued', 'first queued']);
+    });
+  });
+
+  it('reorders queued commands and auto-resumes execution-failed pauses', async () => {
+    const conversationId = createConversationId();
+    const onExecute = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useConversationCommandQueue({
+        conversationId,
+        isBusy: true,
+        onExecute,
+      })
+    );
+
+    act(() => {
+      result.current.enqueue({
+        input: 'first queued',
+        files: [],
+      });
+      result.current.enqueue({
+        input: 'second queued',
+        files: [],
+      });
+      result.current.pause('execute_failed');
     });
 
     await waitFor(() => {
@@ -578,7 +655,7 @@ describe('useConversationCommandQueue', () => {
     });
   });
 
-  it('removes a blocked queued command and clears the paused state', async () => {
+  it('removes a blocked queued command and auto-resumes execution-failed pauses', async () => {
     const conversationId = createConversationId();
     const onExecute = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
@@ -596,7 +673,7 @@ describe('useConversationCommandQueue', () => {
         files: [],
       });
       commandId = queuedItem?.id ?? '';
-      result.current.pause();
+      result.current.pause('execute_failed');
     });
 
     await waitFor(() => {
@@ -1388,6 +1465,37 @@ describe('CommandQueuePanel', () => {
     await user.click(screen.getAllByRole('button', { name: 'More actions' })[1]);
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     await user.click(screen.getAllByRole('button', { name: 'Cancel' }).at(-1)!);
+
+    expect(onPause).toHaveBeenCalledTimes(1);
+    expect(onResume).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-resumes after saving an edit that paused the queue temporarily', async () => {
+    const user = userEvent.setup();
+    const onPause = vi.fn();
+    const onResume = vi.fn();
+
+    render(
+      <CommandQueuePanel
+        items={baseItems}
+        paused={false}
+        interactionLocked={false}
+        onPause={onPause}
+        onResume={onResume}
+        onInteractionLock={vi.fn()}
+        onInteractionUnlock={vi.fn()}
+        onUpdate={vi.fn(() => true)}
+        onReorder={vi.fn()}
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getAllByRole('button', { name: 'More actions' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.clear(screen.getByRole('textbox'));
+    await user.type(screen.getByRole('textbox'), 'first command updated');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(onPause).toHaveBeenCalledTimes(1);
     expect(onResume).toHaveBeenCalledTimes(1);

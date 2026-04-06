@@ -2677,3 +2677,107 @@
 - Next:
   - 提交并推送这批 fresh-send waiting cue 收口
   - 进入用户验收，看这条过渡是否已足够接近 Zed 的首包前体感
+
+### 2026-04-06 / Batch 41
+
+- 对应 SC:
+  - `SC-044`
+- Goal:
+  - 收紧 ACP queue 的暂停语义，避免 queue mutation 静默解除本应要求显式 `Resume` 的暂停态。
+  - 同时保留已有的 blocked-command 恢复体验：
+    - 如果 queue 是因 `execute_failed` 暂停，用户修正 / 重排 / 删除阻塞项后仍可自动恢复。
+- Root cause:
+  - 共享 `useConversationCommandQueue` 在 `update / reorder / remove` 时会无条件把 `isPaused` 清成 `false`。
+  - 这让 `SC-036` 的 barrier 合同出现缺口：
+    - ACP live generic error 把 queue 置为 paused 后
+    - 用户如果只是编辑、重排或删除 queued command
+    - queue 也会被意外放行，而不是继续等待显式 `Resume`
+  - `CommandQueuePanel` 还额外依赖了这条旧语义：
+    - 编辑前若 queue 原本未暂停，panel 会临时 `Pause`
+    - 保存后依赖 hook 的“mutation 自动清 paused”来恢复
+    - 因此这轮也必须把“临时编辑 pause -> 保存后恢复原状态”改成显式合同
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-044 ACP Queue Mutations Must Not Auto-Resume Barrier Pauses`
+  - `src/renderer/pages/conversation/platforms/useConversationCommandQueue.ts`
+    - 为 queue state 新增持久化 `pauseReason`
+    - 把暂停原因区分为：
+      - `manual`
+      - `barrier`
+      - `execute_failed`
+    - `update / reorder / remove` 现在只会自动解除 `execute_failed`
+    - `manual / barrier` pause 在 queue mutation 后继续保持 paused
+    - `resume()` 与 dequeue cleanup 会显式清空 `pauseReason`
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - live generic error barrier 改为 `pause('barrier')`
+    - 让 ACP queue 明确进入“必须显式 Resume”的暂停态
+  - `src/renderer/components/chat/CommandQueuePanel.tsx`
+    - 保存编辑时，如果 queue 只是为了编辑而临时暂停，成功保存后会显式恢复到编辑前的未暂停状态
+    - 避免把“临时 edit pause”混成真正的 `manual / barrier` pause
+  - `tests/unit/renderer/conversationCommandQueue.test.ts`
+    - 更新 queue state 合同，覆盖 `pauseReason`
+  - `tests/unit/renderer/conversationCommandQueue.dom.test.tsx`
+    - 新增 / 调整 DOM 合同：
+      - manual pause + edit 后仍 paused
+      - execute_failed pause + edit 后自动恢复
+      - manual pause + reorder 后仍 paused
+      - execute_failed pause + reorder/remove 后自动恢复
+      - 编辑前未暂停时，panel 的临时暂停在保存后会恢复
+  - `tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 新增 ACP 回归：
+      - live generic error 把 queue 置为 barrier pause
+      - 删除 queued command 不会自动恢复执行
+      - 只有显式 `Resume` 后才继续放行下一条
+  - `tests/e2e/fixtures.ts`
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+  - `tests/e2e/specs/ext-no-extensions.e2e.ts`
+    - 本地 Electron Playwright 启动从 `args: ['.']` 收紧为显式 app path
+    - 避免本地自动化误启动 Electron 默认 welcome app，导致把环境问题误判成 ACP 启动失败
+  - `tests/unit/process/utils/configMigration.test.ts`
+    - 清掉仓库级 lint 阻断，让 `verify:acp` 能真正跑到 ACP suites
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径沿用 `SC-036` 与 `SC-044` 的既有产品合同：
+    - `manual / barrier` pause 必须要求显式 `Resume`
+    - `execute_failed` pause 可以在 queue mutation 后自动恢复
+    - panel 的临时编辑 pause 不得改写 queue 原本的暂停真相
+- Verification:
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test tests/unit/renderer/conversationCommandQueue.test.ts tests/unit/renderer/conversationCommandQueue.dom.test.tsx tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 结果：`74 passed`
+  - `bun run test:acp:unit`
+    - 结果：`426 passed | 1 skipped`
+  - `bun run test:acp:integration`
+    - 结果：`21 passed | 3 skipped`
+  - `bun run test`
+    - 结果：`3223 passed | 17 skipped (3240 tests)`
+    - 补充说明：
+      - suite 里仍有既有 warning：
+        - `MaxListenersExceededWarning`
+        - `tests/unit/skillsMarket.test.ts` 的 hoisted `vi.mock(...)` warning
+      - 本轮不阻塞通过
+  - `bun run test:acp:e2e`
+    - 结果：`19 passed | 4 skipped`
+    - 补充说明：
+      - skipped 为预期项：
+        - screenshot specs
+        - `@real-codex-canary`
+  - `bun run verify:acp`
+    - 通过
+    - 结论：
+      - `SC-044` 的 queue barrier 合同已经跑通到 ACP full suite
+      - 本地 Electron E2E 的剩余前提是 GUI-capable 环境，而不是 ACP runtime 自身故障
+- Product judgement:
+  - 这一刀不是在增加一个新按钮，而是在把 queue 的“为什么暂停”变成真正的 runtime truth。
+  - 从用户视角看，变化是：
+    - live generic error 或手动 `Pause` 后，编辑 / 重排 / 删除 queue 项不再偷偷继续执行
+    - 只有下一条本身执行失败时，queue mutation 才会继续承担“修正后自动恢复”的快捷修复体验
+- Open risks:
+  - 这轮已经把 pause reason 收到 queue state，但更深一层的 `queue / busy` 单一真相源仍未完全和 ACP runtime contract 合并。
+  - 本地 Electron E2E 仍依赖可用 GUI 环境；在受限沙箱里可能继续表现为泛化的 `Process failed to launch!`，但这不是 ACP 合同层面的回归。
+- Next:
+  - 继续推进 queue / busy 真相源收口时，应沿用 `pauseReason` 这层语义，不要回退成单一 `isPaused` 布尔值。
+  - 如果要继续 ACP 产品化收口，下一优先级可以回到：
+    - queue / busy runtime contract 的更深层统一
+    - 或 settings / guid 侧现有 ACP e2e 失败的独立修复

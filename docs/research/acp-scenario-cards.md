@@ -1755,3 +1755,49 @@ Reviewer adjustment:
   - `ThoughtDisplay` 不能把 mid-turn streaming 或 terminal 状态误显示成 processing
   - 不能为了加动画条而出现双 waiting cue
   - DOM/E2E tests 必须守住“出现”和“让位”两侧边界
+
+## SC-044 ACP Queue Mutations Must Not Auto-Resume Barrier Pauses
+
+- Goal:
+  - 把 ACP queue 的暂停语义再收紧一层：
+    - `live generic error` 或用户手动 `Pause` 触发的暂停，必须继续要求显式 `Resume`
+    - 用户只是编辑 / 重排 / 删除 queued command，不能悄悄把 queue 放行
+  - 同时保留已有的 blocked-command 恢复体验：
+    - 若 queue 是因为“下一条启动失败”而暂停，用户修正 / 重排 / 删除后，仍可继续自动放行
+- User action:
+  - 当前 ACP 会话有 queued commands
+  - queue 因 live generic error barrier 或手动 Pause 进入暂停态
+  - 用户在 queue panel 中编辑、重排或删除 queued command
+- Current failure:
+  - 共享 `useConversationCommandQueue` 目前在 `update / reorder / remove` 时会无条件把 `isPaused` 清成 `false`
+  - 这会打破 `SC-036` 的合同：
+    - live generic error 后 queue 本应等待用户明确 `Resume`
+    - 但用户只要改动 queue 项，就可能意外恢复执行
+- Expected UI state:
+  - `manual / barrier` pause:
+    - edit / reorder / remove 后 queue 仍保持 paused
+    - 只有用户点击 `Resume` 才继续放行下一条
+  - `execute_failed` pause:
+    - 用户修正 / 重排 / 删除阻塞项后，可继续自动恢复执行
+  - 如果 queue 原本并未 paused，只是 panel 为了编辑暂时调用 `Pause`
+    - 保存编辑后应恢复到编辑前的未暂停状态
+- Automation plan:
+  - `useConversationCommandQueue`
+    - 新增 pause reason，区分 `manual / barrier / execute_failed`
+    - hook 单测分别覆盖：
+      - manual pause + edit/reorder/remove -> 仍 paused
+      - execute_failed pause + edit/reorder/remove -> 自动恢复
+  - `CommandQueuePanel`
+    - 守住“编辑前未暂停 -> 保存后恢复未暂停”的临时 pause 语义
+  - `AcpSendBoxQueueFlow.dom.test.tsx`
+    - live generic error 把 queue 置为 barrier pause
+    - queue mutation 后仍不自动发送
+    - 只有显式 `Resume` 后才继续执行下一条
+- Exit criteria:
+  - barrier/manual pause 不会再被 queue mutation 静默解除
+  - execute_failed pause 的既有修复路径不回退
+  - ACP 与通用 queue 测试共同证明这三类 pause 语义被正确区分
+- Reviewer focus:
+  - pause reason 不能因为 remount / persist / hydrate 丢失
+  - `CommandQueuePanel` 的临时编辑 pause 不能和真正的 barrier/manual pause 混淆
+  - ACP live error barrier 必须继续守住“explicit Resume 才放行”的用户合同

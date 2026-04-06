@@ -148,7 +148,7 @@ async function launchHermeticAcpApp(
   ensureFreshElectronBundle();
   const sandbox = options.sandbox ?? createHermeticAcpSandbox();
   const destroySandboxOnCleanup = options.destroySandboxOnCleanup ?? true;
-  const launchArgs = ['.'];
+  const launchArgs = [PROJECT_ROOT];
   const inheritedEnv = { ...process.env };
   delete inheritedEnv.AIONUI_E2E_CODEX_ACP_CLI_PATH;
 

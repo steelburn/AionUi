@@ -12,8 +12,14 @@
  *
  * Set `E2E_PACKAGED=1` to force packaged mode, or `E2E_DEV=1` to force dev mode.
  */
-import { test as base, expect, type ElectronApplication, type Page, type TestInfo } from '@playwright/test';
-import { _electron as electron } from 'playwright';
+import {
+  test as base,
+  expect,
+  type ElectronApplication,
+  type Page,
+  type TestInfo,
+  _electron as electron,
+} from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -127,6 +133,7 @@ function shouldUsePackagedMode(): boolean {
 
 async function launchApp(): Promise<ElectronApplication> {
   const projectRoot = path.resolve(__dirname, '../..');
+  const localAppPath = projectRoot;
   const usePackaged = shouldUsePackagedMode();
 
   const commonEnv = {
@@ -170,9 +177,9 @@ async function launchApp(): Promise<ElectronApplication> {
   }
 
   ensureFreshElectronBundle();
-  console.log(`[E2E] Launching LOCAL app from current out/ build: ${projectRoot}`);
+  console.log(`[E2E] Launching LOCAL app from current out/ build: ${localAppPath}`);
 
-  const launchArgs = ['.'];
+  const launchArgs = [localAppPath];
   if (process.platform === 'linux' && process.env.CI) {
     launchArgs.push('--no-sandbox');
   }

@@ -166,6 +166,7 @@ vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({
     sendNowLoading,
     onPause,
     onResume,
+    onRemove,
   }: {
     items: Array<{ id: string }>;
     paused?: boolean;
@@ -173,6 +174,7 @@ vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({
     sendNowLoading?: boolean;
     onPause?: () => void;
     onResume?: () => void;
+    onRemove?: (commandId: string) => void;
   }) =>
     React.createElement(
       'div',
@@ -209,6 +211,19 @@ vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({
               },
             },
             'Send Now'
+          )
+        : null,
+      onRemove && items[0]
+        ? React.createElement(
+            'button',
+            {
+              type: 'button',
+              'data-testid': 'queue-remove-first',
+              onClick: () => {
+                onRemove(items[0]!.id);
+              },
+            },
+            'Remove First'
           )
         : null
     ),
@@ -792,6 +807,72 @@ describe('AcpSendBox queue flow', () => {
       expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
     });
+  });
+
+  it('keeps a live-error ACP queue paused after removing the first queued command until the user explicitly resumes', async () => {
+    const conversationId = createConversationId();
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: conversationId,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-2' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('2');
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('false');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-error-preserves-pause-after-remove',
+      data: {
+        status: 'error',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('true');
+    });
+
+    fireEvent.click(screen.getByTestId('queue-remove-first'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('true');
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('queue-toggle-pause'));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAcpSendInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: conversationId,
+        input: 'queued command 2',
+      })
+    );
   });
 
   it('resets the live-error queue acknowledgement when switching conversations', async () => {
