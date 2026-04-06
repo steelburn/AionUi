@@ -593,6 +593,7 @@ Zed 领先点已经比较稳定，可归纳为：
 - 历史 timeline 不再默认混入 ACP runtime status 和 legacy 基础设施红条
 - ACP 最小版 streaming reveal buffer 已落地，并已守住 finish / stop / unmount 语义
 - `ACP logs` 已从主界面撤到右上角 runtime status dot 的二级诊断入口
+- 新会话首发的 waiting cue 已收口成 conversation-scoped 合同，不再被 mount hydration 或切线程时序误清
 
 ### 仍未完成的部分
 
@@ -785,6 +786,9 @@ Zed 领先点已经比较稳定，可归纳为：
   - 当最后一条可见 timeline 消息仍是 user-side 时，waiting cue 会继续保留
   - 当已经出现 assistant-side activity 时，保持 busy/stop 语义，但不会错误回到 `Connecting to {agent}`
   - 在没有新的 live 激活信号前，不会过早乐观地显示“等待首个响应”
+- 如果这是一个刚创建并立刻发送首条消息的新会话：
+  - mount hydration 不会再把这段 waiting cue 错误清掉
+  - 这条 waiting 也不会在切到别的 conversation 时串线
 
 当前用户不会看到：
 

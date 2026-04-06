@@ -65,6 +65,7 @@ vi.mock('@/renderer/pages/conversation/Messages/hooks', async () => {
 import { sanitizeAcpTimelineMessages, useAcpMessage } from '@/renderer/pages/conversation/platforms/acp/useAcpMessage';
 
 const CONVERSATION_ID = 'acp-conv-1';
+const NEXT_CONVERSATION_ID = 'acp-conv-2';
 const createDeferred = <T>() => {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -82,6 +83,7 @@ describe('useAcpMessage', () => {
     setMockMessageList([]);
     mockAddOrUpdateMessage.mockReset();
     clearAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID);
+    clearAcpRuntimeDiagnosticsSnapshot(NEXT_CONVERSATION_ID);
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,
       type: 'acp',
@@ -301,6 +303,101 @@ describe('useAcpMessage', () => {
         })
       );
     });
+  });
+
+  it('does not let mount hydration clear a pending first-response wait state', async () => {
+    const deferredConversationGet = createDeferred<{
+      id: string;
+      type: 'acp';
+      status: 'finished';
+      extra: Record<string, never>;
+    }>();
+    mockConversationGetInvoke.mockReturnValueOnce(deferredConversationGet.promise);
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    act(() => {
+      result.current.setAiProcessing(true);
+    });
+
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+      })
+    );
+
+    await act(async () => {
+      deferredConversationGet.resolve({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+      await deferredConversationGet.promise;
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.aiProcessing).toBe(true);
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+      })
+    );
+  });
+
+  it('does not let a pending wait from the previous conversation suppress hydration for the next conversation', async () => {
+    const { result, rerender } = renderHook(({ conversationId }) => useAcpMessage(conversationId), {
+      initialProps: { conversationId: CONVERSATION_ID },
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      result.current.setAiProcessing(true);
+    });
+
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+      })
+    );
+
+    mockConversationGetInvoke.mockResolvedValueOnce({
+      id: NEXT_CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {
+        lastAcpStatus: {
+          status: 'disconnected',
+          updatedAt: 123,
+          backend: 'claude',
+          agentName: 'Claude',
+          disconnectCode: 42,
+          disconnectSignal: 'SIGTERM',
+        },
+      },
+    });
+
+    rerender({ conversationId: NEXT_CONVERSATION_ID });
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.aiProcessing).toBe(false);
+    expect(result.current.acpStatus).toBe('disconnected');
+    expect(readAcpRuntimeDiagnosticsSnapshot(NEXT_CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'idle',
+        status: 'disconnected',
+        statusSource: 'hydrated',
+      })
+    );
   });
 
   it('keeps a hydrated running ACP conversation in waiting when the latest visible timeline message is still user-side', async () => {

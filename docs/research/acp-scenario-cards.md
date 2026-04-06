@@ -1581,3 +1581,40 @@ Reviewer adjustment:
 - Reviewer focus:
   - 测试不能只绑 `start` 这种实现细节；要盯住 runtime status 合同
   - hydrated waiting 线程在没有 live 激活前，不能误显示“等待首个响应”
+
+## SC-040 ACP Initial Send Waiting Must Survive Mount Hydration And Conversation Switches
+
+- Goal:
+  - 修掉新会话首发的一个真实竞态：
+    - 用户刚发出第一条消息，waiting cue 已经进入 pending
+    - 但 mount hydration 随后把它错误踩回去，导致线程看起来“很冷静”
+  - 同时确保这个 pending waiting 只属于当前 conversation，不会在切线程时串线。
+- User action:
+  - 用户创建一个新的 ACP 会话并立刻发送第一条消息
+  - 或者在一个 hook 实例内从 conversation A 切到 conversation B
+- Current failure:
+  - `useAcpInitialMessage` / send-path 会先把 `aiProcessing` 置为 `true`
+  - `useAcpMessage` 的 mount hydration 随后会读取 `conversation.get(...)` 并按持久化状态重写 `running / aiProcessing`
+  - 如果 hydration 还没感知到 live activity，就会把新会话刚进入的 waiting cue 清掉
+  - 初版修复虽然能保住同一线程里的 pending waiting，但 reviewer 指出它仍是 hook 级 guard，不是 conversation 级 owner；切到另一条 conversation 时，旧 waiting 可能继续压住新线程的 hydration
+- Expected UI state:
+  - 新会话首发后，只要还没首包，线程底部 waiting cue 必须保留
+  - hydration 不得把这条 pending waiting 清掉
+  - 切到另一条 conversation 时：
+    - 旧 conversation 的 waiting 不得串到新 conversation
+    - 新 conversation 的 hydrated terminal status / idle state 仍要正确恢复
+- Automation plan:
+  - `useAcpMessage`
+    - 把 `aiProcessing` guard 收成 conversation-scoped owner
+    - runtime diagnostics 和外部返回值也只暴露“属于当前 conversation 的 waiting”
+  - `useAcpMessage.dom.test.ts`
+    - 守住 mount hydration 不清 pending waiting
+    - 新增 rerender/switch 合同，验证 conversation A 的 waiting 不会压住 conversation B 的 hydration
+- Exit criteria:
+  - 新会话首发时，waiting cue 不再被 hydration 误清
+  - conversation 切换时，pending waiting 不再跨线程串线
+  - reviewer 对“这仍然不是 new-conversation guard”的担忧被消除
+- Reviewer focus:
+  - guard 必须是 conversation-scoped，而不是 hook-scoped
+  - 不能因为保 waiting 又把新 conversation 的 hydrated terminal 状态吃掉
+  - diagnostics / sendbox 不能继续暴露来自旧 conversation 的 waiting

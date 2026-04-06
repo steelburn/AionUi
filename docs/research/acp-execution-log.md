@@ -2411,3 +2411,67 @@
 - Next:
   - 再决定是否需要进一步做更完整的 thread-level generating row / elapsed meta
   - 再继续评估 diagnostics 入口是否还要继续下沉
+
+### 2026-04-06 / Batch 37
+
+- 对应 SC:
+  - `SC-040`
+- Goal:
+  - 修掉新会话首发 waiting cue 的一个真实竞态：
+    - 用户刚发出第一条 ACP 消息，线程应该进入 waiting
+    - 但 mount hydration 随后会按持久化 conversation 状态重写 `running / aiProcessing`
+    - 导致 UI 看起来“很冷静”，像是什么都没发生
+  - 同时把这条 guard 从 hook 级收成 conversation 级，避免切线程时串线。
+- Root cause:
+  - 初版修复只盯住了“同一条 conversation 的 deferred hydration 不要清掉 pending waiting”
+  - reviewer `Boole` 指出一个有效漏洞：
+    - `aiProcessingRef.current` 只是 hook 级状态
+    - 如果同一个 hook 实例切到另一条 `conversation_id`，旧 conversation 的 waiting 仍可能压住新 conversation 的 hydration
+  - 这意味着它还不算真正的 `new-conversation` 修复，只是先压住了一部分时序。
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 给 `aiProcessing` 引入 conversation-scoped owner
+    - `setAiProcessing(...)` 现在会同步更新：
+      - `aiProcessingRef`
+      - `aiProcessingOwnerConversationIdRef`
+    - hydration、diagnostics、外部返回值统一只认“属于当前 conversation 的 waiting”
+    - 去掉若干手动 `aiProcessingRef.current = false`，改由统一 setter 维护
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 保留 mount hydration 不清 pending waiting 的合同
+    - 新增 rerender/switch 合同：
+      - conversation A 的 pending waiting 不得压住 conversation B 的 hydrated terminal status
+- Reviewer:
+  - reviewer：`Boole`
+  - 第一轮 finding：
+    - pending waiting 仍然是 hook-scoped，不是 conversation-scoped
+    - 新增测试还没有覆盖 rerender / conversation switch
+  - 修复：
+    - 把 waiting guard 改成 conversation owner 语义
+    - 新增跨 conversation rerender 的回归测试
+  - 最终结论：
+    - `no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 结果：`39 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过（仓库既有 unknown-key warnings 保持 warning-only）
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`418 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - 这批不是在“加一个更热闹的动画”，而是在把等待态变成真实、稳定的线程事实：
+    - 新会话首发时，waiting cue 不再被 hydration 误清
+    - 切线程时，旧 waiting 也不会污染新线程
+  - 这让 send-time affordance 终于能稳定服务真实新会话，而不是只在理想时序里成立。
+- Next:
+  - 继续补一条 hermetic E2E，直接守住“新会话首发必须出现 waiting cue”
+  - 再决定是否继续往更完整的 generating row / elapsed meta 推进
