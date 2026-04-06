@@ -18,6 +18,7 @@
 1. AionUi 的主要问题不在 ACP bridge 本身，而在连接生命周期、状态语义、错误可见性、认证交互、队列语义和可观测性。
 2. Claude Code 方案对 `streaming buffer`、`disconnected`、`turn guard`、`queue/idle kill 风险` 的方向判断有价值，但部分表述过满，部分优先级偏高。
 3. Zed 真正领先的不只是“更顺滑”，而是把 external agent 当作一等产品能力来做：连接复用、认证 CTA、Send Now、错误分层、ACP logs。
+   但这不应被扩写成“Zed 已统一解决 external agent 的历史 resume”；截至当前本地代码与文档对照，这一点仍取决于各 agent 的 capability。
 4. 最终方案不能只做短期止血，也不能直接跳到大重构。正确顺序应是：
    `先补真相层 -> 再补用户动作层 -> 再收口状态机和热路径 -> 最后才动连接拓扑和运行时托管`
 
@@ -55,6 +56,15 @@ Zed 领先点已经比较稳定，可归纳为：
 - Send Now / interrupt-and-send
 - ACP logs
 - capability-based degrade
+
+但不应把以下项继续归入 Zed 的稳定领先点：
+
+- external agent 历史会话的统一 resume / reopen 保证
+
+代码事实对照（本地 Zed 仓库：`/Users/veryliu/Documents/GitHub/zed`）显示：
+
+- `crates/acp_thread/src/connection.rs` 将 `load_session / resume_session` 设计为 capability，而不是所有 external agents 的统一保证
+- `docs/src/ai/external-agents.md` 明确写出 Gemini CLI、Claude Agent、Codex 当前都可能不支持 `resuming threads from history`
 
 ### 4. AionUi 不是“没有能力”，而是“能力分散”
 
@@ -140,7 +150,7 @@ Zed 领先点已经比较稳定，可归纳为：
 - `src/process/task/AcpAgentManager.ts:342`
 - `src/process/task/AcpAgentManager.ts:503`
 
-### 6. 成立：Zed 在产品能力层面领先，不只是代码实现层面领先
+### 6. 成立：Zed 在产品能力层面领先，但 external-agent history resume 不是统一基线
 
 已能从代码与文档中明确确认的 Zed 优势：
 
@@ -148,6 +158,10 @@ Zed 领先点已经比较稳定，可归纳为：
 - 认证 CTA：`Authentication Required` / `Authenticate`
 - 抢发：`interrupt_and_send` / `Send Now`
 - ACP logs：专用 debug 入口
+
+需要明确降级的非优势项：
+
+- external agent 从历史线程继续对话的统一 resume 能力
 
 相关代码：
 
@@ -157,6 +171,10 @@ Zed 领先点已经比较稳定，可归纳为：
 - `crates/agent_ui/src/conversation_view/thread_view.rs:1170`
 - `crates/agent_ui/src/conversation_view/thread_view.rs:3281`
 - `docs/src/ai/external-agents.md:247`
+- `crates/acp_thread/src/connection.rs:59`
+- `docs/src/ai/external-agents.md:61`
+- `docs/src/ai/external-agents.md:129`
+- `docs/src/ai/external-agents.md:189`
 
 ### 7. 降级：不能再说“完全没有前端缓冲”
 
@@ -586,6 +604,7 @@ Zed 领先点已经比较稳定，可归纳为：
 - `disconnected -> Retry` 已有 thread-level UI 和自动化回归
 - `auth_required -> Authenticate` 已有 thread-level UI 和自动化回归
 - reopen / resume / load 的 hermetic 和 real canary 主链路已打通
+- `Codex -> session/load`、`Claude / CodeBuddy -> session/new + resume`、generic `resumeSessionId` 三条 app-level resume 路径都已经在 AionUi 侧收口；这项能力不再应被描述为落后于 Zed external-agent 基线
 - queue / Send Now / barrier blocking 的关键合同已补齐
 - live generic error / in-flight recovery / historical error reopen 这三类 queue 边界也已进一步收紧
 - `Authenticate / Retry` 的 in-flight 状态已可跨 remount 保持，并抑制 terminal handoff 后的 stale failure
@@ -844,6 +863,12 @@ Zed 领先点已经比较稳定，可归纳为：
 
 这类 runtime chatter 默认出现在主界面。
 
+对于 external agents，Zed 当前也没有把“从历史线程恢复并继续对话”作为统一可依赖能力对外承诺。根据本地 Zed 文档：
+
+- Gemini CLI 当前可能不支持 `resuming threads from history`
+- Claude Agent 当前可能不支持 `resuming threads from history`
+- Codex 当前可能不支持 `resuming threads from history`
+
 ### 2. 需要认证
 
 用户会看到：
@@ -897,6 +922,16 @@ Zed 也有 ACP logs，但它是：
 - retry 不工作
 - auth 不工作
 - reopen 不工作
+
+并且不应再把以下表述保留为默认前提：
+
+- Zed 在 external agent 历史 resume 上天然更强
+
+截至当前代码事实，更准确的判断是：
+
+- AionUi 在 ACP session reopen / resume 上已经不再落后
+- 对 `Codex` 这类 backend，AionUi 当前的自动化证明甚至强于 Zed 对 external agents 的公开保证
+- 当前真正剩下的差距主要是产品克制感、capability-based degrade 和更成熟的状态入口设计
 
 当前剩余的主要差距更偏产品化：
 
