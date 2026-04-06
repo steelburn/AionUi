@@ -692,6 +692,87 @@ test.describe.serial('ACP conversation page (hermetic)', () => {
     }
   });
 
+  test('shows a warmup cue for a fresh ACP conversation before the first response arrives', async ({}, testInfo) => {
+    const hermeticApp = await launchHermeticAcpApp({
+      FAKE_ACP_AUTH_MODE: 'none',
+      FAKE_ACP_PROMPT_MODE: 'delayed_first_response',
+      FAKE_ACP_STEP_DELAY_MS: '1500',
+    });
+
+    try {
+      const { id } = await createHermeticAcpConversation(hermeticApp.page, 'Hermetic ACP First Response Waiting Cue');
+      const input = 'Hold the first response for a moment';
+
+      await navigateTo(hermeticApp.page, `#/conversation/${id}`);
+      await waitForConversationSendBoxReady(hermeticApp.page);
+      await installResponseStreamProbe(hermeticApp.page);
+      await sendAcpMessage(hermeticApp.page, input);
+      const conversationBody = hermeticApp.page.locator('body');
+
+      await expect
+        .poll(
+          async () => {
+            const contentCount = countConversationEvents(
+              await readResponseStreamProbe(hermeticApp.page),
+              id,
+              'content'
+            );
+            if (contentCount > 0) {
+              return null;
+            }
+
+            return await conversationBody.textContent();
+          },
+          { timeout: 4_000 }
+        )
+        .toMatch(/Processing/);
+
+      const warmupIndicator = hermeticApp.page.locator('[data-testid="acp-warmup-indicator"]');
+      await expect
+        .poll(
+          async () => {
+            const contentCount = countConversationEvents(
+              await readResponseStreamProbe(hermeticApp.page),
+              id,
+              'content'
+            );
+            if (contentCount > 0) {
+              return null;
+            }
+
+            if (!(await warmupIndicator.isVisible().catch(() => false))) {
+              return null;
+            }
+
+            return await warmupIndicator.textContent();
+          },
+          { timeout: 4_000 }
+        )
+        .toMatch(/Connecting to Fake ACP Agent|Waiting for the first response from Fake ACP Agent/);
+
+      await waitForConversationEvent(hermeticApp.page, id, 'content');
+      await waitForConversationEvent(hermeticApp.page, id, 'finish');
+      await expect(warmupIndicator).toHaveCount(0);
+      await expect(hermeticApp.page.locator('body')).toContainText('Fake response to:', {
+        timeout: 15_000,
+      });
+    } finally {
+      await testInfo.attach('response-stream-probe', {
+        body: Buffer.from(JSON.stringify(await readResponseStreamProbe(hermeticApp.page), null, 2), 'utf8'),
+        contentType: 'application/json',
+      });
+      await testInfo.attach('main-runtime-info', {
+        body: Buffer.from(JSON.stringify(hermeticApp.runtimeInfo, null, 2), 'utf8'),
+        contentType: 'application/json',
+      });
+      await testInfo.attach('renderer-console', {
+        body: Buffer.from(hermeticApp.consoleMessages.join('\n') || '[no renderer console output]', 'utf8'),
+        contentType: 'text/plain',
+      });
+      await hermeticApp.cleanup();
+    }
+  });
+
   test('reopens the same ACP conversation after app restart and resumes remembered memory', async ({}, testInfo) => {
     const sandbox = createHermeticAcpSandbox();
     let firstApp: HermeticAcpApp | null = null;

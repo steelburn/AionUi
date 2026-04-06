@@ -1618,3 +1618,140 @@ Reviewer adjustment:
   - guard 必须是 conversation-scoped，而不是 hook-scoped
   - 不能因为保 waiting 又把新 conversation 的 hydrated terminal 状态吃掉
   - diagnostics / sendbox 不能继续暴露来自旧 conversation 的 waiting
+
+## SC-041 ACP Fresh-Send Warmup Cue Must Be Guarded By Hermetic E2E
+
+- Goal:
+  - 把“新会话首发时 UI 太冷静”从主观体验收成一个真正的产品合同：
+    - 新会话发出第一条 ACP 消息后
+    - 在首个可见响应到达前
+    - 线程里必须出现 warmup cue
+  - 这条合同不能只靠 unit/hook 推断，必须有 hermetic E2E 守住。
+- User action:
+  - 用户新建一个 ACP 会话
+  - 立即发送第一条消息
+  - backend 已经开始这轮 turn，但首包故意延迟一点才到
+- Current failure:
+  - `SC-040` 修掉了 hydration 竞态，但还没有一条真实会话级自动化来证明“fresh send 真的能看见 warmup cue”
+  - 原有 fake ACP 默认会同步吐首包，无法稳定复现“start 已到 / 首包未到”的窗口
+  - 当我们补了一个延迟首包的 hermetic E2E 后，第一次实际跑就证明现状确实还有缺口：warmup cue 没出来
+- Expected UI state:
+  - 新会话 fresh send 后：
+    - 在首包前出现 `acp-warmup-indicator`
+    - indicator 文案可以是 `Connecting...` 或 `Waiting for the first response...`
+  - 一旦首个 content 到达：
+    - warmup cue 消失
+    - 正文接管
+- Automation plan:
+  - `tests/fixtures/fake-acp-cli/index.js`
+    - 新增 `delayed_first_response` 模式，稳定制造 “start 已到 / first content 未到” 的时间窗
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - 新增 hermetic fresh-send test
+    - 在首包到达前直接断言 warmup cue 出现
+    - 最后断言首包后 warmup cue 消失、正文完成
+  - `useAcpMessage`
+    - runtime diagnostics 的 waiting 判定不再只依赖 `aiProcessing`
+    - 在 `running` 且 timeline 仍只有 user-side activity 时，也维持 `waiting`
+  - `useAcpMessage.dom.test.ts`
+    - 新增 live `start` 但 assistant-side activity 尚未到来时，diagnostics 仍是 `waiting`
+- Exit criteria:
+  - hermetic E2E 能稳定证明新会话首发前的 warmup cue 存在
+  - 这条 E2E 不是“只靠时间运气”，而是依赖 fixture 明确制造首包延迟窗口
+  - 现有 waiting / streaming 合同不被打坏
+- Reviewer focus:
+  - delayed fixture 不能引入新的 flaky 行为
+  - waiting 判定不能把已有 assistant-side activity 的 running turn 误判成 warmup
+  - E2E 必须针对用户抱怨的“fresh conversation first send”，而不是别的路径
+
+## SC-042 ACP Fresh-Send Waiting Cue Must Start From User Intent, Not ACP Stream Timing
+
+- Goal:
+  - 把“新会话点发送后仍然很冷静”的体验差距进一步收口：
+    - waiting cue 不能再只依赖 `request_trace / start / aiProcessing` 的时序碰巧对上
+    - 用户一点击发送，线程和 header 就应该立刻进入等待态
+    - 只有真正看到 assistant-side 可见反馈，或 turn 进入终态，才释放等待态
+- User action:
+  - 用户新建一个 ACP 会话
+  - 立即发送第一条消息
+  - 在 ACP 仍未吐出第一段可见 assistant 内容前观察 UI
+- Current failure:
+  - `SC-041` 虽然把 fresh-send warmup 做成了 hermetic E2E，但单独重跑仍能复现：
+    - 新会话发送后
+    - `request_trace` 已到
+    - `acp-warmup-indicator` 仍可能不存在
+  - 这说明现有 waiting cue 还是过度依赖底层流式事件的到达顺序，而不是用户动作本身
+- Expected UI state:
+  - 用户点击发送后：
+    - 线程底部 warmup row 立刻出现
+    - header runtime status dot 立刻进入 pulse
+  - 如果 ACP 已经 `session_active` 但正文还没 visible：
+    - 副标题切换到 `Waiting for the first response...`
+  - 只有当 assistant-side activity 真正可见于 timeline，或 turn 终止：
+    - warmup row / pulse 才释放
+- Automation plan:
+  - 新增 conversation-scoped 的 send-time warmup pending store
+    - 由 `executeCommand` / `useAcpInitialMessage` 直接拉起
+    - 由 `useAcpMessage` 在 visible assistant activity / terminal event 时释放
+  - `AcpWarmupIndicator`
+    - 改为吃 `activityPhase || uiWarmupPending`
+  - `AcpRuntimeStatusButton`
+    - 改为在 `uiWarmupPending` 时也 pulse，避免 header 继续显得“冷静”
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - 补一条合同：`content` 到了但 assistant-side timeline 尚未 visible 时，warmup cue 仍保留
+  - `acp-agent.e2e.ts`
+    - 继续用 hermetic fresh-send case 兜底
+    - fixture delay 拉长，避免把观察窗口压得过窄
+- Exit criteria:
+  - fresh-send waiting cue 从“依赖 stream timing”变成“发送动作直接拉起”
+  - thread warmup row 和 header dot 都能在首包前给用户明确反馈
+  - hermetic E2E 稳定通过
+- Reviewer focus:
+  - send-time pending store 不能在 assistant-side content 已 visible 后残留
+  - 不能把 reopen/hydrated running 会话误判成 fresh-send waiting
+  - header dot / warmup row 不能因为 pending store 引入新的无限重渲染或 stale 状态
+
+## SC-043 ACP Fresh-Send Waiting Cue Must Reuse AionUi's Native Processing Affordance
+
+- Goal:
+  - 不再让 ACP fresh-send 的等待态只依赖一个相对克制的 warmup row
+  - 让它直接复用 AionUi 其他 agent 已在使用的 `ThoughtDisplay`
+  - 在首包前给用户更明显、更熟悉的 `Processing` 动画反馈
+- User action:
+  - 用户新建一个 ACP 会话并发送第一条消息
+  - 或 reopen 一个仍在等待首包的 running ACP 会话
+  - 在第一段 assistant-side 内容可见前观察线程底部过渡 UI
+- Current failure:
+  - `SC-042` 已经让 header dot 和 warmup row 进入 send-time waiting
+  - 但真实体验里，这段过渡仍然显得“太冷静”：
+    - sendbox 很快回到普通态
+    - 如果用户没注意到右上角状态点或细 warmup row，会误以为系统还没开始处理
+  - AionUi 其他平台本来就有 `ThoughtDisplay` 作为 loading affordance，ACP 这条链没有充分复用这套现成机制
+- Expected UI state:
+  - fresh send 后，在首包前：
+    - 线程底部 waiting cue 直接复用 `ThoughtDisplay` 风格的 `Processing` affordance
+    - 连接 / first-response 副标题继续保留在同一个单一 waiting cue 内
+  - 一旦 inline thinking 出现，或 assistant-side 内容真正可见：
+    - 这条 waiting cue 让位，不和 inline thinking / 正文重复
+  - reopen 一个 mid-turn 但已有 assistant-side activity 的会话时：
+    - 不应误显示这条 processing affordance
+- Automation plan:
+  - `ThoughtDisplay.tsx`
+    - 支持 ACP warmup 所需的 subtitle / testId 扩展
+  - `AcpWarmupIndicator.tsx`
+    - 不再维持单独的 ACP 自定义卡片
+    - 直接复用 `ThoughtDisplay` 承载 `Processing + subtitle`
+    - 保证首包前只存在一个 coherent waiting cue，而不是叠两层 loading 面
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - 守住 waiting cue 出现
+    - 守住 thinking / visible assistant activity 后 waiting cue 消失
+  - `acp-agent.e2e.ts`
+    - 继续复用 hermetic fresh-send case
+    - 断言首包前 body 中存在 `Processing`
+- Exit criteria:
+  - ACP fresh-send 在首包前拥有一个与其他平台一致的 `Processing` waiting cue
+  - 这条 affordance 不会和 inline thinking / 已可见正文重复，也不会出现双 cue
+  - warmup row、status dot、sendbox busy 合同保持成立
+- Reviewer focus:
+  - `ThoughtDisplay` 不能把 mid-turn streaming 或 terminal 状态误显示成 processing
+  - 不能为了加动画条而出现双 waiting cue
+  - DOM/E2E tests 必须守住“出现”和“让位”两侧边界

@@ -50,6 +50,7 @@ export type AcpRuntimeDiagnosticsSnapshot = {
   statusSource: AcpRuntimeStatusSource | null;
   statusRevision: number;
   activityPhase: AcpRuntimeActivityPhase;
+  uiWarmupPending?: boolean;
   hasThinkingMessage?: boolean;
   logs: AcpLogEntry[];
 };
@@ -59,11 +60,13 @@ const EMPTY_ACP_RUNTIME_DIAGNOSTICS_SNAPSHOT: AcpRuntimeDiagnosticsSnapshot = Ob
   statusSource: null,
   statusRevision: 0,
   activityPhase: 'idle',
+  uiWarmupPending: false,
   hasThinkingMessage: false,
   logs: [],
 });
 
 const acpRuntimeDiagnosticsStore = new Map<string, AcpRuntimeDiagnosticsSnapshot>();
+const acpRuntimeWarmupPendingStore = new Map<string, boolean>();
 const acpRuntimeDiagnosticsListeners = new Map<string, Set<() => void>>();
 
 export const readAcpRuntimeDiagnosticsSnapshot = (conversationId: string): AcpRuntimeDiagnosticsSnapshot => {
@@ -80,41 +83,93 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
   conversationId: string,
   snapshot: AcpRuntimeDiagnosticsSnapshot
 ): void => {
+  const nextSnapshot: AcpRuntimeDiagnosticsSnapshot = {
+    ...snapshot,
+    uiWarmupPending: acpRuntimeWarmupPendingStore.get(conversationId) ?? false,
+  };
   const currentSnapshot = acpRuntimeDiagnosticsStore.get(conversationId);
   if (
     currentSnapshot &&
-    currentSnapshot.status === snapshot.status &&
-    currentSnapshot.statusSource === snapshot.statusSource &&
-    currentSnapshot.statusRevision === snapshot.statusRevision &&
-    currentSnapshot.activityPhase === snapshot.activityPhase &&
-    Boolean(currentSnapshot.hasThinkingMessage) === Boolean(snapshot.hasThinkingMessage) &&
-    currentSnapshot.logs === snapshot.logs
+    currentSnapshot.status === nextSnapshot.status &&
+    currentSnapshot.statusSource === nextSnapshot.statusSource &&
+    currentSnapshot.statusRevision === nextSnapshot.statusRevision &&
+    currentSnapshot.activityPhase === nextSnapshot.activityPhase &&
+    currentSnapshot.uiWarmupPending === nextSnapshot.uiWarmupPending &&
+    Boolean(currentSnapshot.hasThinkingMessage) === Boolean(nextSnapshot.hasThinkingMessage) &&
+    currentSnapshot.logs === nextSnapshot.logs
   ) {
     return;
   }
 
   if (
-    snapshot.status === null &&
-    snapshot.statusSource === null &&
-    snapshot.statusRevision === 0 &&
-    snapshot.activityPhase === 'idle' &&
-    !snapshot.hasThinkingMessage &&
-    snapshot.logs.length === 0
+    nextSnapshot.status === null &&
+    nextSnapshot.statusSource === null &&
+    nextSnapshot.statusRevision === 0 &&
+    nextSnapshot.activityPhase === 'idle' &&
+    !nextSnapshot.uiWarmupPending &&
+    !nextSnapshot.hasThinkingMessage &&
+    nextSnapshot.logs.length === 0
   ) {
     acpRuntimeDiagnosticsStore.delete(conversationId);
   } else {
-    acpRuntimeDiagnosticsStore.set(conversationId, snapshot);
+    acpRuntimeDiagnosticsStore.set(conversationId, nextSnapshot);
+  }
+
+  emitAcpRuntimeDiagnosticsSnapshot(conversationId);
+};
+
+export const setAcpRuntimeUiWarmupPending = (conversationId: string, pending: boolean): void => {
+  const currentPending = acpRuntimeWarmupPendingStore.get(conversationId) ?? false;
+  if (currentPending === pending) {
+    return;
+  }
+
+  if (pending) {
+    acpRuntimeWarmupPendingStore.set(conversationId, true);
+  } else {
+    acpRuntimeWarmupPendingStore.delete(conversationId);
+  }
+
+  const currentSnapshot = acpRuntimeDiagnosticsStore.get(conversationId);
+  if (currentSnapshot) {
+    const nextSnapshot: AcpRuntimeDiagnosticsSnapshot = {
+      ...currentSnapshot,
+      uiWarmupPending: pending,
+    };
+
+    if (
+      nextSnapshot.status === null &&
+      nextSnapshot.statusSource === null &&
+      nextSnapshot.statusRevision === 0 &&
+      nextSnapshot.activityPhase === 'idle' &&
+      !nextSnapshot.uiWarmupPending &&
+      !nextSnapshot.hasThinkingMessage &&
+      nextSnapshot.logs.length === 0
+    ) {
+      acpRuntimeDiagnosticsStore.delete(conversationId);
+    } else {
+      acpRuntimeDiagnosticsStore.set(conversationId, nextSnapshot);
+    }
+  } else if (pending) {
+    acpRuntimeDiagnosticsStore.set(conversationId, {
+      ...EMPTY_ACP_RUNTIME_DIAGNOSTICS_SNAPSHOT,
+      uiWarmupPending: true,
+    });
   }
 
   emitAcpRuntimeDiagnosticsSnapshot(conversationId);
 };
 
 export const clearAcpRuntimeDiagnosticsSnapshot = (conversationId: string): void => {
-  if (!acpRuntimeDiagnosticsStore.has(conversationId)) {
+  const hadDiagnostics = acpRuntimeDiagnosticsStore.has(conversationId);
+  const hadWarmupPending = acpRuntimeWarmupPendingStore.has(conversationId);
+
+  if (!hadDiagnostics && !hadWarmupPending) {
     return;
   }
 
   acpRuntimeDiagnosticsStore.delete(conversationId);
+  acpRuntimeWarmupPendingStore.delete(conversationId);
   emitAcpRuntimeDiagnosticsSnapshot(conversationId);
 };
 

@@ -2475,3 +2475,205 @@
 - Next:
   - 继续补一条 hermetic E2E，直接守住“新会话首发必须出现 waiting cue”
   - 再决定是否继续往更完整的 generating row / elapsed meta 推进
+
+### 2026-04-06 / Batch 38
+
+- 对应 SC:
+  - `SC-041`
+- Goal:
+  - 把“新会话首发仍然很冷静”从用户口头反馈，收成一条真正的 hermetic 产品合同：
+    - fresh ACP send 后，在首包到达前，线程里必须出现 warmup cue
+- Root cause:
+  - `SC-040` 修掉了 mount hydration / conversation switch 的 waiting 竞态，但它仍主要依赖 hook/unit 级推断
+  - 当我们第一次把这条抱怨写成 hermetic E2E 后，测试直接失败：
+    - `request_trace` 已到
+    - 但 `[data-testid="acp-warmup-indicator"]` 仍不存在
+  - 进一步排查后发现：
+    - 现有 diagnostics 的 waiting 判定过度依赖 `aiProcessing`
+    - 但真实 fresh send 链路里，更稳定的事实应该是：
+      - 当前 turn 已 `running`
+      - timeline 仍只有 user-side activity
+      - assistant-side activity 还没到
+    - 这时即使 `aiProcessing` 已不再是唯一信号，warmup cue 仍应该继续存在
+- Changes:
+  - `tests/fixtures/fake-acp-cli/index.js`
+    - 新增 `delayed_first_response`
+    - 稳定制造 “start 已到 / first content 未到” 的时间窗
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - 新增 hermetic E2E：
+      - 新会话 fresh send
+      - 在首包前直接断言 `acp-warmup-indicator` 出现
+      - 断言首包完成后 indicator 消失
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - diagnostics 的 waiting 判定改成更真实的合同：
+      - `running`
+      - 且当前 timeline 仍只有 user-side activity
+      - 即使 `aiProcessing` 已不是唯一信号，仍保持 `waiting`
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 新增 live `start` 后但 assistant-side activity 未到时，diagnostics 仍为 `waiting`
+    - 修正原有 `waiting -> streaming` 测试，让它在 content 进入 mock timeline 后再断言 `streaming`
+- Reviewer:
+  - reviewer：`Boole`
+  - 最终结论：`no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 结果：`40 passed`
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`41 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bunx cross-env AIONUI_ACP_REAL_CODEX_CANARY=0 playwright test tests/e2e/specs/acp-agent.e2e.ts --grep "shows a warmup cue for a fresh ACP conversation before the first response arrives"`
+    - 首轮结果：失败，成功复现真实缺口
+    - 修复后结果：`1 passed`
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过（仓库既有 unknown-key warnings 保持 warning-only）
+  - `bun run verify:acp`
+    - 通过
+    - ACP unit：`419 passed | 1 skipped`
+    - ACP integration：`21 passed | 3 skipped`
+    - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 通过
+    - `316 passed | 5 skipped (321 files)`
+    - `3216 passed | 17 skipped (3233 tests)`
+- Product judgement:
+  - 这批的价值不只是“让 indicator 出现”：
+    - 它把“fresh send 的 warmup cue”从 UI 观感，升级成了 fixture + E2E 的一等合同
+  - 从这一刀开始，只要有人再把新会话首发改回“很冷静”，hermetic E2E 会第一时间把它打出来。
+- Next:
+  - 再继续评估是否需要往更完整的 generating row / elapsed meta 走下一步
+
+### 2026-04-06 / Batch 39
+
+- 对应 SC:
+  - `SC-042`
+- Goal:
+  - 把 fresh-send waiting cue 从“依赖 ACP stream timing”升级成“用户点发送就立刻进入等待态”的显式 UI contract
+  - 让 thread warmup row 和 header runtime dot 都不再显得“很冷静”
+- Root cause:
+  - `SC-041` 补了 hermetic E2E 后，单独重跑这条用例仍然会失败：
+    - 新会话发出第一条消息
+    - `request_trace` 已到
+    - 但 warmup indicator 仍可能不存在
+  - 这说明当前 waiting cue 还是过度依赖：
+    - `request_trace / start / content`
+    - 以及 `useAcpMessage` 内部 `aiProcessing` / diagnostics 的时序
+  - 对用户体感来说，更直接的真相其实应该是：
+    - 用户已经点击发送
+    - 还没看到第一段 assistant-side 可见反馈
+- Changes:
+  - `acpRuntimeDiagnostics.ts`
+    - 新增 conversation-scoped `uiWarmupPending`
+    - 由独立 setter 维护，并写入稳定 snapshot，避免 `useSyncExternalStore` 读时生成新对象
+  - `AcpSendBox.tsx`
+    - `executeCommand` / stop / send failure 现在都会显式更新 `uiWarmupPending`
+  - `useAcpInitialMessage.ts`
+    - guid/initial message 路径也会拉起同一套 pending warmup
+  - `useAcpMessage.ts`
+    - 在 `thinking`、terminal event、reset、conversation switch cleanup 时释放 pending warmup
+    - 新增一条 effect：
+      - 只要 assistant-side activity 已 visible，或 turn 已经不在 waiting contract 内，就清掉 pending warmup
+  - `AcpWarmupIndicator.tsx`
+    - 改为吃 `activityPhase === waiting || uiWarmupPending`
+  - `AcpRuntimeStatusButton.tsx`
+    - 改为在 `uiWarmupPending` 时也 pulse / 显示 `Processing`
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增合同：
+      - 即使 content event 已到
+      - 只要 assistant-side timeline 还没 visible
+      - warmup cue 仍保留
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 新增合同：
+      - 仅 send-time warmup pending 也会让 header dot pulse
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - fresh-send hermetic case 的 first-response delay 拉长到 `800ms`
+    - 避免观察窗口过窄
+- Reviewer:
+  - reviewer：`Boole`
+  - 初始 finding：
+    - 不能因为 send-time warmup 变强，就引入“双 waiting cue”或把内部 trace 时序写成产品合同
+  - 最终结论：
+    - 该中风险问题在 `SC-043` 里通过“单一 `ThoughtDisplay`-backed waiting cue”收口
+    - 本批自身已无剩余 blocking findings
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 结果：`6 passed`
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`42 passed`
+  - `bun run test tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 结果：`40 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bunx cross-env AIONUI_ACP_REAL_CODEX_CANARY=0 playwright test tests/e2e/specs/acp-agent.e2e.ts --grep "shows a warmup cue for a fresh ACP conversation before the first response arrives"`
+    - 首轮结果：失败，证明 fresh-send waiting cue 仍然不稳
+    - 修复后结果：`1 passed`
+- Product judgement:
+  - 这一刀之后，fresh-send waiting cue 不再只是“等 ACP 告诉 UI 它开始了”
+  - 它已经变成“用户动作驱动的等待态”，更接近 Zed 的直觉感
+- Next:
+  - 回收 reviewer 结论
+  - 跑完整 ACP 门禁和全仓测试
+  - commit / push
+
+### 2026-04-06 / Batch 40
+
+- 对应 SC:
+  - `SC-043`
+- Goal:
+  - 把 ACP fresh-send 的等待态从“逻辑上有 warmup cue”推进到“用户一眼能感知到正在处理”
+  - 直接复用 AionUi 其他 agent 已在使用的 `ThoughtDisplay`，让 ACP 的 send -> first-response 过渡不再显得过冷
+- Root cause:
+  - `SC-042` 已经把 send-time waiting contract 做对了：
+    - warmup row 有了
+    - header status dot 会 pulse
+    - sendbox 也会进 Processing 占位
+  - 但真实体感里，这一套仍然偏克制：
+    - 用户如果没注意到右上角小点或细 warmup row，会觉得“像是还没开始”
+    - AionUi 其他平台本来就有 `ThoughtDisplay` 这套 native processing affordance，ACP 没接上，导致首发等待态和产品其他平台不一致
+- Changes:
+  - `ThoughtDisplay.tsx`
+    - 扩展 `subtitle / testId`
+    - 允许 ACP 直接复用这套原生 processing affordance，而不是再造一套只属于 ACP 的 loading 卡片
+  - `AcpWarmupIndicator.tsx`
+    - 从 ACP 自定义卡片收敛为对 `ThoughtDisplay` 的单点封装
+    - 继续承担 `Connecting -> Waiting for the first response` 的 subtitle 细语义
+    - 保证首包前只存在一个 coherent waiting cue，而不是双层 loading 面
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 更新 mock 合同，使 warmup cue 真实反映 `ThoughtDisplay` 的 `Processing + subtitle`
+    - 守住 waiting cue 出现 / 让位，不再把“双 cue”写成预期
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - 继续复用 hermetic fresh-send case
+    - 去掉对内部 `request_trace` 的前置依赖，只守住首包前 body 内可见 `Processing`
+- Reviewer:
+  - reviewer：`Boole`
+  - 最终结论：`no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`43 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过（仓库既有 unknown-key warnings 保持 warning-only）
+  - `bunx cross-env AIONUI_ACP_REAL_CODEX_CANARY=0 playwright test tests/e2e/specs/acp-agent.e2e.ts --grep "shows a warmup cue for a fresh ACP conversation before the first response arrives"`
+    - 结果：`1 passed`
+  - `bun run verify:acp`
+    - 通过
+    - ACP unit：`422 passed | 1 skipped`
+    - ACP integration：`21 passed | 3 skipped`
+    - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 通过
+    - `316 passed | 5 skipped (321 files)`
+    - `3219 passed | 17 skipped (3236 tests)`
+- Product judgement:
+  - 这一刀不是再发明新的 ACP 专用动画，而是把 ACP 收回到 AionUi 已有的 processing affordance
+  - 对用户来说，变化是：
+    - fresh send 时不再只有“很轻的状态变化”
+    - 线程底部会出现一个统一的 `Processing` waiting cue，而不是双层等待面
+- Next:
+  - 提交并推送这批 fresh-send waiting cue 收口
+  - 进入用户验收，看这条过渡是否已足够接近 Zed 的首包前体感

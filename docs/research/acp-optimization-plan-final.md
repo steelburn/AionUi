@@ -594,6 +594,9 @@ Zed 领先点已经比较稳定，可归纳为：
 - ACP 最小版 streaming reveal buffer 已落地，并已守住 finish / stop / unmount 语义
 - `ACP logs` 已从主界面撤到右上角 runtime status dot 的二级诊断入口
 - 新会话首发的 waiting cue 已收口成 conversation-scoped 合同，不再被 mount hydration 或切线程时序误清
+- 新会话 fresh send 的 warmup cue 已有 hermetic E2E 守住，不再只靠 unit/hook 推断
+- fresh-send waiting cue 已进一步升级成 send-time UI contract：用户点发送后，thread warmup row 和 header dot 都会立刻进入等待态，直到 assistant-side 可见反馈接管
+- ACP fresh-send 现在也复用了 AionUi 原生的 `ThoughtDisplay` Processing affordance，首包前收口成一个单一 coherent 的 waiting cue，不再只靠 warmup row / status dot 承担感知反馈
 
 ### 仍未完成的部分
 

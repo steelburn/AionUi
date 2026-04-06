@@ -273,6 +273,16 @@ describe('useAcpMessage', () => {
           content: 'hello',
         },
       });
+      setMockMessageList([
+        {
+          id: 'assistant-first-response',
+          type: 'text',
+          msg_id: 'content-first-response',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: { content: 'hello' },
+        },
+      ]);
     });
 
     await waitFor(() => {
@@ -396,6 +406,40 @@ describe('useAcpMessage', () => {
         activityPhase: 'idle',
         status: 'disconnected',
         statusSource: 'hydrated',
+      })
+    );
+  });
+
+  it('keeps runtime diagnostics in waiting after a live start until assistant-side activity arrives', async () => {
+    mockConversationGetInvoke.mockResolvedValueOnce({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID, { backend: 'claude', agentName: 'Claude' }));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    act(() => {
+      capturedResponseListener?.({
+        type: 'start',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'start-before-first-response',
+        data: null,
+      });
+    });
+
+    expect(result.current.running).toBe(true);
+    expect(result.current.aiProcessing).toBe(false);
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+        status: 'session_active',
+        statusSource: 'live',
       })
     );
   });

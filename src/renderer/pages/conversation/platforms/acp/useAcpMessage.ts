@@ -13,6 +13,7 @@ import type { ThoughtData } from '@/renderer/components/chat/ThoughtDisplay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   publishAcpRuntimeDiagnosticsSnapshot,
+  setAcpRuntimeUiWarmupPending,
   type AcpLogEntry,
   type AcpRuntimeStatus,
   type AcpRuntimeStatusSource,
@@ -418,6 +419,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
             setRunning(true);
             runningRef.current = true;
           }
+          setAcpRuntimeUiWarmupPending(conversation_id, false);
           hasThinkingMessageRef.current = true;
           setHasThinkingMessage(true);
           addOrUpdateMessage(transformedMessage);
@@ -454,6 +456,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
             // Mark turn as finished to prevent auto-recover from late messages
             turnFinishedRef.current = true;
             // Immediate state reset (notification is handled by centralized hook)
+            setAcpRuntimeUiWarmupPending(conversation_id, false);
             setRunning(false);
             runningRef.current = false;
             setAiProcessing(false);
@@ -570,6 +573,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
             // lifecycle noise cannot revive the send box loading state.
             if (isTerminalAcpStatus(agentData.status)) {
               turnFinishedRef.current = true;
+              setAcpRuntimeUiWarmupPending(conversation_id, false);
               setRunning(false);
               runningRef.current = false;
               setAiProcessing(false);
@@ -650,6 +654,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
         case 'error':
           // Stop all loading states when error occurs
           turnFinishedRef.current = true;
+          setAcpRuntimeUiWarmupPending(conversation_id, false);
           setRunning(false);
           runningRef.current = false;
           setAiProcessing(false);
@@ -712,7 +717,10 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   useEffect(() => {
     const isCurrentConversationProcessing =
       aiProcessing && aiProcessingOwnerConversationIdRef.current === conversation_id;
-    const activityPhase = isCurrentConversationProcessing ? 'waiting' : running ? 'streaming' : 'idle';
+    const shouldKeepWaitingForFirstResponse =
+      running && shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
+    const activityPhase =
+      isCurrentConversationProcessing || shouldKeepWaitingForFirstResponse ? 'waiting' : running ? 'streaming' : 'idle';
     publishAcpRuntimeDiagnosticsSnapshot(conversation_id, {
       status: acpStatus,
       statusSource: acpStatusSource,
@@ -728,9 +736,23 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     acpStatusSource,
     aiProcessing,
     conversation_id,
+    messageList,
     hasThinkingMessage,
     running,
   ]);
+
+  useEffect(() => {
+    const isCurrentConversationProcessing =
+      aiProcessingRef.current && aiProcessingOwnerConversationIdRef.current === conversation_id;
+    const shouldKeepWaitingForFirstResponse =
+      runningRef.current && shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
+
+    if (isCurrentConversationProcessing || shouldKeepWaitingForFirstResponse) {
+      return;
+    }
+
+    setAcpRuntimeUiWarmupPending(conversation_id, false);
+  }, [conversation_id, messageList]);
 
   // Reset state when conversation changes and restore actual running status
   useEffect(() => {
@@ -768,6 +790,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     requestTraceRef.current = null;
     acpLogSequenceRef.current = 0;
     clearBufferedContent();
+    setAcpRuntimeUiWarmupPending(conversation_id, false);
 
     // Check actual conversation status from backend before resetting running/aiProcessing
     // to avoid flicker when switching to a running conversation
@@ -853,12 +876,14 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     return () => {
       cancelled = true;
       clearBufferedContent();
+      setAcpRuntimeUiWarmupPending(conversation_id, false);
     };
   }, [clearBufferedContent, conversation_id]);
 
   const resetState = useCallback(() => {
     clearBufferedContent();
     turnFinishedRef.current = true;
+    setAcpRuntimeUiWarmupPending(conversation_id, false);
     setRunning(false);
     runningRef.current = false;
     setAiProcessing(false);
@@ -866,7 +891,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     hasContentInTurnRef.current = false;
     hasThinkingMessageRef.current = false;
     setHasThinkingMessage(false);
-  }, [clearBufferedContent]);
+  }, [clearBufferedContent, conversation_id]);
 
   const currentConversationAiProcessing =
     aiProcessing && aiProcessingOwnerConversationIdRef.current === conversation_id;

@@ -8,6 +8,7 @@ import { ipcBridge } from '@/common';
 import { uuid } from '@/common/utils';
 import { emitter } from '@/renderer/utils/emitter';
 import { useEffect } from 'react';
+import { setAcpRuntimeUiWarmupPending } from './acpRuntimeDiagnostics';
 
 type UseAcpInitialMessageParams = {
   conversationId: string;
@@ -65,6 +66,7 @@ export const useAcpInitialMessage = ({
         // File references are added by the backend ACP agent (using actual copied paths)
         // Avoid two inconsistent sets of file references in the message
         // Start AI processing loading state (user message will be added via backend response)
+        setAcpRuntimeUiWarmupPending(conversationId, true);
         setAiProcessing(true);
         primeRequestTraceFallback({
           backend,
@@ -97,6 +99,7 @@ export const useAcpInitialMessage = ({
               detail: result?.msg || 'Failed to send initial message.',
             });
           }
+          setAcpRuntimeUiWarmupPending(conversationId, false);
           setAiProcessing(false); // Stop loading state on failure
         }
       } catch (error) {
@@ -110,6 +113,7 @@ export const useAcpInitialMessage = ({
             detail: error instanceof Error ? error.message : String(error),
           });
         }
+        setAcpRuntimeUiWarmupPending(conversationId, false);
         setAiProcessing(false); // Stop loading state on error
       }
     };

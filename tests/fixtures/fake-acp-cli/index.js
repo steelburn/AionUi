@@ -7,7 +7,7 @@
  *
  * Scenario controls are process-wide and configured via environment variables:
  * - FAKE_ACP_AUTH_MODE=none|required
- * - FAKE_ACP_PROMPT_MODE=default|late_chunk_after_cancel|exit_mid_stream|exit_mid_stream_once|silent_hang
+ * - FAKE_ACP_PROMPT_MODE=default|delayed_first_response|late_chunk_after_cancel|exit_mid_stream|exit_mid_stream_once|silent_hang
  * - FAKE_ACP_STEP_DELAY_MS=40
  * - FAKE_ACP_EXIT_CODE=42
  * - FAKE_ACP_STATE_FILE=/tmp/fake-acp-state.json
@@ -505,6 +505,36 @@ function handleRequest(message) {
 
             emitChunk(sessionId, chunks[1]);
             finishPrompt(promptState);
+          },
+          getStepDelayMs()
+        );
+        break;
+      }
+
+      if (promptMode === 'delayed_first_response') {
+        const promptState = createPromptState(id, sessionId, promptMode);
+        promptState.promptText = promptText;
+        promptState.responseText = responseText;
+        schedulePrompt(
+          promptState,
+          () => {
+            if (promptState.canceled) {
+              return;
+            }
+
+            emitChunk(sessionId, chunks[0]);
+            schedulePrompt(
+              promptState,
+              () => {
+                if (promptState.canceled) {
+                  return;
+                }
+
+                emitChunk(sessionId, chunks[1]);
+                finishPrompt(promptState);
+              },
+              getStepDelayMs()
+            );
           },
           getStepDelayMs()
         );

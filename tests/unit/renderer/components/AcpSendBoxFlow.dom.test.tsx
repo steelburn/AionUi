@@ -5,7 +5,10 @@ import MessageAgentStatus from '@/renderer/pages/conversation/Messages/component
 import AcpRuntimeStatusButton from '@/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton';
 import AcpWarmupIndicator from '@/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator';
 import AcpSendBox from '@/renderer/pages/conversation/platforms/acp/AcpSendBox';
-import { clearAcpRuntimeDiagnosticsSnapshot } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
+import {
+  clearAcpRuntimeDiagnosticsSnapshot,
+  setAcpRuntimeUiWarmupPending,
+} from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CONVERSATION_ID = 'conv-acp-flow';
@@ -161,7 +164,17 @@ vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({
 
 vi.mock('@/renderer/components/chat/ThoughtDisplay', () => ({
   __esModule: true,
-  default: ({ thought, running }: { thought?: { subject?: string; description?: string }; running?: boolean }) => {
+  default: ({
+    thought,
+    running,
+    subtitle,
+    testId,
+  }: {
+    thought?: { subject?: string; description?: string };
+    running?: boolean;
+    subtitle?: string;
+    testId?: string;
+  }) => {
     if (!thought?.subject && !running) {
       return null;
     }
@@ -169,9 +182,11 @@ vi.mock('@/renderer/components/chat/ThoughtDisplay', () => ({
     return React.createElement(
       'div',
       {
-        'data-testid': 'thought-display',
+        'data-testid': testId || 'thought-display',
         'data-running': String(Boolean(running)),
       },
+      running ? React.createElement('span', { 'data-testid': 'thought-processing' }, 'Processing') : null,
+      subtitle ? React.createElement('span', { 'data-testid': 'thought-subtitle' }, subtitle) : null,
       thought?.subject ? React.createElement('span', { 'data-testid': 'thought-subject' }, thought.subject) : null,
       thought?.description
         ? React.createElement('span', { 'data-testid': 'thought-description' }, thought.description)
@@ -563,6 +578,31 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
   });
 
+  it('keeps the send box busy while send-time warmup is pending before ACP stream activity starts', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    act(() => {
+      setAcpRuntimeUiWarmupPending(CONVERSATION_ID, true);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
+  });
+
   it('updates the warmup subtitle when runtime status becomes session_active before the first visible response', async () => {
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,
@@ -604,6 +644,75 @@ describe('AcpSendBox live ACP flow', () => {
       );
     });
     expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting to Claude...');
+  });
+
+  it('keeps the thread warmup cue visible until assistant-side activity becomes visible in the timeline', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+    });
+    expect(document.querySelectorAll('[data-running="true"]')).toHaveLength(1);
+    expect(screen.queryByTestId('thought-display')).not.toBeInTheDocument();
+
+    act(() => {
+      emitAcpResponse({
+        type: 'start',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'start-before-first-visible-response',
+        data: null,
+      });
+      emitAcpResponse({
+        type: 'content',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'content-before-first-visible-response',
+        data: {
+          content: 'First token',
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
+        'Waiting for the first response from Claude...'
+      );
+    });
+    expect(document.querySelectorAll('[data-running="true"]')).toHaveLength(1);
+    expect(screen.queryByTestId('thought-display')).not.toBeInTheDocument();
+
+    act(() => {
+      setMockMessageList([
+        {
+          id: 'assistant-visible-first-response',
+          type: 'text',
+          msg_id: 'content-before-first-visible-response',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: { content: 'First token' },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    });
   });
 
   it('does not show the warmup indicator when reopening a running ACP conversation mid-turn', async () => {
@@ -707,6 +816,16 @@ describe('AcpSendBox live ACP flow', () => {
           content: 'First token',
         },
       });
+      setMockMessageList([
+        {
+          id: 'assistant-first-token',
+          type: 'text',
+          msg_id: 'content-placeholder-streaming',
+          position: 'left',
+          conversation_id: CONVERSATION_ID,
+          content: { content: 'First token' },
+        },
+      ]);
     });
 
     await waitFor(() => {

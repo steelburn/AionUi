@@ -5,6 +5,7 @@ import AcpRuntimeStatusButton from '@/renderer/pages/conversation/components/Cha
 import {
   clearAcpRuntimeDiagnosticsSnapshot,
   publishAcpRuntimeDiagnosticsSnapshot,
+  setAcpRuntimeUiWarmupPending,
   type AcpLogEntry,
 } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 
@@ -168,6 +169,18 @@ describe('AcpRuntimeStatusButton', () => {
       activityPhase: 'waiting',
       logs: [],
     });
+
+    render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
+
+    expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--primary-6))',
+    });
+  });
+
+  it('keeps the header dot animated while send-time warmup is pending even before live activity starts', () => {
+    setAcpRuntimeUiWarmupPending(CONVERSATION_ID, true);
 
     render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
 

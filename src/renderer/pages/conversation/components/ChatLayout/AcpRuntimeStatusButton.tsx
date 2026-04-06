@@ -87,19 +87,20 @@ const AcpRuntimeStatusButton: React.FC<{
   agentName?: string;
 }> = ({ conversationId, backend, agentName }) => {
   const { t } = useTranslation();
-  const { status, statusSource, activityPhase, logs } = useAcpRuntimeDiagnostics(conversationId);
+  const { status, statusSource, activityPhase, logs, uiWarmupPending } = useAcpRuntimeDiagnostics(conversationId);
   const [visible, setVisible] = React.useState(false);
   const displayName = agentName || backend || 'ACP';
   const diagnosticsOnly = shouldDemoteHydratedTerminalStatus(status, statusSource);
   const effectiveStatus = diagnosticsOnly ? null : status;
+  const isWaiting = activityPhase === 'waiting' || uiWarmupPending;
   const statusLabel = getButtonLabel({
-    activityPhase,
+    activityPhase: isWaiting ? 'waiting' : activityPhase,
     diagnosticsOnly,
     effectiveStatus,
     agentName: displayName,
     t,
   });
-  const color = activityPhase === 'waiting' ? 'rgb(var(--primary-6))' : getStatusColor(effectiveStatus);
+  const color = isWaiting ? 'rgb(var(--primary-6))' : getStatusColor(effectiveStatus);
 
   const panelEntries = React.useMemo<AcpLogEntry[]>(() => {
     if (logs.length > 0) {
@@ -157,7 +158,7 @@ const AcpRuntimeStatusButton: React.FC<{
         <span
           data-testid='acp-runtime-status-dot'
           className={`block h-8px w-8px rounded-full shadow-[0_0_0_1px_var(--color-border-2)] ${
-            activityPhase === 'waiting' ? 'animate-pulse' : ''
+            isWaiting ? 'animate-pulse' : ''
           }`}
           style={{ backgroundColor: color }}
         />

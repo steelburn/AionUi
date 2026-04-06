@@ -19,6 +19,8 @@ interface ThoughtDisplayProps {
   style?: 'default' | 'compact';
   running?: boolean;
   onStop?: () => void;
+  subtitle?: string;
+  testId?: string;
 }
 
 // Background gradient constants
@@ -40,6 +42,8 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   style = 'default',
   running = false,
   onStop: _onStop,
+  subtitle,
+  testId,
 }) => {
   const { theme } = useThemeContext();
   const { t } = useTranslation();
@@ -91,14 +95,20 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
   if (running && !thought?.subject) {
     return (
       <div
+        data-testid={testId}
         className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary flex items-center gap-8px'
         style={containerStyle}
       >
-        <Spin size={14} />
-        <span className='text-t-secondary'>
-          {t('conversation.chat.processing')}
-          <span className='ml-8px opacity-60'>({formatElapsedTime(elapsedTime)})</span>
-        </span>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center gap-8px'>
+            <Spin size={14} />
+            <span className='text-t-secondary'>
+              {t('conversation.chat.processing')}
+              <span className='ml-8px opacity-60'>({formatElapsedTime(elapsedTime)})</span>
+            </span>
+          </div>
+          {subtitle && <div className='pl-22px pt-4px text-12px lh-18px text-t-secondary'>{subtitle}</div>}
+        </div>
       </div>
     );
   }
@@ -108,6 +118,7 @@ const ThoughtDisplay: React.FC<ThoughtDisplayProps> = ({
 
   return (
     <div
+      data-testid={testId}
       className='relative z-1 mb--20px pb-30px px-10px py-10px rd-t-20px text-14px lh-20px text-t-primary'
       style={containerStyle}
     >
