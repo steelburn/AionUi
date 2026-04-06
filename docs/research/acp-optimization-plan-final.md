@@ -936,11 +936,22 @@ Zed 也有 ACP logs，但它是：
 当前剩余的主要差距更偏产品化：
 
 - AionUi 已将 `ACP logs` 收到二级入口，但 diagnostics status dot 仍比 Zed 更直接暴露在主线程 header 中
-- AionUi 已补上轻量的 thread-level generating row / elapsed meta，并覆盖了 cold waiting 与普通 streaming；但它仍没有 Zed 那种更完整的 turn stats / token meta / tool-aware differentiation
+- AionUi 已补上轻量的 thread-level generating row / elapsed meta，并覆盖了 cold waiting 与普通 streaming；后续如果继续扩展 turn stats / token meta / tool-aware affordance，应视为 AionUi 的产品增强，而不是 Zed external-agent 的默认基线
 - AionUi 的 streaming reveal 已有最小版，但离 Zed 更细腻的观感调优仍有空间
+
+并且不应再把以下表述作为默认前提：
+
+- Zed 在 external agent 上已经把 `token usage display / turn stats / tool-aware differentiation` 做成统一可见基线
+
+证据：
+
+- Zed `Agent Panel` 文档已明确写明：对 external agents，`restoring threads from history`、`checkpoints`、`token usage display` 等能力“may not be supported”，具体取决于 agent
+- 对应文档锚点：
+  - `/Users/veryliu/Documents/GitHub/zed/docs/src/ai/agent-panel.md`
+  - `/Users/veryliu/Documents/GitHub/zed/docs/src/ai/external-agents.md`
 
 因此后续优先级应继续是：
 
 1. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
-2. 再决定是否需要把现有 generating row 继续扩成更完整的 turn stats / tool-aware affordance
+2. 再继续打磨 current generating row / reveal 的克制感与连贯性，而不是先假设必须补 token/tool stats
 3. 再决定是否进入更大的连接拓扑 / runtime 托管阶段
