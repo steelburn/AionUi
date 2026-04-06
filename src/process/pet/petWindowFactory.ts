@@ -39,7 +39,7 @@ export function createPetWindows(size: PetSize): PetWindows {
     hasShadow: false,
     focusable: false,
     webPreferences: {
-      preload: path.join(__dirname, '..', 'preload', 'petPreload.js'),
+      preload: path.join(__dirname, '..', '..', 'preload', 'petPreload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -70,7 +70,7 @@ export function createPetWindows(size: PetSize): PetWindows {
     hasShadow: false,
     focusable: false,
     webPreferences: {
-      preload: path.join(__dirname, '..', 'preload', 'petHitPreload.js'),
+      preload: path.join(__dirname, '..', '..', 'preload', 'petHitPreload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -102,8 +102,8 @@ export function loadPetContent(petWindow: BrowserWindow, petHitWindow: BrowserWi
       console.error('[Pet] loadURL failed for pet-hit window:', error);
     });
   } else {
-    const petFile = path.join(__dirname, '..', 'renderer', 'pet', 'pet.html');
-    const petHitFile = path.join(__dirname, '..', 'renderer', 'pet', 'pet-hit.html');
+    const petFile = path.join(__dirname, '..', '..', 'renderer', 'pet', 'pet.html');
+    const petHitFile = path.join(__dirname, '..', '..', 'renderer', 'pet', 'pet-hit.html');
 
     petWindow.loadFile(petFile).catch((error) => {
       console.error('[Pet] loadFile failed for pet window:', error);
