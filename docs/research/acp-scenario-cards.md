@@ -1368,3 +1368,47 @@ Reviewer adjustment:
   - 不能靠旧的 `running => streaming` 一刀切偷懒。
   - 更不能把 `messageList` 带进主 hydration/reset effect 依赖，导致普通列表更新触发全量 reset。
   - 必须补一条“message list 变化不清空 live diagnostics”的自动化合同。
+
+## SC-035 Live ACP Failures Must Surface As Thread Callouts Without Reviving Historical Errors
+
+- Goal:
+  - 让 live ACP failure 不再只藏在 diagnostics 里，而是像 Zed 一样在当前线程里给出明确 callout。
+  - 同时继续保持“历史 hydrate 回来的 failure 默认安静”，避免用户一切进旧线程就被红条打脸。
+- User action:
+  - 用户在 ACP 会话里发消息，但发送在 request trace 建立前失败。
+  - 或者请求已经开始，随后收到 live `request_error` / `status:error`。
+  - 再之后线程进入更高优先级的 `auth_required` 或 `disconnected`。
+  - 或者用户重开一个历史上停留在 `lastAcpStatus: error` 的线程。
+- Current failure:
+  - `SC-028` 之后 diagnostics 已经收到二级入口，但 live generic failure 仍然偏开发者视角：
+    - 用户必须点开 diagnostics 才知道“这次请求到底失败了”
+  - 如果粗暴把所有 `error` 都升成 banner，又会把历史 hydrate 错误重新铺回线程，打坏 `SC-030 / SC-031` 的安静 reopen 合同。
+- Expected UI state:
+  - live `send_failed / request_error / status:error`：
+    - 显示 thread-level generic error banner
+  - `auth_failed`：
+    - 优先显示 `Authenticate` banner，而不是 generic error banner
+  - `disconnected`：
+    - 优先显示 `Retry` banner，而不是 generic error banner
+  - 历史 hydrate 回来的 `lastAcpStatus: error`：
+    - 只保留在 diagnostics
+    - 默认不展示 thread banner
+  - 当后续出现更新的 lifecycle entry 时：
+    - 旧的 generic error banner 会自然退出
+- Automation plan:
+  - `AcpSendBox` 根据最新 live ACP log 决定是否渲染 generic error banner
+  - `AcpErrorBanner` 复用 diagnostics 的 log formatter，避免文案和错误详情再分叉
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - pre-request send failure => generic banner
+    - live request error => generic banner
+    - `auth_required / disconnected` 抢占 generic banner
+    - hydrated historical `error` 仍只在 diagnostics 中可见
+    - `status:error` 不丢 `disconnect code / signal`
+- Exit criteria:
+  - live generic failure 在主线程里可见，不再只藏在 diagnostics 中。
+  - auth/disconnected recovery CTA 仍保持最高优先级。
+  - 历史 hydrate error 不会重新污染线程。
+- Reviewer focus:
+  - 不能把 `auth_failed` 错接成 generic error，必须仍给用户恢复 CTA。
+  - 不能让历史 `lastAcpStatus: error` 恢复出默认红 banner。
+  - `status:error` 的 callout 不能丢掉 disconnect metadata。

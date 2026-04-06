@@ -340,11 +340,13 @@ vi.mock('@arco-design/web-react', () => ({
     title,
     content,
     children,
+    closable: _closable,
     ...props
   }: {
     title?: React.ReactNode;
     content?: React.ReactNode;
     children?: React.ReactNode;
+    closable?: boolean;
   }) => React.createElement('div', props, title, content, children),
   Badge: ({ text }: { text?: React.ReactNode }) => React.createElement('span', {}, text),
   Button: ({ children, onClick, ...props }: { children?: React.ReactNode; onClick?: () => void }) =>
@@ -437,6 +439,8 @@ vi.mock('react-i18next', () => ({
           return `Failed to warm up ${agent}. Try again or send a new message.`;
         case 'acp.status.disconnected':
           return `${agent} disconnected`;
+        case 'acp.status.error':
+          return 'Connection error';
         case 'acp.status.connecting':
           return `Connecting to ${agent}...`;
         case 'conversation.chat.processing':
@@ -881,6 +885,9 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
     });
 
+    expect(screen.getByTestId('acp-auth-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-auth-banner')).toHaveTextContent('Fake ACP Agent authentication required');
     expect(screen.queryByTestId('acp-logs-panel')).not.toBeInTheDocument();
     expect(mockAddOrUpdateMessage).toHaveBeenCalledTimes(1);
     expect(mockAddOrUpdateMessage).toHaveBeenCalledWith(
@@ -893,7 +900,6 @@ describe('AcpSendBox live ACP flow', () => {
     );
 
     await openAcpDiagnostics();
-    expect(screen.getByText('Authentication failed for Fake ACP Agent')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('acp-logs-toggle'));
     const logsList = screen.getByTestId('acp-logs-list');
     expect(within(logsList).getByText('Authentication failed for Fake ACP Agent')).toBeInTheDocument();
@@ -934,6 +940,9 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
     });
 
+    expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('Failed to send request for Fake ACP Agent');
+    expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('Fake send failure before request trace');
     expect(screen.queryByTestId('acp-logs-panel')).not.toBeInTheDocument();
     expect(mockAddOrUpdateMessage).toHaveBeenCalledTimes(1);
     expect(mockAddOrUpdateMessage).toHaveBeenCalledWith(
@@ -946,12 +955,260 @@ describe('AcpSendBox live ACP flow', () => {
     );
 
     await openAcpDiagnostics();
-    expect(screen.getByText('Failed to send request for Fake ACP Agent')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('acp-logs-toggle'));
     const logsList = screen.getByTestId('acp-logs-list');
     expect(within(logsList).getByText('Failed to send request for Fake ACP Agent')).toBeInTheDocument();
     expect(within(logsList).getByText('Fake send failure before request trace')).toBeInTheDocument();
     expect(within(logsList).queryByText(/-> .* failed in /)).not.toBeInTheDocument();
+  });
+
+  it('surfaces a generic ACP error banner for live request errors until a newer lifecycle entry replaces it', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      mockConversationGetInvoke.mockResolvedValueOnce({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+
+      dateNowSpy.mockReturnValue(1000);
+      renderAcpSendBoxWithDiagnostics({
+        conversation_id: CONVERSATION_ID,
+        backend: 'custom',
+        agentName: 'Fake ACP Agent',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-live-request-error',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1000,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(1300);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'live-request-error',
+          data: 'socket reset by peer',
+        });
+      });
+
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+      expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('Fake ACP Agent -> fake-model failed in 300ms');
+      expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('socket reset by peer');
+
+      dateNowSpy.mockReturnValue(1600);
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-recovery-request',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1600,
+          },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+      });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('gives the disconnected recovery banner precedence over a prior generic ACP error banner', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      mockConversationGetInvoke.mockResolvedValueOnce({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+
+      dateNowSpy.mockReturnValue(1000);
+      renderAcpSendBoxWithDiagnostics({
+        conversation_id: CONVERSATION_ID,
+        backend: 'custom',
+        agentName: 'Fake ACP Agent',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-before-disconnected-precedence',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1000,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(1300);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'request-error-before-disconnected-precedence',
+          data: 'socket reset by peer',
+        });
+      });
+
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+
+      act(() => {
+        emitAcpResponse({
+          type: 'agent_status',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'disconnected-precedence',
+          data: {
+            backend: 'custom',
+            status: 'disconnected',
+            agentName: 'Fake ACP Agent',
+          },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('acp-disconnected-banner')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('gives the auth recovery banner precedence over a prior generic ACP error banner', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      mockConversationGetInvoke.mockResolvedValueOnce({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+
+      dateNowSpy.mockReturnValue(1000);
+      renderAcpSendBoxWithDiagnostics({
+        conversation_id: CONVERSATION_ID,
+        backend: 'custom',
+        agentName: 'Fake ACP Agent',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-before-auth-precedence',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1000,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(1300);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'request-error-before-auth-precedence',
+          data: 'socket reset by peer',
+        });
+      });
+
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+
+      act(() => {
+        emitAcpResponse({
+          type: 'agent_status',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'auth-precedence',
+          data: {
+            backend: 'custom',
+            status: 'auth_required',
+            agentName: 'Fake ACP Agent',
+          },
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('acp-auth-banner')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('surfaces disconnect metadata for live ACP status:error banners', async () => {
+    mockConversationGetInvoke.mockResolvedValueOnce({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'custom',
+      agentName: 'Fake ACP Agent',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    act(() => {
+      emitAcpResponse({
+        type: 'agent_status',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'status-error-banner',
+        data: {
+          backend: 'custom',
+          status: 'error',
+          agentName: 'Fake ACP Agent',
+          disconnectCode: 23,
+          disconnectSignal: 'SIGTERM',
+        },
+      });
+    });
+
+    expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('Connection error');
+    expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('code: 23, signal: SIGTERM');
   });
 
   it('surfaces disconnected status and clears loading in the live send box flow', async () => {
@@ -2404,5 +2661,30 @@ describe('AcpSendBox live ACP flow', () => {
 
     await openAcpDiagnostics();
     expect(screen.getByText('Claude authentication required')).toBeInTheDocument();
+  });
+
+  it('keeps a hydrated error status in diagnostics without restoring the generic error banner', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {
+        lastAcpStatus: {
+          backend: 'claude',
+          status: 'error',
+          agentName: 'Claude',
+          updatedAt: Date.now(),
+        },
+      },
+    });
+
+    renderAcpSendBoxWithDiagnostics({ conversation_id: CONVERSATION_ID, backend: 'claude', agentName: 'Claude' });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+    });
+
+    await openAcpDiagnostics();
+    expect(screen.getByText('Connection error')).toBeInTheDocument();
   });
 });

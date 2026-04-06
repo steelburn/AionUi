@@ -2109,3 +2109,72 @@
 - Next:
   - 继续评估是否要把当前 warmup row 再向更完整的 generating affordance 靠近，例如加入更明确的 elapsed / waiting meta
   - 在不退化这批 hydrated-running 合同的前提下，继续推进更底层 `queue / busy` runtime contract 收束
+
+### 2026-04-06 / Batch 32
+
+- 对应 SC:
+  - `SC-035`
+- Goal:
+  - 让 live ACP generic failure 不再只停留在 diagnostics 里，而是在当前线程中给出明确 callout。
+  - 同时保持历史 hydrate failure 默认安静，不把旧错误重新抬回主线程。
+- Root cause:
+  - 经过 `SC-028 ~ SC-031` 后，ACP diagnostics 已经被压到右上角 status dot 后面，但 live generic failure 仍然过于“开发态”：
+    - 用户要先想到点 diagnostics，才知道这次请求为什么失败
+  - 如果简单把所有 `error` 一律升成 banner，又会打坏 reopen 合同：
+    - 历史 `lastAcpStatus: error` 会在用户切进旧线程时重新变成一条红 banner
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/AcpErrorBanner.tsx`
+    - 新增通用 ACP thread-level error callout
+    - 复用 ACP log formatter 的 summary / detail 文案
+  - `src/renderer/pages/conversation/platforms/acp/AcpLogsPanel.tsx`
+    - 导出共享的 `formatAcpLogEntry(...)`
+    - `status:error` 且缺少 detail 时，补回 disconnect `code / signal` fallback
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - 新增 live generic ACP error banner 选择逻辑
+    - 仅对 live `send_failed / request_error / status:error` 升格成 banner
+    - hydrated log 默认不升格
+    - `auth_failed` 改走 `Authenticate` banner，而不是 generic error banner
+    - `auth_required / disconnected` 仍保持比 generic error 更高的优先级
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 补齐合同：
+      - pre-request send failure => generic error banner
+      - live request error => generic error banner
+      - `auth_required / disconnected` 抢占 generic error banner
+      - hydrated `lastAcpStatus: error` 仍只保留在 diagnostics
+      - `status:error` 不丢 disconnect metadata
+- Reviewer:
+  - primary reviewer：`Boole`
+    - 两次超时，没有按时返回有效 finding
+  - backup reviewer：`Hooke`
+    - 第一轮 finding：
+      - `status:error` banner 丢失 disconnect metadata fallback
+      - 缺少 `auth_required` 抢占 generic banner 的回归合同
+    - 修复后复审结论：
+      - `no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`37 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test:acp:unit`
+    - 结果：`407 passed | 1 skipped`
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`407 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - AionUi 终于不再要求普通用户先打开 diagnostics 才知道“这次 ACP 请求挂了”：
+    - live generic failure 会直接体现在当前线程
+  - 同时仍保持了比早期实现更克制的 reopen 体验：
+    - 历史 hydrate error 默认继续安静
+    - 只有 live failure 或更高优先级 recovery state 才升格成主线程 UI
+  - 这一刀让 AionUi 更接近 Zed 的 thread-level error callout 语义：
+    - auth/disconnected 继续用专门 recovery CTA
+    - generic failure 也终于从 diagnostics-only 变成用户可感知
+- Next:
+  - 继续推进更底层 `queue / busy` runtime contract 收束
+  - 继续评估当前 warmup / waiting affordance 是否还需要更完整的 thread-level generating meta

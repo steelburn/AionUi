@@ -674,7 +674,27 @@ Zed 领先点已经比较稳定，可归纳为：
 - banner 才会消失
 - queue 才会继续自动放行下一条
 
-### 6. 有排队消息时
+### 6. 一般错误
+
+用户现在会看到：
+
+- live `send_failed / request_error / status:error`
+- 对应的 thread-level generic error callout
+
+但以下情况默认不会升格成这块 generic error callout：
+
+- `auth_failed`
+- `auth_required`
+- `disconnected`
+- 历史 hydrate 回来的 `lastAcpStatus: error`
+
+这些状态会分别走：
+
+- `Authenticate` banner
+- `Retry` banner
+- diagnostics-only historical error
+
+### 7. 有排队消息时
 
 用户会看到：
 
@@ -695,7 +715,7 @@ Zed 领先点已经比较稳定，可归纳为：
 - 仍然会保留对应 banner
 - 用户必须先恢复，再继续自动出队
 
-### 7. 右上角 runtime status dot / diagnostics
+### 8. 右上角 runtime status dot / diagnostics
 
 用户会看到：
 
@@ -718,12 +738,13 @@ Zed 领先点已经比较稳定，可归纳为：
 
 - 内联展示在发送区上方的 `ACP 日志` 面板
 
-### 8. 重新打开旧会话
+### 9. 重新打开旧会话
 
 如果该 ACP 会话上次结束在：
 
 - `auth_required`
 - `disconnected`
+- `error`
 
 当前会恢复出：
 
@@ -737,7 +758,7 @@ Zed 领先点已经比较稳定，可归纳为：
 
 而不会再把这些状态混成正文里的红色消息块。
 
-### 9. 发送后到首包前
+### 10. 发送后到首包前
 
 当前用户会看到：
 
@@ -753,7 +774,7 @@ Zed 领先点已经比较稳定，可归纳为：
 
 - 为了制造“热闹感”而插入一条假的 assistant 正文消息
 
-### 10. ACP Logs
+### 11. ACP Logs
 
 当前普通用户默认不会看到：
 
@@ -767,12 +788,13 @@ Zed 领先点已经比较稳定，可归纳为：
 - request error
 - auth / retry / cancel / send now / status
 - 历史 hydrate 回来的 `auth_required / disconnected`
+- 历史 hydrate 回来的 `error`
 
-### 11. 仍然偏粗糙的用户体验点
+### 12. 仍然偏粗糙的用户体验点
 
 当前仍需继续优化的用户面问题：
 
-- 某些一般性 send failure 仍更偏向“诊断可见”，而不是“统一 CTA 可见”
+- generic error callout 现在已经进主线程，但还没有 Zed 那种更完整的 `Retry Generation / Copy Error Message` 语义
 - 流式 reveal 已有最小版收口，但 cadence 仍可继续微调
 - diagnostics 入口虽然已经二级化，但仍比 Zed 更直接暴露在主线程 header 中
 
@@ -856,6 +878,7 @@ Zed 也有 ACP logs，但它是：
 当前剩余的主要差距更偏产品化：
 
 - AionUi 已将 `ACP logs` 收到二级入口，但 diagnostics status dot 仍比 Zed 更直接暴露在主线程 header 中
+- AionUi 的 live generic failure 已经进主线程 callout，但仍缺少 Zed 更完整的 retry / copy-error affordance
 - AionUi 的 send-time waiting affordance 已上移到线程底部，但仍没有 Zed 那种更完整的 thread-level generating row / elapsed meta
 - AionUi 的 streaming reveal 已有最小版，但离 Zed 更细腻的观感调优仍有空间
 

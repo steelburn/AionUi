@@ -25,7 +25,7 @@ const formatTimestamp = (timestamp: number): string => {
   return new Date(timestamp).toISOString().slice(11, 19);
 };
 
-const formatEntry = (
+export const formatAcpLogEntry = (
   entry: AcpLogEntry,
   t: (key: string, options?: Record<string, unknown>) => string
 ): { summary: string; detail?: string } => {
@@ -122,7 +122,14 @@ const formatEntry = (
       if (entry.status === 'error') {
         return {
           summary: t('acp.status.error'),
-          detail: entry.detail,
+          detail:
+            entry.detail ||
+            (entry.disconnectCode !== undefined || entry.disconnectSignal !== undefined
+              ? t('acp.logs.disconnectReason', {
+                  code: entry.disconnectCode ?? '-',
+                  signal: entry.disconnectSignal ?? '-',
+                })
+              : undefined),
         };
       }
 
@@ -151,7 +158,7 @@ const AcpLogsPanel: React.FC<{
   }
 
   const latestEntry = entries[0];
-  const latestSummary = formatEntry(latestEntry, t);
+  const latestSummary = formatAcpLogEntry(latestEntry, t);
   const tagColor =
     latestEntry.level === 'error'
       ? 'red'
@@ -192,7 +199,7 @@ const AcpLogsPanel: React.FC<{
           className='mt-10px flex flex-col gap-8px border-t border-[color:var(--color-border-2)] pt-8px'
         >
           {entries.map((entry) => {
-            const formattedEntry = formatEntry(entry, t);
+            const formattedEntry = formatAcpLogEntry(entry, t);
 
             return (
               <div key={entry.id} className='flex items-start gap-8px'>
