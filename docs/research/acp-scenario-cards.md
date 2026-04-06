@@ -1968,3 +1968,55 @@ Reviewer adjustment:
   - live warm-session hint 只能来自当前仍存活的 ACP task，不能把 stale persisted status 当成同一回事
   - terminal hydrated status 的既有 neutral/barrier 语义不能退化
   - 不能靠“简单改文案”掩盖 runtime ownership 仍然丢失的问题
+
+## SC-048 Warm Session Waiting Must Stay Active And Subtle
+
+- Goal:
+  - 把 `SC-047` 剩下的最后一层“假重连体感”继续收掉：
+    - warm session 已经被正确 hydrate 成 live `session_active`
+    - 但回来再发送下一轮时，等待态仍不能看起来像 fresh connect / reconnect
+  - 让 warm-session waiting 更接近 Zed 的克制感：
+    - active 会话就继续表现为 active
+    - 需要等待首包，也不应再重放一块“正在重新连接”的大提示
+- User action:
+  - 用户在一个 ACP 会话里完成一轮对话，确认 agent 已停止输出。
+  - 切到别的会话，再切回这个会话。
+  - 再发送下一条消息，观察：
+    - 右上角 runtime status dot
+    - 线程里的 waiting / warmup cue
+    - 输入框 placeholder 与整体体感
+- Current failure:
+  - `SC-047` 已经修复了 runtime continuity：
+    - streaming 会话切回时，status dot 能立即恢复 active
+    - finished-but-warm 会话回来再 send 时，不再真正掉回 cold-start runtime
+  - 但用户反馈表明，下一轮 send 仍有明显“又重连了一次”的感觉：
+    - status dot 会从绿点退回 waiting accent，视觉上像 active 丢了
+    - 线程底部还会重放一块大的 warmup banner
+    - 虽然文案已是 “waiting for the first response”，但整体体感仍太像 reconnect
+- Expected UI state:
+  - 对 warm session 的下一轮 send：
+    - 仍允许首包前等待
+    - status dot 应继续留在 active / success 语义，只表现“正在处理”而不是“重新连接”
+    - 可以保留轻量 busy 提示，但不应再重放重型 thread warmup banner
+  - 对真正 fresh connect / cold start：
+    - 保持当前更强的 waiting / connect cue
+    - 不因为这轮优化而被错误降级
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 提供可复用的 warm-session waiting selector
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - warm-session waiting 继续使用 active/success family，并保留 processing pulse
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - warm-session waiting 不再渲染重型 thread warmup indicator
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+- Exit criteria:
+  - finished-but-warm 会话回来再 send 时，status dot 不再从 active 语义掉成“重连色”
+  - warm-session waiting 不再重放 thread-level 大块 warmup banner
+  - sendbox 仍能维持轻量 processing affordance，不出现“像没在跑”的冷状态
+  - fresh connect / cold start waiting 合同不退化
+- Reviewer focus:
+  - 不能只靠把颜色改绿就掩盖 busy 语义；warm-session waiting 仍需让用户感知到“正在处理”
+  - suppress warmup banner 不能让 true cold-start waiting 丢失必要反馈
+  - selector 必须绑定明确的 warm-session 条件，不能把普通 waiting 一起误降级

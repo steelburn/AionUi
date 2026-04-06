@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import AcpLogsPanel from '@/renderer/pages/conversation/platforms/acp/AcpLogsPanel';
 import {
   isAcpRuntimeWaitingSnapshot,
+  isAcpRuntimeWarmSessionWaitingSnapshot,
   useAcpRuntimeDiagnostics,
   type AcpLogEntry,
   type AcpRuntimeActivityPhase,
@@ -95,6 +96,7 @@ const AcpRuntimeStatusButton: React.FC<{
   const diagnosticsOnly = shouldDemoteHydratedTerminalStatus(status, statusSource);
   const effectiveStatus = diagnosticsOnly ? null : status;
   const isWaiting = isAcpRuntimeWaitingSnapshot(runtimeDiagnostics);
+  const isWarmSessionWaiting = isAcpRuntimeWarmSessionWaitingSnapshot(runtimeDiagnostics);
   const statusLabel = getButtonLabel({
     activityPhase: isWaiting ? 'waiting' : activityPhase,
     diagnosticsOnly,
@@ -102,7 +104,11 @@ const AcpRuntimeStatusButton: React.FC<{
     agentName: displayName,
     t,
   });
-  const color = isWaiting ? 'rgb(var(--primary-6))' : getStatusColor(effectiveStatus);
+  const color = isWaiting
+    ? isWarmSessionWaiting
+      ? 'rgb(var(--success-6))'
+      : 'rgb(var(--primary-6))'
+    : getStatusColor(effectiveStatus);
 
   const panelEntries = React.useMemo<AcpLogEntry[]>(() => {
     if (logs.length > 0) {

@@ -1,7 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
-import { isAcpRuntimeWaitingSnapshot, useAcpRuntimeDiagnostics, type AcpRuntimeStatus } from './acpRuntimeDiagnostics';
+import {
+  isAcpRuntimeWaitingSnapshot,
+  isAcpRuntimeWarmSessionWaitingSnapshot,
+  useAcpRuntimeDiagnostics,
+  type AcpRuntimeStatus,
+} from './acpRuntimeDiagnostics';
 
 const shouldDescribeAwaitingFirstResponse = (status: AcpRuntimeStatus | null): boolean => {
   return status === 'connected' || status === 'authenticated' || status === 'session_active';
@@ -15,7 +20,10 @@ const AcpWarmupIndicator: React.FC<{
   const { t } = useTranslation();
   const runtimeDiagnostics = useAcpRuntimeDiagnostics(conversationId);
   const { hasThinkingMessage, status } = runtimeDiagnostics;
-  const showIndicator = isAcpRuntimeWaitingSnapshot(runtimeDiagnostics) && !hasThinkingMessage;
+  const showIndicator =
+    isAcpRuntimeWaitingSnapshot(runtimeDiagnostics) &&
+    !isAcpRuntimeWarmSessionWaitingSnapshot(runtimeDiagnostics) &&
+    !hasThinkingMessage;
 
   if (!showIndicator) {
     return null;

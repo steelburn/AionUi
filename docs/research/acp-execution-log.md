@@ -3028,3 +3028,88 @@
   - 如果体验通过，再继续评估：
     - 是否还需要把 fresh-send waiting 与 warm-session waiting 的视觉差异再收细一点
     - 或继续往更深层 runtime / queue ownership 推进
+
+### 2026-04-06 / Batch 45
+
+- 对应 SC:
+  - `SC-048`
+- Goal:
+  - 把 `SC-047` 剩下的一层 warm-session 假重连体感继续收掉。
+  - 让 finished-but-warm 会话回来再 send 时：
+    - status dot 继续保留 active 语义
+    - thread 不再重放一整块 reconnect-style warmup banner
+- Root cause:
+  - `SC-047` 已经修复了 runtime continuity：
+    - streaming 会话切回时 status dot 能立即恢复 active
+    - finished-but-warm 会话回来再 send 时也不再真正掉回 cold-start runtime
+  - 但 waiting UI 仍然把 warm session 和 fresh connect 混成一类：
+    - header dot 只要进入 waiting 就统一切到 generic waiting accent
+    - `AcpWarmupIndicator` 也会为 warm-session waiting 重放重型 `ThoughtDisplay`
+  - 结果是：
+    - 用户虽然不再真的“断开再连”
+    - 但视觉和动作语义仍像“又重新连接了一次”
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-048 Warm Session Waiting Must Stay Active And Subtle`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 新增 `isAcpRuntimeWarmSessionWaitingSnapshot()`
+    - 把 “hydrated + session_active + waiting” 这条 warm-session waiting 合同显式抽成 selector
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - warm-session waiting 时，header dot 改为继续使用 success/active color family
+    - 仍保留 pulse，表达“正在处理”，但不再像 reconnect
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - warm-session waiting 不再渲染重型 thread warmup indicator
+    - fresh connect / cold-start waiting 仍保留既有 banner
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 新增回归：hydrated warm-session waiting dot 维持绿色 pulse
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 更新回归：finished-but-warm 会话回来再 send 时
+      - 不再出现 `acp-warmup-indicator`
+      - sendbox 仍显示 `Processing`
+      - header dot 继续保持 success pulse
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-048` 固定：
+    - 不能只把颜色改绿而让 waiting 感知消失
+    - suppress warmup banner 不能影响 true cold-start waiting
+    - warm-session waiting 必须由明确 selector 驱动，不能误伤普通 waiting
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`52 passed`
+  - `bun run verify:acp`
+    - 首次 run 未通过
+    - 原因：
+      - hermetic E2E `interrupts the current turn with Send Now and starts exactly one queued ACP command`
+      - `command-queue-send-now` 在超时窗口内未出现
+    - 处理：
+      - 单独重跑该 e2e：`1 passed`
+      - 复跑整套 `bun run verify:acp`：通过
+    - 最终结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`434 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+    - 当前判断：
+      - 该失败更像 hermetic queue timing 波动，不构成 `SC-048` 功能回归
+  - `bun run test`
+    - 通过
+    - 结果：`3232 passed | 17 skipped (3249 tests)`
+- Product judgement:
+  - 这轮把 `SC-047` 之后还残留的“warm session 看起来像 reconnect”继续往下压了一刀。
+  - 用户现在切回 finished-but-warm 会话再 send 时：
+    - 右上角不会因为 waiting 而掉成“失去 active”的体感
+    - thread 也不会重放一整块 reconnect-style banner
+    - 同时 sendbox 仍保留 `Processing`，不会冷到像没在跑
+  - 和 Zed 的用户感知差距继续缩小，但还没收到底。
+- Open risks:
+  - `queue / busy` 的最终真相源仍未完全收回主进程 runtime ownership；这轮只是把 warm-session waiting 的前台语义进一步校正。
+  - 当前仍没有 Zed 那种更完整的 thread-level generating row / elapsed meta；waiting/streaming 虽已稳定，但整体生成观感还可继续打磨。
+  - diagnostics 已被压到二级入口，但仍比 Zed 稍显存在感。
+- Next:
+  - 先请用户体验：
+    - finished-but-warm 会话切走再切回后发送下一条
+    - 确认 status dot 继续保持 active 语义，且 thread 不再出现 reconnect-style warmup banner
+  - 按本轮与 Zed 的差距复盘，下一优先级建议：
+    - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
+    - 第二优先：评估是否补更完整的 thread-level generating affordance，而不是只靠 sendbox placeholder + dot

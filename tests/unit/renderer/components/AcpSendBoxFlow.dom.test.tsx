@@ -860,14 +860,12 @@ describe('AcpSendBox live ACP flow', () => {
       });
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
-        'Waiting for the first response from Claude...'
-      );
-    });
-
-    expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting to Claude...');
+    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--success-6))',
+    });
   });
 
   it('switches the sendbox placeholder to processing while ACP is busy', async () => {

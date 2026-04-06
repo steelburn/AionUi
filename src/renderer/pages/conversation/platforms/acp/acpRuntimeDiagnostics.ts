@@ -77,6 +77,11 @@ export const isAcpRuntimeWaitingSnapshot = (
   snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
 ): boolean => snapshot.activityPhase === 'waiting' || snapshot.uiWarmupPending === true;
 
+export const isAcpRuntimeWarmSessionWaitingSnapshot = (
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending' | 'status' | 'statusSource'>
+): boolean =>
+  isAcpRuntimeWaitingSnapshot(snapshot) && snapshot.status === 'session_active' && snapshot.statusSource === 'hydrated';
+
 export const isAcpRuntimeBusySnapshot = (
   snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
 ): boolean => snapshot.activityPhase !== 'idle' || snapshot.uiWarmupPending === true;

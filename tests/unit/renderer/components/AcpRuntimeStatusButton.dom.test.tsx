@@ -190,4 +190,22 @@ describe('AcpRuntimeStatusButton', () => {
       backgroundColor: 'rgb(var(--primary-6))',
     });
   });
+
+  it('keeps a hydrated warm-session waiting dot green while the next ACP turn is pending', () => {
+    publishAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID, {
+      status: 'session_active',
+      statusSource: 'hydrated',
+      statusRevision: 7,
+      activityPhase: 'waiting',
+      logs: [],
+    });
+
+    render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
+
+    expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--success-6))',
+    });
+  });
 });
