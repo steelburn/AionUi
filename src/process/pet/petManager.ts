@@ -4,14 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { BrowserWindow } from 'electron';
+import path from 'node:path';
+import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
 import { PetStateMachine } from './petStateMachine';
 import { PetIdleTicker } from './petIdleTicker';
 import { PetEventBridge } from './petEventBridge';
 import { setPetNotifyHook } from '../../common/adapter/main';
-import { createPetWindows, loadPetContent, destroyPetWindows } from './petWindowFactory';
-import { registerPetIpcHandlers, unregisterPetIpcHandlers, clearDragTimer } from './petIpcHandlers';
 import type { PetSize, PetState } from './petTypes';
+
+const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
+const RENDERER_DIR = path.join(__dirname, '..', 'renderer', 'pet');
 
 let petWindow: BrowserWindow | null = null;
 let petHitWindow: BrowserWindow | null = null;
@@ -19,9 +21,12 @@ let stateMachine: PetStateMachine | null = null;
 let idleTicker: PetIdleTicker | null = null;
 let eventBridge: PetEventBridge | null = null;
 let currentSize: PetSize = 280;
+let dragTimer: ReturnType<typeof setInterval> | null = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 /**
- * Create pet windows (rendering window + hit detection window)
+ * Create pet windows (rendering window + hit detection window).
  */
 export function createPetWindow(): void {
   if (petWindow && !petWindow.isDestroyed()) {
@@ -30,59 +35,100 @@ export function createPetWindow(): void {
     return;
   }
 
-  const windows = createPetWindows(currentSize);
-  petWindow = windows.petWindow;
-  petHitWindow = windows.petHitWindow;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const margin = 20;
+  const x = screenWidth - currentSize - margin;
+  const y = screenHeight - currentSize - margin;
+
+  // Rendering window (transparent, always on top, ignores mouse events)
+  petWindow = new BrowserWindow({
+    width: currentSize,
+    height: currentSize,
+    x,
+    y,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'petPreload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (process.platform === 'darwin') {
+    petWindow.setAlwaysOnTop(true, 'screen-saver');
+  } else {
+    petWindow.setAlwaysOnTop(true, 'pop-up-menu');
+  }
+
+  petWindow.setIgnoreMouseEvents(true);
+
+  // Hit detection window (body area only, 60% of pet size)
+  const hitSize = Math.round(currentSize * 0.6);
+  const hitOffset = Math.round(currentSize * 0.2);
+
+  petHitWindow = new BrowserWindow({
+    width: hitSize,
+    height: hitSize,
+    x: x + hitOffset,
+    y: y + hitOffset,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(PRELOAD_DIR, 'petHitPreload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  if (process.platform === 'darwin') {
+    petHitWindow.setAlwaysOnTop(true, 'screen-saver');
+  } else {
+    petHitWindow.setAlwaysOnTop(true, 'pop-up-menu');
+  }
+
+  petHitWindow.setIgnoreMouseEvents(false);
 
   // Initialize state machine, idle ticker, and event bridge
   stateMachine = new PetStateMachine();
   idleTicker = new PetIdleTicker(stateMachine);
   eventBridge = new PetEventBridge(stateMachine, idleTicker);
 
-  // Register state change callback → send to renderer via IPC
   stateMachine.onStateChange((state: PetState) => {
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send('pet:state-changed', state);
     }
   });
 
-  // Register eye move callback
   idleTicker.onEyeMove((data) => {
     if (petWindow && !petWindow.isDestroyed()) {
       petWindow.webContents.send('pet:eye-move', data);
     }
   });
 
-  // Set pet bounds for idle ticker
-  idleTicker.setPetBounds(windows.initialX, windows.initialY, currentSize, currentSize);
+  idleTicker.setPetBounds(x, y, currentSize, currentSize);
 
-  // Set pet notify hook for bridge events
   setPetNotifyHook((name: string, data: unknown) => {
     if (eventBridge) {
       eventBridge.handleBridgeMessage(name, data);
     }
   });
 
-  // Start idle ticker
   idleTicker.start();
+  registerIpcHandlers();
+  loadContent();
 
-  // Register IPC handlers
-  registerPetIpcHandlers({
-    getPetWindow: () => petWindow,
-    getPetHitWindow: () => petHitWindow,
-    getStateMachine: () => stateMachine,
-    getIdleTicker: () => idleTicker,
-    getCurrentSize: () => currentSize,
-    setCurrentSize: (size) => {
-      currentSize = size;
-    },
-    hidePetWindow: () => hidePetWindow(),
-  });
-
-  // Load renderer HTML
-  loadPetContent(petWindow, petHitWindow);
-
-  // Clean up on window close
   petWindow.on('closed', () => {
     destroyPetWindow();
   });
@@ -91,7 +137,7 @@ export function createPetWindow(): void {
 }
 
 /**
- * Destroy pet windows and clean up resources
+ * Destroy pet windows and clean up resources.
  */
 export function destroyPetWindow(): void {
   clearDragTimer();
@@ -112,42 +158,212 @@ export function destroyPetWindow(): void {
   }
 
   setPetNotifyHook(null);
-  unregisterPetIpcHandlers();
-  destroyPetWindows(petWindow, petHitWindow);
+  unregisterIpcHandlers();
 
+  if (petHitWindow && !petHitWindow.isDestroyed()) {
+    petHitWindow.destroy();
+  }
   petHitWindow = null;
+
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.destroy();
+  }
   petWindow = null;
 
   console.log('[Pet] Pet windows destroyed');
 }
 
-/**
- * Show pet windows
- */
 export function showPetWindow(): void {
-  if (petWindow && !petWindow.isDestroyed()) {
-    petWindow.show();
-  }
-  if (petHitWindow && !petHitWindow.isDestroyed()) {
-    petHitWindow.show();
-  }
+  if (petWindow && !petWindow.isDestroyed()) petWindow.show();
+  if (petHitWindow && !petHitWindow.isDestroyed()) petHitWindow.show();
 }
 
-/**
- * Hide pet windows
- */
 export function hidePetWindow(): void {
-  if (petWindow && !petWindow.isDestroyed()) {
-    petWindow.hide();
-  }
-  if (petHitWindow && !petHitWindow.isDestroyed()) {
-    petHitWindow.hide();
-  }
+  if (petWindow && !petWindow.isDestroyed()) petWindow.hide();
+  if (petHitWindow && !petHitWindow.isDestroyed()) petHitWindow.hide();
 }
 
-/**
- * Get event bridge instance for external calls
- */
 export function getEventBridge(): PetEventBridge | null {
   return eventBridge;
+}
+
+// ---------------------------------------------------------------------------
+// Window content loading
+// ---------------------------------------------------------------------------
+
+function loadContent(): void {
+  if (!petWindow || !petHitWindow) return;
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
+
+  if (!app.isPackaged && rendererUrl) {
+    petWindow.loadURL(`${rendererUrl}/pet/pet.html`).catch((error) => {
+      console.error('[Pet] loadURL failed for pet window:', error);
+    });
+    petHitWindow.loadURL(`${rendererUrl}/pet/pet-hit.html`).catch((error) => {
+      console.error('[Pet] loadURL failed for pet-hit window:', error);
+    });
+  } else {
+    petWindow.loadFile(path.join(RENDERER_DIR, 'pet.html')).catch((error) => {
+      console.error('[Pet] loadFile failed for pet window:', error);
+    });
+    petHitWindow.loadFile(path.join(RENDERER_DIR, 'pet-hit.html')).catch((error) => {
+      console.error('[Pet] loadFile failed for pet-hit window:', error);
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// IPC handlers
+// ---------------------------------------------------------------------------
+
+function registerIpcHandlers(): void {
+  ipcMain.on('pet:drag-start', () => {
+    if (!petWindow || petWindow.isDestroyed() || !petHitWindow || petHitWindow.isDestroyed()) return;
+
+    const cursor = screen.getCursorScreenPoint();
+    const windowPos = petWindow.getPosition();
+    dragOffsetX = cursor.x - windowPos[0];
+    dragOffsetY = cursor.y - windowPos[1];
+
+    stateMachine?.forceState('dragging');
+
+    dragTimer = setInterval(() => {
+      if (!petWindow || petWindow.isDestroyed() || !petHitWindow || petHitWindow.isDestroyed()) {
+        clearDragTimer();
+        return;
+      }
+
+      const cursor = screen.getCursorScreenPoint();
+      const newX = cursor.x - dragOffsetX;
+      const newY = cursor.y - dragOffsetY;
+
+      petWindow.setPosition(newX, newY, false);
+
+      const hitOffset = Math.round(currentSize * 0.2);
+      petHitWindow.setPosition(newX + hitOffset, newY + hitOffset, false);
+
+      idleTicker?.setPetBounds(newX, newY, currentSize, currentSize);
+    }, 16);
+  });
+
+  ipcMain.on('pet:drag-end', () => {
+    clearDragTimer();
+    stateMachine?.forceState('idle');
+    idleTicker?.resetIdle();
+  });
+
+  ipcMain.on('pet:click', (_event, data: { side: string; count: number }) => {
+    if (!stateMachine || !idleTicker) return;
+
+    idleTicker.resetIdle();
+
+    if (data.count >= 3) {
+      stateMachine.requestState('error');
+    } else if (data.count === 2) {
+      stateMachine.requestState(data.side === 'left' ? 'poke-left' : 'poke-right');
+    } else if (data.count === 1) {
+      stateMachine.requestState('attention');
+    }
+  });
+
+  ipcMain.on('pet:context-menu', () => {
+    if (!petHitWindow || petHitWindow.isDestroyed()) return;
+
+    const menu = Menu.buildFromTemplate([
+      {
+        label: 'Pat',
+        click: () => {
+          if (stateMachine && idleTicker) {
+            idleTicker.resetIdle();
+            stateMachine.requestState('happy');
+          }
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Size',
+        submenu: ([200, 280, 360] as PetSize[]).map((size) => ({
+          label: `${size === 200 ? 'Small' : size === 280 ? 'Medium' : 'Large'} (${size}px)`,
+          type: 'radio' as const,
+          checked: currentSize === size,
+          click: () => resizePet(size),
+        })),
+      },
+      { type: 'separator' },
+      {
+        label: 'Do Not Disturb',
+        type: 'checkbox',
+        checked: stateMachine?.getDnd() ?? false,
+        click: (menuItem) => {
+          stateMachine?.setDnd(menuItem.checked);
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Reset Position',
+        click: () => resetPosition(),
+      },
+      {
+        label: 'Hide',
+        click: () => hidePetWindow(),
+      },
+    ]);
+
+    menu.popup({ window: petHitWindow });
+  });
+}
+
+function unregisterIpcHandlers(): void {
+  ipcMain.removeAllListeners('pet:drag-start');
+  ipcMain.removeAllListeners('pet:drag-end');
+  ipcMain.removeAllListeners('pet:click');
+  ipcMain.removeAllListeners('pet:context-menu');
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function clearDragTimer(): void {
+  if (dragTimer) {
+    clearInterval(dragTimer);
+    dragTimer = null;
+  }
+}
+
+function resizePet(size: PetSize): void {
+  if (!petWindow || petWindow.isDestroyed() || !petHitWindow || petHitWindow.isDestroyed()) return;
+
+  currentSize = size;
+  const [x, y] = petWindow.getPosition();
+
+  petWindow.setSize(size, size, false);
+
+  const hitSize = Math.round(size * 0.6);
+  const hitOffset = Math.round(size * 0.2);
+  petHitWindow.setSize(hitSize, hitSize, false);
+  petHitWindow.setPosition(x + hitOffset, y + hitOffset, false);
+
+  idleTicker?.setPetBounds(x, y, size, size);
+
+  if (!petWindow.isDestroyed()) {
+    petWindow.webContents.send('pet:resize', size);
+  }
+}
+
+function resetPosition(): void {
+  if (!petWindow || petWindow.isDestroyed() || !petHitWindow || petHitWindow.isDestroyed()) return;
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
+  const margin = 20;
+  const x = screenWidth - currentSize - margin;
+  const y = screenHeight - currentSize - margin;
+
+  petWindow.setPosition(x, y, false);
+
+  const hitOffset = Math.round(currentSize * 0.2);
+  petHitWindow.setPosition(x + hitOffset, y + hitOffset, false);
+
+  idleTicker?.setPetBounds(x, y, currentSize, currentSize);
 }
