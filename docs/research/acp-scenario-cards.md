@@ -1503,3 +1503,41 @@ Reviewer adjustment:
   - dismiss 不能把后续新的 live error 一起吞掉。
   - copy 文案不能和 diagnostics formatter 分叉。
   - 不能重新把历史 hydrate error 升格成 thread banner。
+
+## SC-038 ACP Generic Error Retry Must Replay The Last Attempted Command
+
+- Goal:
+  - 让 ACP generic error callout 再向 Zed 靠一步：
+    - 用户可以直接从 callout 重试这一次失败的命令
+  - 但 scope 只限于“重放上一次尝试的命令”，不在这一刀里引入更深的 session-aware regenerate 语义。
+- User action:
+  - live `send_failed / request_error / status:error` 出现在当前线程
+  - 用户点击 generic error callout 里的 `Retry`
+- Current failure:
+  - `SC-037` 已经补了 `Copy / Close`，但当用户想“再试一次”时，仍只能手动重新输入或重发。
+  - Zed 的 generic error callout 已经提供 `Retry Generation`，AionUi 还差这一步。
+- Expected UI state:
+  - live generic error callout：
+    - 展示 `Retry`
+    - 点击后直接重放当前这次失败的命令
+  - retry 行为：
+    - 重发的是上一次尝试的 `input / files`
+    - 不是当前 draft 里的内容
+    - 不会把历史 hydrate error 或 auth/disconnected 恢复 CTA 混进来
+- Automation plan:
+  - `AcpSendBox`
+    - 记录最近一次 `executeCommand(...)` 的 `input / files`
+    - generic error callout 点击 `Retry` 时，直接重放该命令
+  - `AcpErrorBanner`
+    - 增加 `Retry` action
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - 失败后点击 `Retry`
+    - 断言第二次 `sendMessage.invoke(...)` 使用同一份原始命令参数
+- Exit criteria:
+  - generic error callout 不再只支持 copy / close，也支持直接重试。
+  - retry 重放的是失败的那条命令，而不是当前草稿。
+  - auth/disconnected 的更高优先级 CTA 不受影响。
+- Reviewer focus:
+  - 不能把 retry 接到“当前草稿内容”；必须重放上一次失败命令。
+  - 不能让 retry 状态在 conversation 间串线。
+  - 不能让历史 hydrate error 获得错误的 retry CTA。

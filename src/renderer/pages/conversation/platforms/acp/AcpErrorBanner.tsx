@@ -9,10 +9,12 @@ const { Text } = Typography;
 
 type AcpErrorBannerProps = {
   entry: AcpLogEntry;
+  retrying?: boolean;
+  onRetry?: () => void;
   onDismiss: () => void;
 };
 
-const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry, onDismiss }) => {
+const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry, retrying = false, onRetry, onDismiss }) => {
   const { t } = useTranslation();
   const formattedEntry = formatAcpLogEntry(entry, t);
   const copyPayload = formattedEntry.detail
@@ -39,6 +41,17 @@ const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry, onDismiss }) => 
         <Space direction='vertical' size='small' style={{ width: '100%' }}>
           {formattedEntry.detail ? <Text>{formattedEntry.detail}</Text> : null}
           <Space>
+            {onRetry ? (
+              <Button
+                type='primary'
+                size='mini'
+                loading={retrying}
+                data-testid='acp-error-banner-retry'
+                onClick={onRetry}
+              >
+                {t('common.retry')}
+              </Button>
+            ) : null}
             <Button type='secondary' size='mini' data-testid='acp-error-banner-copy' onClick={handleCopy}>
               {t('common.copy')}
             </Button>

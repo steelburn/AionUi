@@ -2303,3 +2303,52 @@
 - Next:
   - 跑完全量 ACP 门禁并推远端
   - 再决定 generic error callout 是否值得进入 request-level retry
+
+### 2026-04-06 / Batch 35
+
+- 对应 SC:
+  - `SC-038`
+- Goal:
+  - 把 ACP generic error callout 的能力从 `Copy / Close` 再推进到 `Retry`，让 live failure 发生后，用户可以直接重放这一次失败的命令。
+- Root cause:
+  - `SC-037` 已经让用户不必再手抄错误，但“一键再试一次”仍然缺位。
+  - 如果要贴近 Zed 的 `Retry Generation`，第一步不该是做复杂 regenerate，而是先稳稳地重放上一次失败的 `input / files`。
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/AcpErrorBanner.tsx`
+    - 增加 `Retry`
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - 记录最近一次 `executeCommand(...)` 的 `input / files`
+    - generic error callout 点击 `Retry` 时，直接重放该命令
+    - conversation 切换时重置 retrying state 与最近命令缓存
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增合同：
+      - generic error callout 点击 `Retry`
+      - 第二次 `sendMessage.invoke(...)` 使用同一份失败命令参数
+- Reviewer:
+  - reviewer：`Hooke`
+  - 这轮 review 请求已发出，但在时限内未返回
+  - 按 workflow 记录为 `green automation + driver self-review fallback`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`40 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test:acp:unit`
+    - 结果：`415 passed | 1 skipped`
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`415 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - 到这一步，AionUi 的 generic error callout 已经不再只是“展示错误”：
+    - 可以重试
+    - 可以复制
+    - 可以关闭
+  - 虽然这还不是更深层的 session-aware regenerate，但对普通用户来说，已经非常接近 Zed 那种“坏了以后可以立刻处理”的感知。
+- Next:
+  - 跑完全量 ACP 门禁并推远端
+  - 再回到 send-time waiting affordance / diagnostics 入口这些剩余产品化差距

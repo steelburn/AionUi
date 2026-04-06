@@ -1120,6 +1120,48 @@ describe('AcpSendBox live ACP flow', () => {
     }
   });
 
+  it('retries the last failed ACP command directly from the generic error banner', async () => {
+    mockConversationGetInvoke.mockResolvedValueOnce({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    mockAcpSendInvoke
+      .mockRejectedValueOnce(new Error('Fake send failure before request trace'))
+      .mockResolvedValueOnce({ success: true });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'custom',
+      agentName: 'Fake ACP Agent',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('acp-error-banner-retry'));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenNthCalledWith(2, {
+        input: 'Hermetic request trace fallback',
+        msg_id: expect.any(String),
+        conversation_id: CONVERSATION_ID,
+        files: [],
+      });
+    });
+
+    expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+  });
+
   it('keeps a dismissed live generic ACP error banner hidden until a newer error arrives', async () => {
     const dateNowSpy = vi.spyOn(Date, 'now');
 

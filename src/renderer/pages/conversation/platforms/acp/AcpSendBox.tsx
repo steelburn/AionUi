@@ -258,6 +258,7 @@ const AcpSendBox: React.FC<{
   const { t } = useTranslation();
   const teamPermission = useTeamPermission();
   const mountedRef = React.useRef(true);
+  const lastExecutedCommandRef = React.useRef<Pick<ConversationCommandQueueItem, 'input' | 'files'> | null>(null);
   // In team mode, only the lead agent shows the permission mode selector
   const showModeSelector = !teamPermission || conversation_id === teamPermission.leadConversationId;
   const { checkAndUpdateTitle } = useAutoTitle();
@@ -297,6 +298,7 @@ const AcpSendBox: React.FC<{
   const actionableErrorLog = isActionableAcpErrorLog(acpLogs[0]) ? acpLogs[0] : null;
   const [acknowledgedQueueErrorLogId, setAcknowledgedQueueErrorLogId] = useState<string | null>(null);
   const [dismissedErrorLogId, setDismissedErrorLogId] = useState<string | null>(null);
+  const [retryGenerationPending, setRetryGenerationPending] = useState(false);
   const isAuthActionActive = authenticatingRevision !== null || pendingAuthReadyRevision !== null;
   const isRetryActionActive = retryingDisconnectedRevision !== null || pendingRetryReadyRevision !== null;
   const hasHydratedTerminalStatus = acpStatusSource === 'hydrated' && isTerminalAcpStatus(acpStatus);
@@ -472,6 +474,10 @@ const AcpSendBox: React.FC<{
   const executeCommand = useCallback(
     async ({ input, files }: Pick<ConversationCommandQueueItem, 'input' | 'files'>) => {
       const msg_id = uuid();
+      lastExecutedCommandRef.current = {
+        input,
+        files: [...files],
+      };
 
       setAiProcessing(true);
       if (!teamId) {
@@ -616,6 +622,8 @@ Please check your local CLI tool authentication status`,
 
   useEffect(() => {
     setDismissedErrorLogId(null);
+    setRetryGenerationPending(false);
+    lastExecutedCommandRef.current = null;
   }, [conversation_id]);
 
   useEffect(() => {
@@ -657,6 +665,7 @@ Please check your local CLI tool authentication status`,
     !shouldShowDisconnectedBanner &&
     actionableErrorLog !== null &&
     actionableErrorLog.id !== dismissedErrorLogId;
+  const canRetryErrorBanner = shouldShowErrorBanner && lastExecutedCommandRef.current !== null;
 
   const onSendHandler = async (message: string) => {
     const atPathFiles = atPath.map((item) => (typeof item === 'string' ? item : item.path));
@@ -715,6 +724,31 @@ Please check your local CLI tool authentication status`,
     },
     [agentName, appendAcpUiLog, backend, conversation_id, resetActiveExecution, resetState]
   );
+
+  const handleRetryGeneration = useCallback(async (): Promise<void> => {
+    if (retryGenerationPending) {
+      return;
+    }
+
+    const command = lastExecutedCommandRef.current;
+    if (!command) {
+      return;
+    }
+
+    setRetryGenerationPending(true);
+    setDismissedErrorLogId(null);
+
+    try {
+      await executeCommand({
+        input: command.input,
+        files: [...command.files],
+      });
+    } catch {
+      // executeCommand already emits ACP diagnostics / UI errors for retry failures
+    } finally {
+      setRetryGenerationPending(false);
+    }
+  }, [executeCommand, retryGenerationPending]);
 
   useEffect(() => {
     if (pendingAuthReadyRevision === null) {
@@ -1034,6 +1068,14 @@ Please check your local CLI tool authentication status`,
       {shouldShowErrorBanner && (
         <AcpErrorBanner
           entry={actionableErrorLog}
+          retrying={retryGenerationPending}
+          onRetry={
+            canRetryErrorBanner
+              ? () => {
+                  void handleRetryGeneration();
+                }
+              : undefined
+          }
           onDismiss={() => {
             setDismissedErrorLogId(actionableErrorLog.id);
           }}

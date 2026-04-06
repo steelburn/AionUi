@@ -681,7 +681,7 @@ Zed 领先点已经比较稳定，可归纳为：
 
 - live `send_failed / request_error / status:error`
 - 对应的 thread-level generic error callout
-- callout 内的 `Copy / Close`
+- callout 内的 `Retry / Copy / Close`
 
 但以下情况默认不会升格成这块 generic error callout：
 
@@ -807,7 +807,6 @@ Zed 领先点已经比较稳定，可归纳为：
 
 当前仍需继续优化的用户面问题：
 
-- generic error callout 已有 `Copy / Close`，但还没有 Zed 那种更完整的 `Retry Generation` 语义
 - 流式 reveal 已有最小版收口，但 cadence 仍可继续微调
 - diagnostics 入口虽然已经二级化，但仍比 Zed 更直接暴露在主线程 header 中
 
@@ -892,13 +891,11 @@ Zed 也有 ACP logs，但它是：
 当前剩余的主要差距更偏产品化：
 
 - AionUi 已将 `ACP logs` 收到二级入口，但 diagnostics status dot 仍比 Zed 更直接暴露在主线程 header 中
-- AionUi 的 live generic failure 已经进主线程 callout，也已有 `Copy / Close`，但仍缺少 Zed 更完整的 `Retry Generation`
 - AionUi 的 send-time waiting affordance 已上移到线程底部，但仍没有 Zed 那种更完整的 thread-level generating row / elapsed meta
 - AionUi 的 streaming reveal 已有最小版，但离 Zed 更细腻的观感调优仍有空间
 
 因此后续优先级应继续是：
 
-1. 评估 generic error callout 是否值得进入 request-level `Retry Generation`
-2. 再决定是否需要引入更明确的 thread-level generating affordance
-3. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
-4. 再决定是否进入更大的连接拓扑 / runtime 托管阶段
+1. 再决定是否需要引入更明确的 thread-level generating affordance
+2. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
+3. 再决定是否进入更大的连接拓扑 / runtime 托管阶段
