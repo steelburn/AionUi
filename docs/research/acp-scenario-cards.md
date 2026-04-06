@@ -1456,3 +1456,50 @@ Reviewer adjustment:
   - live error 的 pause 不能只靠 effect 顺序赌 timing，必须有真正的 gate。
   - pending recovery 时 fresh send 必须走 enqueue，而不是直接 `executeCommand()`。
   - error acknowledgement 不能跨 conversation 泄漏。
+
+## SC-037 ACP Generic Error Callout Needs Copy / Close Without Regressing Error Priority
+
+- Goal:
+  - 让 ACP 的 generic error callout 更接近 Zed 的基础可操作性：
+    - 用户可以直接复制错误信息
+    - 用户可以关闭当前这条错误提示
+  - 同时保持现有优先级不被打坏：
+    - `Authenticate / Retry` 仍高于 generic error
+    - 历史 hydrate error 仍只留在 diagnostics
+- User action:
+  - 当前 turn 发生 live `send_failed / request_error / status:error`
+  - 用户看到 thread-level generic error callout
+  - 用户想复制错误详情发给同事，或暂时关闭当前 callout 继续看线程
+- Current failure:
+  - `SC-035` 已经把 generic failure 拉回主线程，但 callout 还只是“能看见”，没有 Zed 那种基础可操作性。
+  - 如果直接加 `Retry Generation`，会立刻把 scope 拉大到 request 恢复语义，不适合这一刀。
+- Expected UI state:
+  - live generic error callout：
+    - 展示 `Copy`
+    - 展示 `Close`
+  - `Copy`：
+    - 复制当前 callout 的 summary + detail
+    - 成功 / 失败都有 toast
+  - `Close`：
+    - 只隐藏当前这条 live generic error
+    - 同一条错误不应立刻反弹
+    - 下一条新的 live error 仍应重新出现
+- Automation plan:
+  - `AcpErrorBanner`
+    - 复用现有 diagnostics formatter 生成复制内容
+    - 增加 `Copy / Close` 操作
+  - `AcpSendBox`
+    - 增加当前 live generic error 的 dismiss state
+    - 新 error 到来时自动重置 dismiss
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - copy 成功
+    - dismiss 后当前错误隐藏
+    - 更新的 error 到来后重新出现
+- Exit criteria:
+  - generic error callout 不再只是“展示错误”，而是具备基础处置能力。
+  - 不新增历史 error 污染线程的问题。
+  - 不打坏 auth / disconnected 的更高优先级 CTA。
+- Reviewer focus:
+  - dismiss 不能把后续新的 live error 一起吞掉。
+  - copy 文案不能和 diagnostics formatter 分叉。
+  - 不能重新把历史 hydrate error 升格成 thread banner。

@@ -27,6 +27,8 @@ const mockSetSendBoxHandler = vi.fn();
 const mockClearFiles = vi.fn();
 const mockQueueResetActiveExecution = vi.fn();
 const mockArcoError = vi.fn();
+const mockArcoSuccess = vi.fn();
+const mockCopyText = vi.fn();
 let mockMessageList: unknown[] = [];
 
 const emitAcpResponse = (message: unknown) => {
@@ -335,6 +337,10 @@ vi.mock('@/renderer/utils/file/fileSelection', () => ({
   mergeFileSelectionItems: vi.fn((current: unknown) => current),
 }));
 
+vi.mock('@/renderer/utils/ui/clipboard', () => ({
+  copyText: (...args: unknown[]) => mockCopyText(...args),
+}));
+
 vi.mock('@arco-design/web-react', () => ({
   Alert: ({
     title,
@@ -354,7 +360,7 @@ vi.mock('@arco-design/web-react', () => ({
   Message: {
     error: (...args: unknown[]) => mockArcoError(...args),
     warning: vi.fn(),
-    success: vi.fn(),
+    success: (...args: unknown[]) => mockArcoSuccess(...args),
   },
   Popover: ({
     children,
@@ -423,6 +429,14 @@ vi.mock('react-i18next', () => ({
           return 'Show';
         case 'common.hide':
           return 'Hide';
+        case 'common.copy':
+          return 'Copy';
+        case 'common.copySuccess':
+          return 'Copied';
+        case 'common.copyFailed':
+          return 'Copy failed';
+        case 'common.close':
+          return 'Close';
         case 'acp.connection.disconnectedHint':
           return 'The ACP runtime stopped unexpectedly. Retry the connection now, or send another message to start a fresh session.';
         case 'acp.auth.requiredHint':
@@ -474,6 +488,7 @@ describe('AcpSendBox live ACP flow', () => {
     mockAcpSendInvoke.mockResolvedValue({ success: true });
     mockAcpAuthenticateInvoke.mockResolvedValue({ success: true });
     mockDatabaseMessagesInvoke.mockResolvedValue([]);
+    mockCopyText.mockResolvedValue(undefined);
   });
 
   it('suppresses late content after stop in the live send box flow', async () => {
@@ -1028,6 +1043,180 @@ describe('AcpSendBox live ACP flow', () => {
       await waitFor(() => {
         expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
       });
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('lets the user copy and dismiss a live generic ACP error banner', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      mockConversationGetInvoke.mockResolvedValueOnce({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+
+      dateNowSpy.mockReturnValue(1000);
+      renderAcpSendBoxWithDiagnostics({
+        conversation_id: CONVERSATION_ID,
+        backend: 'custom',
+        agentName: 'Fake ACP Agent',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-copy-dismiss-request-error',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1000,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(1300);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'copy-dismiss-request-error',
+          data: 'socket reset by peer',
+        });
+      });
+
+      const errorBanner = screen.getByTestId('acp-error-banner');
+      expect(errorBanner).toHaveTextContent('Fake ACP Agent -> fake-model failed in 300ms');
+      expect(errorBanner).toHaveTextContent('socket reset by peer');
+
+      fireEvent.click(screen.getByTestId('acp-error-banner-copy'));
+
+      await waitFor(() => {
+        expect(mockCopyText).toHaveBeenCalledWith(
+          'Fake ACP Agent -> fake-model failed in 300ms\n\nsocket reset by peer'
+        );
+      });
+      expect(mockArcoSuccess).toHaveBeenCalledWith('Copied');
+
+      fireEvent.click(screen.getByTestId('acp-error-banner-dismiss'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+      });
+
+      await openAcpDiagnostics();
+      fireEvent.click(screen.getByTestId('acp-logs-toggle'));
+      expect(screen.getByTestId('acp-logs-list')).toHaveTextContent('socket reset by peer');
+    } finally {
+      dateNowSpy.mockRestore();
+    }
+  });
+
+  it('keeps a dismissed live generic ACP error banner hidden until a newer error arrives', async () => {
+    const dateNowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      mockConversationGetInvoke.mockResolvedValueOnce({
+        id: CONVERSATION_ID,
+        type: 'acp',
+        status: 'finished',
+        extra: {},
+      });
+
+      dateNowSpy.mockReturnValue(1000);
+      renderAcpSendBoxWithDiagnostics({
+        conversation_id: CONVERSATION_ID,
+        backend: 'custom',
+        agentName: 'Fake ACP Agent',
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      });
+
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-dismissed-request-error',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1000,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(1300);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'dismissed-request-error',
+          data: 'socket reset by peer',
+        });
+      });
+
+      fireEvent.click(screen.getByTestId('acp-error-banner-dismiss'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+      });
+
+      dateNowSpy.mockReturnValue(1600);
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-after-dismiss',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1600,
+          },
+        });
+      });
+
+      expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+
+      dateNowSpy.mockReturnValue(1900);
+      act(() => {
+        emitAcpResponse({
+          type: 'request_trace',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'trace-new-request-error-after-dismiss',
+          data: {
+            backend: 'custom',
+            modelId: 'fake-model',
+            timestamp: 1900,
+          },
+        });
+      });
+
+      dateNowSpy.mockReturnValue(2250);
+      act(() => {
+        emitAcpResponse({
+          type: 'error',
+          conversation_id: CONVERSATION_ID,
+          msg_id: 'new-request-error-after-dismiss',
+          data: 'another socket reset by peer',
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('Fake ACP Agent -> fake-model failed in 350ms');
+      expect(screen.getByTestId('acp-error-banner')).toHaveTextContent('another socket reset by peer');
     } finally {
       dateNowSpy.mockRestore();
     }

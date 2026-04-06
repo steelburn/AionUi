@@ -1,4 +1,5 @@
-import { Alert, Typography } from '@arco-design/web-react';
+import { copyText } from '@/renderer/utils/ui/clipboard';
+import { Alert, Button, Message, Space, Typography } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatAcpLogEntry } from './AcpLogsPanel';
@@ -8,11 +9,25 @@ const { Text } = Typography;
 
 type AcpErrorBannerProps = {
   entry: AcpLogEntry;
+  onDismiss: () => void;
 };
 
-const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry }) => {
+const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry, onDismiss }) => {
   const { t } = useTranslation();
   const formattedEntry = formatAcpLogEntry(entry, t);
+  const copyPayload = formattedEntry.detail
+    ? `${formattedEntry.summary}\n\n${formattedEntry.detail}`
+    : formattedEntry.summary;
+
+  const handleCopy = React.useCallback(() => {
+    void copyText(copyPayload)
+      .then(() => {
+        Message.success(t('common.copySuccess'));
+      })
+      .catch(() => {
+        Message.error(t('common.copyFailed'));
+      });
+  }, [copyPayload, t]);
 
   return (
     <Alert
@@ -20,7 +35,19 @@ const AcpErrorBanner: React.FC<AcpErrorBannerProps> = ({ entry }) => {
       closable={false}
       data-testid='acp-error-banner'
       title={formattedEntry.summary}
-      content={formattedEntry.detail ? <Text>{formattedEntry.detail}</Text> : undefined}
+      content={
+        <Space direction='vertical' size='small' style={{ width: '100%' }}>
+          {formattedEntry.detail ? <Text>{formattedEntry.detail}</Text> : null}
+          <Space>
+            <Button type='secondary' size='mini' data-testid='acp-error-banner-copy' onClick={handleCopy}>
+              {t('common.copy')}
+            </Button>
+            <Button type='secondary' size='mini' data-testid='acp-error-banner-dismiss' onClick={onDismiss}>
+              {t('common.close')}
+            </Button>
+          </Space>
+        </Space>
+      }
       style={{ marginBottom: 12 }}
     />
   );

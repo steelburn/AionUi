@@ -2245,3 +2245,61 @@
 - Next:
   - 继续评估 generic error callout 是否要补更直接的 retry / copy-error affordance
   - 继续决定 send-time waiting affordance 是否还要向更完整的 generating row / elapsed meta 迈一步
+
+### 2026-04-06 / Batch 34
+
+- 对应 SC:
+  - `SC-037`
+- Goal:
+  - 把 ACP live generic error callout 从“只能看”收口到“可复制、可关闭”，先补齐最稳的一层 Zed 式可操作性，而不在这刀里冒进到 `Retry Generation`。
+- Root cause:
+  - `SC-035` 之后，AionUi 已经能把 live generic failure 升格成主线程 callout，但用户仍然缺两个非常基础的操作：
+    - 复制错误信息
+    - 关闭当前错误提示
+  - 如果没有 `Close`，callout 会一直占着线程底部；如果没有 `Copy`，用户仍要点 diagnostics 或自己手抄错误。
+  - 但这一刀如果直接做 request-level retry，会立刻把 scope 拉进恢复语义和 stale request 风险，不值得在当前 batch 扩大。
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/AcpErrorBanner.tsx`
+    - 增加 `Copy / Close`
+    - `Copy` 复用 diagnostics 的 `formatAcpLogEntry(...)`，复制 summary + detail
+    - copy 成功 / 失败统一走 `Message.success/error`
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - 新增当前 live generic error 的 dismiss state
+    - `Close` 只隐藏当前 error
+    - 当 actionable error 切到更新的 entry 时，dismiss 会自动重置
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增合同：
+      - live generic error 可 `Copy`
+      - `Copy` 复制的是 formatter 后的 summary + detail
+      - `Close` 后当前 error 隐藏
+      - 新的 live error 到来后，callout 重新出现
+- Reviewer:
+  - reviewer：`Hooke`
+  - 这轮 review 请求已发出，但在时限内未返回
+  - 按 workflow 记录为 `green automation + driver self-review fallback`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`39 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test:acp:unit`
+    - 结果：`414 passed | 1 skipped`
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`414 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - 这批让 AionUi 的 generic error callout 又向 Zed 靠近了一步：
+    - 不再只是“告诉用户坏了”
+    - 而是具备最基础的处置能力：复制、关闭
+  - 同时仍保持了现有克制边界：
+    - `Authenticate / Retry` 继续优先
+    - 历史 hydrate error 继续只留在 diagnostics
+  - 这批没有冒进去做 `Retry Generation`，范围控制是对的。
+- Next:
+  - 跑完全量 ACP 门禁并推远端
+  - 再决定 generic error callout 是否值得进入 request-level retry
