@@ -252,7 +252,7 @@ describe('useAcpMessage', () => {
     );
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
     });
 
     await waitFor(() => {
@@ -327,7 +327,7 @@ describe('useAcpMessage', () => {
     const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
     });
 
     expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
@@ -368,7 +368,7 @@ describe('useAcpMessage', () => {
     });
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
     });
 
     expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
@@ -630,7 +630,7 @@ describe('useAcpMessage', () => {
     });
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
     });
 
     await waitFor(() => {
@@ -1693,7 +1693,7 @@ describe('useAcpMessage', () => {
     const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
       capturedResponseListener?.({
         type: 'start',
         conversation_id: CONVERSATION_ID,
@@ -1743,7 +1743,7 @@ describe('useAcpMessage', () => {
     const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
 
     act(() => {
-      result.current.setAiProcessing(true);
+      result.current.beginPendingFirstResponse();
       capturedResponseListener?.({
         type: 'request_trace',
         conversation_id: CONVERSATION_ID,
@@ -1945,7 +1945,7 @@ describe('useAcpMessage', () => {
       });
 
       act(() => {
-        result.current.setAiProcessing(true);
+        result.current.beginPendingFirstResponse();
         capturedResponseListener?.({
           type: 'start',
           conversation_id: CONVERSATION_ID,

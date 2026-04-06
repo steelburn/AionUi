@@ -8,14 +8,14 @@ import { ipcBridge } from '@/common';
 import { uuid } from '@/common/utils';
 import { emitter } from '@/renderer/utils/emitter';
 import { useEffect } from 'react';
-import { setAcpRuntimeUiWarmupPending } from './acpRuntimeDiagnostics';
 
 type UseAcpInitialMessageParams = {
   conversationId: string;
   backend: string;
   agentName?: string;
   sessionMode?: string;
-  setAiProcessing: (value: boolean) => void;
+  beginPendingFirstResponse: () => void;
+  clearPendingFirstResponse: () => void;
   appendAcpUiLog: (entry: {
     kind: 'send_failed';
     level: 'error';
@@ -42,7 +42,8 @@ export const useAcpInitialMessage = ({
   backend,
   agentName,
   sessionMode,
-  setAiProcessing,
+  beginPendingFirstResponse,
+  clearPendingFirstResponse,
   appendAcpUiLog,
   primeRequestTraceFallback,
   clearPendingRequestTraceFallback,
@@ -66,8 +67,7 @@ export const useAcpInitialMessage = ({
         // File references are added by the backend ACP agent (using actual copied paths)
         // Avoid two inconsistent sets of file references in the message
         // Start AI processing loading state (user message will be added via backend response)
-        setAcpRuntimeUiWarmupPending(conversationId, true);
-        setAiProcessing(true);
+        beginPendingFirstResponse();
         primeRequestTraceFallback({
           backend,
           agentName,
@@ -99,8 +99,7 @@ export const useAcpInitialMessage = ({
               detail: result?.msg || 'Failed to send initial message.',
             });
           }
-          setAcpRuntimeUiWarmupPending(conversationId, false);
-          setAiProcessing(false); // Stop loading state on failure
+          clearPendingFirstResponse();
         }
       } catch (error) {
         console.error('Error sending initial message:', error);
@@ -113,8 +112,7 @@ export const useAcpInitialMessage = ({
             detail: error instanceof Error ? error.message : String(error),
           });
         }
-        setAcpRuntimeUiWarmupPending(conversationId, false);
-        setAiProcessing(false); // Stop loading state on error
+        clearPendingFirstResponse();
       }
     };
 
@@ -126,7 +124,8 @@ export const useAcpInitialMessage = ({
     backend,
     agentName,
     sessionMode,
-    setAiProcessing,
+    beginPendingFirstResponse,
+    clearPendingFirstResponse,
     appendAcpUiLog,
     primeRequestTraceFallback,
     clearPendingRequestTraceFallback,

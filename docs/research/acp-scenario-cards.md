@@ -1858,3 +1858,57 @@ Reviewer adjustment:
   - streaming 仍必须被视为 busy，不能因为 selector 收口而退化成“只在 waiting 才 busy”
   - hydrated running / warmup pending 的既有合同不能退化
   - 不能让 send box、queue gate、status dot 因 selector 改造重新出现时序分叉
+
+## SC-046 ACP Pending First-Response Contract Must Use Semantic Actions
+
+- Goal:
+  - 继续把 ACP 的 waiting/busy 合同往单一路径收口：
+    - fresh send
+    - guid initial message handoff
+    - send failure / stop / terminal clear
+      都必须走同一套“pending first response”语义动作
+  - 不再把“同时改 `uiWarmupPending` 和 `aiProcessing`”暴露成 send path 的公开合同
+- User action:
+  - 用户从 ACP send box 发起 fresh send
+  - 或从 guid 页面跳进 ACP 会话后自动发送 initial message
+  - 请求随后进入：
+    - 首包前 waiting
+    - 首包后的 streaming
+    - 或在首包前失败 / 被停止
+- Current failure:
+  - `SC-045` 已经把 header/warmup/send box/queue gate 的 busy 读法统一到 runtime diagnostics snapshot
+  - 但外部 send path 仍然直接手工配对：
+    - `setAcpRuntimeUiWarmupPending(...)`
+    - `setAiProcessing(...)`
+  - `AcpSendBox` 与 `useAcpInitialMessage` 仍知道 hook 内部的 raw waiting 实现细节
+  - 这意味着任何新的 send 入口都可能再次把 runtime contract 拆成两套时序
+- Expected UI state:
+  - 任意 ACP send entrypoint 开始发送时：
+    - 通过同一条 semantic action 进入“等待首个响应”
+  - send 失败、stop、terminal error 时：
+    - 通过同一条 semantic clear action 退出 pending-first-response
+  - 首个 `content` 到达后：
+    - pending-first-response 会结束
+    - 但 warmup cue 仍应等到可见 assistant activity 出现后再让位
+    - 不能在 buffered reveal 期间出现冷空档
+- Automation plan:
+  - `useAcpMessage.ts`
+    - 公开 `beginPendingFirstResponse / clearPendingFirstResponse`
+    - 内部 finish / error / terminal status / reset 统一走这套 helper
+  - `useAcpInitialMessage.ts`
+    - guid initial-message path 改为走 semantic helper
+  - `AcpSendBox.tsx`
+    - fresh send / send failure / stop path 不再直接手工切 raw waiting flags
+  - `useAcpMessage.dom.test.ts`
+    - 现有 waiting/hydration 回归改为用 semantic helper 驱动
+  - `platformSendBoxes.dom.test.tsx`
+    - 断言 `AcpSendBox` 会把 semantic helper 传给 initial-message hook
+    - 断言 fresh send / send failure 会走 begin/clear helper
+- Exit criteria:
+  - ACP 外部调用方不再直接持有 raw `setAiProcessing` 合同
+  - fresh send、guid initial message、send failure/stop 的 pending-first-response 进入/退出语义统一
+  - 既有 waiting -> streaming reveal timing 不退化
+- Reviewer focus:
+  - 首个 `content` 到达时不能过早清掉 `uiWarmupPending`
+  - helper 收口不能让 hydrated running / request-trace / terminal clear 路径漏掉重置
+  - `AcpSendBox` 与 `useAcpInitialMessage` 不能重新长出一套手工双 flag 合同

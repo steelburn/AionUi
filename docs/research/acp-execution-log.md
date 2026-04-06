@@ -2860,3 +2860,87 @@
 - Next:
   - 继续把 `queue / busy` 更深层真相源往 runtime publisher / main-process lifecycle 收回去。
   - 或回到 settings / guid 侧 ACP 场景的独立补缺。
+
+### 2026-04-06 / Batch 43
+
+- 对应 SC:
+  - `SC-046`
+- Goal:
+  - 把 ACP send entrypoint 的 pending-first-response 合同再收紧一层：
+    - fresh send
+    - guid initial message
+    - send failure / stop / terminal clear
+      都必须通过同一套 semantic action 进入/退出 waiting
+  - 避免外部继续手工配对：
+    - `setAcpRuntimeUiWarmupPending(...)`
+    - `setAiProcessing(...)`
+- Root cause:
+  - `SC-045` 已经把 header/warmup/send box/queue gate 的 busy 读法统一到 runtime diagnostics snapshot。
+  - 但 ACP send path 仍然暴露 hook 内部细节：
+    - `AcpSendBox` fresh send 直接手工切 `uiWarmupPending + aiProcessing`
+    - `useAcpInitialMessage` 也复制了同一套 paired mutation
+  - 这意味着 waiting contract 仍然有一层“外部知道底层双 flag”的泄漏：
+    - 任何新的 send 入口都可能再次把同一条用户语义拆成两次状态更新
+    - 也让 `SC-040 ~ SC-045` 已经收好的 waiting/reveal 时序继续暴露给调用方
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-046 ACP Pending First-Response Contract Must Use Semantic Actions`
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 把公开合同从 raw `setAiProcessing` 收成：
+      - `beginPendingFirstResponse`
+      - `clearPendingFirstResponse`
+    - finish / error / terminal status / reset 统一走 semantic clear
+    - 首个 `content` 到达时仍只清 pending-first-response，不提前清 warmup pending
+      - 保留 buffered reveal 期间的等待感，避免 cue 冷空档
+  - `src/renderer/pages/conversation/platforms/acp/useAcpInitialMessage.ts`
+    - guid initial-message path 改为走 semantic begin/clear helper
+    - 不再直接操作 raw waiting flags
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - fresh send / send failure / stop path 改为走 semantic begin/clear helper
+    - send box 不再直接手工配对 `uiWarmupPending + aiProcessing`
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - waiting / hydration / delayed-hydration 回归统一改为通过 semantic helper 驱动
+  - `tests/unit/renderer/platformSendBoxes.dom.test.tsx`
+    - ACP mock return contract 改为暴露 semantic helper
+    - 新增回归：
+      - `AcpSendBox` 会把 helper 传给 `useAcpInitialMessage`
+      - fresh send 会调用 `beginPendingFirstResponse`
+      - send failure 会调用 `clearPendingFirstResponse`
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径沿用 `SC-040 ~ SC-045` 的 waiting contract：
+    - pending-first-response 是一条单独用户语义，不应再由外部双 flag 手工拼装
+    - 首个 `content` 到达时不能过早清 warmup cue
+    - terminal clear / stop / send failure 必须和 waiting 进入路径一样统一
+- Verification:
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/platformSendBoxes.dom.test.tsx tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 结果：`77 passed`
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`430 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 结果：`3227 passed | 17 skipped (3244 tests)`
+    - 补充说明：
+      - suite 里仍有既有 warning：
+        - `MaxListenersExceededWarning`
+        - `tests/unit/skillsMarket.test.ts` 的 hoisted `vi.mock(...)` warning
+      - 本轮不阻塞通过
+- Product judgement:
+  - 这轮不是再做一个新的 UI affordance，而是在把 ACP send path 从“手工改两面旗”收回到单一语义动作。
+  - 从用户视角看，变化会更隐形但更稳：
+    - fresh send、guid handoff、send failure、stop、terminal clear 现在更像同一套 waiting contract
+    - 不会因为入口不同而悄悄走出不同的首包前时序
+- Open risks:
+  - runtime diagnostics publisher 仍在 renderer-side `useAcpMessage`，还没有回收到最终的主进程 turn lifecycle ownership。
+  - `aiProcessing` 仍是 hook 内部过渡状态；这轮只是先阻止外部继续直接操作它。
+- Next:
+  - 如果继续收 `queue / busy` 真相源，下一步可以考虑：
+    - 进一步减少 `useAcpMessage` 公开的 raw waiting 痕迹
+    - 或继续把 runtime publisher / turn lifecycle 往更统一的 ownership 推进
