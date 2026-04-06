@@ -20,7 +20,7 @@ import { Shield } from '@icon-park/react';
 import { iconColors } from '@/renderer/styles/colors';
 import FileAttachButton from '@/renderer/components/media/FileAttachButton';
 import AcpConfigSelector from '@/renderer/components/agent/AcpConfigSelector';
-import React, { useCallback, useEffect, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import FilePreview from '@/renderer/components/media/FilePreview';
 import HorizontalFileList from '@/renderer/components/media/HorizontalFileList';
@@ -157,6 +157,9 @@ const updateStoredAcpRecoveryUiState = (
 const isTerminalAcpStatus = (status: string | null): status is 'auth_required' | 'disconnected' | 'error' =>
   status === 'auth_required' || status === 'disconnected' || status === 'error';
 
+const isHydratedQueueBarrierStatus = (status: string | null): status is 'auth_required' | 'disconnected' =>
+  status === 'auth_required' || status === 'disconnected';
+
 const isActionableAcpErrorLog = (entry: AcpLogEntry | undefined): entry is AcpLogEntry => {
   if (!entry || entry.source === 'hydrated') {
     return false;
@@ -291,16 +294,22 @@ const AcpSendBox: React.FC<{
     sendNowPending,
   } = recoveryUiState;
   const isBusy = running || aiProcessing;
+  const actionableErrorLog = isActionableAcpErrorLog(acpLogs[0]) ? acpLogs[0] : null;
+  const [acknowledgedQueueErrorLogId, setAcknowledgedQueueErrorLogId] = useState<string | null>(null);
   const isAuthActionActive = authenticatingRevision !== null || pendingAuthReadyRevision !== null;
   const isRetryActionActive = retryingDisconnectedRevision !== null || pendingRetryReadyRevision !== null;
   const hasHydratedTerminalStatus = acpStatusSource === 'hydrated' && isTerminalAcpStatus(acpStatus);
-  const shouldBlockQueueOnHistoricalBarrier = hasHydratedTerminalStatus;
+  const shouldBlockQueueOnHistoricalBarrier = acpStatusSource === 'hydrated' && isHydratedQueueBarrierStatus(acpStatus);
   const shouldBlockQueueOnLiveAuthBarrier = !isBusy && acpStatus === 'auth_required' && !hasHydratedTerminalStatus;
   const shouldBlockQueueOnLiveDisconnectedBarrier =
     !isBusy && acpStatus === 'disconnected' && !hasHydratedTerminalStatus;
+  const shouldBlockQueueOnLiveErrorBarrier =
+    !isBusy && actionableErrorLog !== null && actionableErrorLog.id !== acknowledgedQueueErrorLogId;
+  const shouldEnqueueFreshSendBehindPendingRecovery = isAuthActionActive || isRetryActionActive;
   const isQueueExecutionBlocked =
     shouldBlockQueueOnLiveAuthBarrier ||
     shouldBlockQueueOnLiveDisconnectedBarrier ||
+    shouldBlockQueueOnLiveErrorBarrier ||
     shouldBlockQueueOnHistoricalBarrier ||
     isAuthActionActive ||
     isRetryActionActive;
@@ -592,6 +601,28 @@ Please check your local CLI tool authentication status`,
     onExecute: executeCommand,
   });
 
+  useEffect(() => {
+    if (!shouldBlockQueueOnLiveErrorBarrier || queuedCommands.length === 0 || isQueuePaused) {
+      return;
+    }
+
+    pause();
+  }, [isQueuePaused, pause, queuedCommands.length, shouldBlockQueueOnLiveErrorBarrier]);
+
+  useEffect(() => {
+    setAcknowledgedQueueErrorLogId(null);
+  }, [conversation_id]);
+
+  const handleResumeQueue = useCallback(() => {
+    if (actionableErrorLog !== null) {
+      setAcknowledgedQueueErrorLogId((currentId) =>
+        currentId === actionableErrorLog.id ? currentId : actionableErrorLog.id
+      );
+    }
+
+    resume();
+  }, [actionableErrorLog, resume]);
+
   const shouldShowAuthBanner =
     !isBusy &&
     ((acpStatus === 'auth_required' && (!hasHydratedTerminalStatus || hasPendingCommands)) ||
@@ -603,7 +634,6 @@ Please check your local CLI tool authentication status`,
     !shouldShowAuthBanner &&
     ((acpStatus === 'disconnected' && (!hasHydratedTerminalStatus || hasPendingCommands)) || isRetryActionActive);
   const isRetryingConnection = shouldShowDisconnectedBanner && isRetryActionActive;
-  const actionableErrorLog = isActionableAcpErrorLog(acpLogs[0]) ? acpLogs[0] : null;
   const shouldShowErrorBanner =
     !isBusy && !shouldShowAuthBanner && !shouldShowDisconnectedBanner && actionableErrorLog !== null;
 
@@ -614,7 +644,12 @@ Please check your local CLI tool authentication status`,
     clearFiles();
     emitter.emit('acp.selected.file.clear');
 
-    if (shouldEnqueueConversationCommand({ isBusy, hasPendingCommands })) {
+    if (
+      shouldEnqueueConversationCommand({
+        isBusy: isBusy || shouldEnqueueFreshSendBehindPendingRecovery,
+        hasPendingCommands,
+      })
+    ) {
       enqueue({ input: message, files: allFiles });
       return;
     }
@@ -987,7 +1022,7 @@ Please check your local CLI tool authentication status`,
         }
         sendNowLoading={sendNowPending}
         onPause={pause}
-        onResume={resume}
+        onResume={handleResumeQueue}
         onInteractionLock={lockInteraction}
         onInteractionUnlock={unlockInteraction}
         onUpdate={(commandId, input) => update(commandId, { input })}

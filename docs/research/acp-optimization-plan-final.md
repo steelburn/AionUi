@@ -587,6 +587,7 @@ Zed 领先点已经比较稳定，可归纳为：
 - `auth_required -> Authenticate` 已有 thread-level UI 和自动化回归
 - reopen / resume / load 的 hermetic 和 real canary 主链路已打通
 - queue / Send Now / barrier blocking 的关键合同已补齐
+- live generic error / in-flight recovery / historical error reopen 这三类 queue 边界也已进一步收紧
 - `Authenticate / Retry` 的 in-flight 状态已可跨 remount 保持，并抑制 terminal handoff 后的 stale failure
 - 侧栏 spinner 与详情页 send/stop 状态的主要分裂已收口
 - 历史 timeline 不再默认混入 ACP runtime status 和 legacy 基础设施红条
@@ -710,10 +711,20 @@ Zed 领先点已经比较稳定，可归纳为：
 - `Send Now` 会隐藏
 - queue 继续冻结
 
+如果 live generic error 发生在当前 turn，且 queue 中还有待执行消息：
+
+- queue 会自动转入 paused
+- 不会悄悄继续滑到下一条
+- 需要用户明确 `Resume` 后才继续
+
 如果只是历史 hydrate 回来的 terminal status，但 queue 里还有待执行消息：
 
-- 仍然会保留对应 banner
-- 用户必须先恢复，再继续自动出队
+- `auth_required / disconnected`：
+  - 仍然会保留对应 banner
+  - 用户必须先恢复，再继续自动出队
+- `error`：
+  - 不再作为 reopen 后的隐形 queue barrier
+  - queue 不会因为一个历史 generic error 被静默卡死
 
 ### 8. 右上角 runtime status dot / diagnostics
 
@@ -750,6 +761,7 @@ Zed 领先点已经比较稳定，可归纳为：
 
 - 中性的 status dot / diagnostics
 - 对应 diagnostics 记录
+- 如果只是历史 generic `error`，不会额外把 queue 卡在一个没有恢复入口的隐形障碍态里
 
 只有以下情况仍会看到 banner：
 
@@ -884,7 +896,7 @@ Zed 也有 ACP logs，但它是：
 
 因此后续优先级应继续是：
 
-1. 继续收紧更底层 `queue / busy` runtime contract
+1. 评估 generic error callout 是否需要更直接的 retry / copy-error affordance
 2. 再决定是否需要引入更明确的 thread-level generating affordance
 3. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
 4. 再决定是否进入更大的连接拓扑 / runtime 托管阶段

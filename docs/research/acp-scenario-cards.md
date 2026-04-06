@@ -1412,3 +1412,47 @@ Reviewer adjustment:
   - 不能把 `auth_failed` 错接成 generic error，必须仍给用户恢复 CTA。
   - 不能让历史 `lastAcpStatus: error` 恢复出默认红 banner。
   - `status:error` 的 callout 不能丢掉 disconnect metadata。
+
+## SC-036 ACP Queue Must Not Auto-Drain Through Generic Errors Or Race In-Flight Recovery
+
+- Goal:
+  - 让 ACP queue / busy 合同在 generic error 与 recovery in-flight 两类边界上更接近用户直觉。
+  - 避免 queue 在用户刚看到错误时就悄悄滑到下一条，也避免 fresh send 去和 `Authenticate / Retry` 的进行中恢复抢跑。
+- User action:
+  - 用户正在一个 busy 的 ACP 线程里，同时已有 queued command。
+  - 当前 turn 发生 live generic error。
+  - 或者用户已经点了 `Authenticate / Retry`，恢复动作尚未完成，又发出 fresh send。
+  - 或者用户重开一个历史上停留在 generic `error` 的 ACP 线程，线程里还有待执行 queue。
+- Current failure:
+  - live generic error 虽然已经能出 thread callout，但 queue 仍可能自动继续执行下一条，用户甚至来不及理解上一条为什么失败。
+  - `Authenticate / Retry` 进行中时，fresh send 仍可能直接 `executeCommand()`，和恢复动作并行抢跑。
+  - 历史 hydrate 回来的 generic `error` 又被当成 queue barrier，但 UI 默认不再显示历史红 banner，结果 reopen 后 queue 会被静默卡死。
+- Expected UI state:
+  - live generic error + queued work：
+    - queue 自动转入 paused
+    - 不再自动滑到下一条
+    - 用户明确 `Resume` 后，才继续执行
+  - `Authenticate / Retry` 进行中 + fresh send：
+    - fresh send 先入队
+    - 等 recovery 真正完成后再自动放行
+  - 历史 hydrate 回来的 generic `error` + persisted queue：
+    - 不应成为 reopen 后的隐形 barrier
+    - queue 可以像普通 reopen 一样继续出队
+- Automation plan:
+  - `AcpSendBox`：
+    - live generic error 变成显式 queue pause barrier
+    - in-flight auth/retry 变成 fresh send 的 enqueue gate
+    - hydrated `error` 不再作为 historical queue barrier
+  - `AcpSendBoxQueueFlow.dom.test.tsx`
+    - live generic error => queue pause, explicit resume 才继续
+    - pending retry/authenticate => fresh send 先入队，恢复完成后再启动
+    - hydrated `error` reopen => queue 不会静默卡死
+    - `A -> B -> A` 切换后，generic error acknowledgement 不串线
+- Exit criteria:
+  - live generic error 不会再让 queue 悄悄滑到下一条。
+  - in-flight recovery 不会再和 fresh send 抢跑。
+  - reopen 后的历史 generic error 不会把 queue 无提示卡死。
+- Reviewer focus:
+  - live error 的 pause 不能只靠 effect 顺序赌 timing，必须有真正的 gate。
+  - pending recovery 时 fresh send 必须走 enqueue，而不是直接 `executeCommand()`。
+  - error acknowledgement 不能跨 conversation 泄漏。

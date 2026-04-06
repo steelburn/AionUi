@@ -161,17 +161,42 @@ vi.mock('@/renderer/components/chat/CommandQueuePanel', () => ({
   __esModule: true,
   default: ({
     items,
+    paused,
     onSendNow,
     sendNowLoading,
+    onPause,
+    onResume,
   }: {
     items: Array<{ id: string }>;
+    paused?: boolean;
     onSendNow?: () => void;
     sendNowLoading?: boolean;
+    onPause?: () => void;
+    onResume?: () => void;
   }) =>
     React.createElement(
       'div',
       {},
       React.createElement('div', { 'data-testid': 'queue-panel' }, String(items.length)),
+      React.createElement('div', { 'data-testid': 'queue-paused' }, String(Boolean(paused))),
+      onPause || onResume
+        ? React.createElement(
+            'button',
+            {
+              type: 'button',
+              'data-testid': 'queue-toggle-pause',
+              onClick: () => {
+                if (paused) {
+                  onResume?.();
+                  return;
+                }
+
+                onPause?.();
+              },
+            },
+            paused ? 'Resume' : 'Pause'
+          )
+        : null,
       onSendNow
         ? React.createElement(
             'button',
@@ -701,6 +726,177 @@ describe('AcpSendBox queue flow', () => {
     );
   });
 
+  it('pauses queued ACP commands behind a live generic error until the user explicitly resumes', async () => {
+    const conversationId = createConversationId();
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: conversationId,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-2' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('2');
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('false');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-error-pauses-queue',
+      data: {
+        status: 'error',
+        backend: 'claude',
+        agentName: 'Claude',
+        disconnectCode: 23,
+        disconnectSignal: 'SIGTERM',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-error-banner')).toBeInTheDocument();
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('true');
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+    expect(screen.getByTestId('queue-panel')).toHaveTextContent('2');
+
+    fireEvent.click(screen.getByTestId('queue-toggle-pause'));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAcpSendInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: conversationId,
+        input: 'queued command 1',
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+  });
+
+  it('resets the live-error queue acknowledgement when switching conversations', async () => {
+    const conversationA = createConversationId();
+    const conversationB = createConversationId();
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationA,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    const { rerender } = renderAcpSendBoxWithDiagnostics({
+      conversation_id: conversationA,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-2' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('2');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationA,
+      msg_id: 'status-error-before-switch',
+      data: {
+        status: 'error',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('true');
+    });
+
+    fireEvent.click(screen.getByTestId('queue-toggle-pause'));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationB,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    rerender(
+      <>
+        <AcpRuntimeStatusButton conversationId={conversationB} backend='claude' agentName='Claude' />
+        <AcpSendBox conversation_id={conversationB} backend='claude' agentName='Claude' />
+      </>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('0');
+    });
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationA,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    rerender(
+      <>
+        <AcpRuntimeStatusButton conversationId={conversationA} backend='claude' agentName='Claude' />
+        <AcpSendBox conversation_id={conversationA} backend='claude' agentName='Claude' />
+      </>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationA,
+      msg_id: 'status-error-after-switch',
+      data: {
+        status: 'error',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('true');
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('keeps queued ACP commands blocked while retry warmup is pending even if session_active arrives early', async () => {
     const conversationId = createConversationId();
     const warmupDeferred = createDeferred<boolean>();
@@ -785,6 +981,84 @@ describe('AcpSendBox queue flow', () => {
     });
   });
 
+  it('queues fresh sends behind a pending retry recovery instead of racing the warmup', async () => {
+    const conversationId = createConversationId();
+    const warmupDeferred = createDeferred<boolean>();
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+    mockConversationWarmupInvoke.mockReturnValueOnce(warmupDeferred.promise);
+
+    render(<AcpSendBox conversation_id={conversationId} backend='claude' agentName='Claude' />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-disconnected-before-pending-retry-send',
+      data: {
+        status: 'disconnected',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-disconnected-banner')).toBeInTheDocument();
+    });
+
+    clickBannerAction('acp-disconnected-banner');
+
+    await waitFor(() => {
+      expect(mockConversationWarmupInvoke).toHaveBeenCalledWith({ conversation_id: conversationId });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('false');
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-session-active-before-retry-send-resolves',
+      data: {
+        status: 'session_active',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+
+    await act(async () => {
+      warmupDeferred.resolve(true);
+      await warmupDeferred.promise;
+    });
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAcpSendInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: conversationId,
+        input: 'queued command 1',
+      })
+    );
+  });
+
   it('keeps queued ACP commands blocked while authenticate is pending even if session_active arrives early', async () => {
     const conversationId = createConversationId();
     const authenticateDeferred = createDeferred<{ success: boolean }>();
@@ -867,6 +1141,84 @@ describe('AcpSendBox queue flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
     });
+  });
+
+  it('queues fresh sends behind a pending authenticate recovery instead of racing the recovery flow', async () => {
+    const conversationId = createConversationId();
+    const authenticateDeferred = createDeferred<{ success: boolean }>();
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+    mockAcpAuthenticateInvoke.mockReturnValueOnce(authenticateDeferred.promise);
+
+    render(<AcpSendBox conversation_id={conversationId} backend='claude' agentName='Claude' />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-auth-required-before-pending-auth-send',
+      data: {
+        status: 'auth_required',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-auth-banner')).toBeInTheDocument();
+    });
+
+    clickBannerAction('acp-auth-banner');
+
+    await waitFor(() => {
+      expect(mockAcpAuthenticateInvoke).toHaveBeenCalledWith({ conversationId: conversationId });
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('queue-panel')).toHaveTextContent('1');
+      expect(screen.getByTestId('queue-paused')).toHaveTextContent('false');
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+
+    emitAcpResponse({
+      type: 'agent_status',
+      conversation_id: conversationId,
+      msg_id: 'status-session-active-before-auth-send-resolves',
+      data: {
+        status: 'session_active',
+        backend: 'claude',
+        agentName: 'Claude',
+      },
+    });
+
+    await flushMicrotasks();
+    expect(mockAcpSendInvoke).not.toHaveBeenCalled();
+
+    await act(async () => {
+      authenticateDeferred.resolve({ success: true });
+      await authenticateDeferred.promise;
+    });
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAcpSendInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: conversationId,
+        input: 'queued command 1',
+      })
+    );
   });
 
   it('keeps queued ACP commands blocked across disconnected-to-auth recovery handoff and hides Send Now', async () => {
@@ -1182,5 +1534,51 @@ describe('AcpSendBox queue flow', () => {
         input: 'persisted auth queue 1',
       })
     );
+  });
+
+  it('does not leave hydrated generic ACP errors silently blocking queued work after reopen', async () => {
+    const conversationId = createConversationId();
+    window.sessionStorage.setItem(
+      `conversation-command-queue/${conversationId}`,
+      JSON.stringify({
+        isPaused: false,
+        items: [
+          { id: 'persisted-error-1', input: 'persisted error queue 1', files: [], createdAt: 1 },
+          { id: 'persisted-error-2', input: 'persisted error queue 2', files: [], createdAt: 2 },
+        ],
+      })
+    );
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'finished',
+      extra: {
+        lastAcpStatus: {
+          status: 'error',
+          updatedAt: Date.now(),
+          backend: 'claude',
+          agentName: 'Claude',
+        },
+      },
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: conversationId,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+    });
+    expect(mockAcpSendInvoke).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: conversationId,
+        input: 'persisted error queue 1',
+      })
+    );
+
+    expect(screen.queryByTestId('acp-error-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('queue-paused')).toHaveTextContent('false');
   });
 });

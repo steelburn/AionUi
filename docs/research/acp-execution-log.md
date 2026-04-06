@@ -2178,3 +2178,70 @@
 - Next:
   - 继续推进更底层 `queue / busy` runtime contract 收束
   - 继续评估当前 warmup / waiting affordance 是否还需要更完整的 thread-level generating meta
+
+### 2026-04-06 / Batch 33
+
+- 对应 SC:
+  - `SC-036`
+- Goal:
+  - 把 ACP queue / busy 合同继续往用户直觉收紧：
+    - live generic error 不再悄悄把 queue 滑到下一条
+    - in-flight `Authenticate / Retry` 不再和 fresh send 抢跑
+    - 历史 hydrate generic `error` 不再把 reopen 后的 queue 静默卡死
+- Root cause:
+  - `SC-035` 已经让 live generic failure 进主线程 callout，但 queue 还缺最后一层约束：
+    - 当前 turn 报错后，renderer 会立刻掉回 idle，queue 可能自动继续执行下一条
+  - `onSendHandler()` 只看 `isBusy / hasPendingCommands`，没把 in-flight authenticate/warmup 动作当成 enqueue gate。
+  - `hasHydratedTerminalStatus` 把历史 `error` 也当成 queue barrier，但 generic historical error 又不会默认出 banner，结果 reopen 后 queue 会被无提示卡死。
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - live generic error 新增 explicit queue barrier：
+      - queued work 自动转入 paused
+      - 用户明确 `Resume` 后才继续
+    - fresh send 在 authenticate / retry 进行中时改走 enqueue
+    - 历史 hydrate `error` 不再作为 queue barrier
+    - conversation 切换时重置 live-error acknowledgement，避免 `A -> B -> A` 串线
+  - `tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 新增合同：
+      - live generic error => queue paused, explicit resume 才继续
+      - pending retry => fresh send 先入队，recovery 完成后再启动
+      - pending authenticate => fresh send 先入队，recovery 完成后再启动
+      - hydrated `error` reopen => queue 不会被静默卡死
+      - `A -> B -> A` rerender 后，generic error acknowledgement 不串线
+  - `docs/research/acp-development-workflow.md`
+    - workflow 补充：每个 batch commit 后立即 push 到远端分支
+- Reviewer:
+  - reviewer：`Hooke`
+  - 第一轮 finding：
+    - manual send / recovery gate / hydrated error / stale trace 里给了 2 high + 1 medium 候选
+  - 本批实际收口：
+    - 收掉了“live generic error 自动滑 queue”“pending auth/retry fresh send 抢跑”“hydrated error 静默卡 queue”三条
+  - 第二轮 finding：
+    - `acknowledgedQueueErrorLogId` 会跨 conversation 泄漏
+  - 修复后：
+    - reviewer 再次 follow-up 超时
+    - 按 workflow 记录为 `green automation + driver self-review fallback`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 结果：`15 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test:acp:unit`
+    - 结果：`412 passed | 1 skipped`
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`412 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - 这批把 ACP queue 的几个“用户最难解释”的边界又收紧了一层：
+    - 报错时不会悄悄继续跑下一条
+    - Authenticate / Retry 进行中不会再和 fresh send 抢跑
+    - reopen 历史 error 也不会把 queue 无声卡死
+  - 到这一步，AionUi 的 queue / recovery 行为已经更接近一个成熟产品，而不只是“刚好没坏”。
+- Next:
+  - 继续评估 generic error callout 是否要补更直接的 retry / copy-error affordance
+  - 继续决定 send-time waiting affordance 是否还要向更完整的 generating row / elapsed meta 迈一步
