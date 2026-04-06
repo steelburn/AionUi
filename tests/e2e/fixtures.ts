@@ -35,6 +35,9 @@ let app: ElectronApplication | null = null;
 let mainPage: Page | null = null;
 const e2eStateSandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aionui-e2e-state-'));
 const e2eStateFile = path.join(e2eStateSandboxDir, 'extension-states.json');
+const e2eDevProfile = path.basename(e2eStateSandboxDir);
+const e2eDevConfigDir = path.join(os.homedir(), `.aionui-config-dev-${e2eDevProfile}`);
+const e2eDevDataDir = path.join(os.homedir(), `.aionui-dev-${e2eDevProfile}`);
 
 function isDevToolsWindow(page: Page): boolean {
   return page.url().startsWith('devtools://');
@@ -143,6 +146,7 @@ async function launchApp(): Promise<ElectronApplication> {
     AIONUI_DISABLE_AUTO_UPDATE: '1',
     AIONUI_DISABLE_DEVTOOLS: '1',
     AIONUI_E2E_TEST: '1',
+    AIONUI_DEV_PROFILE: process.env.AIONUI_DEV_PROFILE || e2eDevProfile,
     AIONUI_CDP_PORT: '0',
   };
 
@@ -282,12 +286,16 @@ function registerCleanup(): void {
       mainPage = null;
     }
     fs.rmSync(e2eStateSandboxDir, { recursive: true, force: true });
+    fs.rmSync(e2eDevConfigDir, { recursive: true, force: true });
+    fs.rmSync(e2eDevDataDir, { recursive: true, force: true });
   });
 
   // Synchronous fallback for abrupt termination
   process.on('exit', () => {
     try {
       fs.rmSync(e2eStateSandboxDir, { recursive: true, force: true });
+      fs.rmSync(e2eDevConfigDir, { recursive: true, force: true });
+      fs.rmSync(e2eDevDataDir, { recursive: true, force: true });
     } catch {
       // best-effort
     }

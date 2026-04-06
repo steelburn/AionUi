@@ -2129,3 +2129,65 @@ Reviewer adjustment:
   - hydrated warm waiting 的恢复必须绑定明确的 “已有历史 assistant-side activity + 当前 trailing user wait” 语义，不能误伤 fresh connect
   - 不能再长出一套独立于 `pendingFirstResponseMode` 之外的第三套 waiting 合同
   - remount 后的恢复必须覆盖到 user-visible diagnostics，而不仅仅是 sendbox loading
+
+## SC-051 ACP Waiting Affordance Should Collapse Into A Simpler Agent Status UI
+
+- Goal:
+  - 把 ACP 还没收口的视觉差距再压一轮，避免“正在处理中”的大块线程提示和 header 外挂 dot 继续显得像补丁层。
+  - 让 fresh/cold waiting 的状态表达更接近一套紧凑、克制的 agent status UI：
+    - thread 里的 waiting 提示改成简单单行
+    - 右上角状态 dot 视觉上收入 agent 胶囊内
+    - cold waiting 的呼吸色改成更可见的主题品牌色，而不是当前过淡的 `primary`
+- User action:
+  - 用户打开一个 ACP 会话，发送一条新消息，并在首包到来前观察两处：
+    - 线程底部的 waiting 提示
+    - 右上角 agent 胶囊和状态 dot
+  - 用户还会切换一个仍在 waiting 的会话，确认回来后状态表达是否仍然一致。
+- Current failure:
+  - 当前 cold waiting 的 thread 提示仍然复用 `ThoughtDisplay` 风格：
+    - 块太大
+    - 有渐变背景
+    - 上下两行信息量偏重
+    - 用户容易感知成“系统内部有一层额外的 processing 模块”
+  - 右上角状态 dot 仍然是 agent 胶囊外面的独立圆点：
+    - 视觉上像外挂控件
+    - 和胶囊不是一套 affordance
+  - cold waiting 使用 `primary-6` pulse：
+    - 在当前默认主题下辨识度不够
+    - 用户切换会话时很容易看不出来当前是 active waiting
+- Expected UI state:
+  - 对 fresh connect / cold start / running-before-first-response：
+    - thread waiting 提示改成轻量单行，不再出现大块 `ThoughtDisplay` 式 processing banner
+    - 文案保持用户可理解，例如“正在连接 {{agent}}...”或“正在等待 {{agent}} 响应...”
+    - 左侧显示 agent 图标并有轻量转动感
+    - header 状态 dot 视觉上收入 agent 胶囊内，而不是外挂在外侧
+    - cold waiting 的 dot 使用更可见的品牌色 pulse
+  - 对 warm-session waiting：
+    - 继续维持前几轮已经固定的“轻量 sendbox processing + header active”语义
+    - 不重新出现 thread processing banner
+    - 不因为这轮视觉改造而退回 generic reconnect 体感
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 用更紧凑的单行 ACP waiting row 替换现有大块 `ThoughtDisplay`
+    - 保留 cold/warm 分流，warm waiting 仍不显示 thread indicator
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - 支持“收入胶囊内”的视觉样式
+    - cold waiting 使用品牌色 pulse；warm waiting 继续 success family
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - 调整 agent pill 与 runtime dot 的 header 排布，让 dot 视觉上并入胶囊
+  - i18n：
+    - 如果 waiting 文案需要更短版本，补 ACP locale key 并更新所有语言
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+- Exit criteria:
+  - cold waiting 不再显示大块双行 processing banner，而是更简单的单行 agent waiting row
+  - 右上角状态 dot 视觉上收入 agent 胶囊内
+  - cold waiting dot 在默认主题下明显可见
+  - warm-session waiting 合同不退化
+  - diagnostics popover 仍然可用
+- Reviewer focus:
+  - 不能把 warm/cold waiting 重新混在一起
+  - 不能因为把 dot 收进胶囊而破坏 agent mode dropdown 或 diagnostics popover 交互
+  - 不能直接硬编码用户文案或颜色值，必须走 i18n / 主题 token

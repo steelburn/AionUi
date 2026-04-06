@@ -44,7 +44,11 @@ vi.mock('@/renderer/pages/conversation/components/ConversationTabs', () => ({
 
 vi.mock('@/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton', () => ({
   __esModule: true,
-  default: () => React.createElement('div', { 'data-testid': 'acp-runtime-status-button' }),
+  default: ({ embeddedInAgentPill }: { embeddedInAgentPill?: boolean }) =>
+    React.createElement('div', {
+      'data-testid': 'acp-runtime-status-button',
+      'data-embedded-in-agent-pill': String(Boolean(embeddedInAgentPill)),
+    }),
 }));
 
 vi.mock('@/renderer/pages/conversation/components/ChatTitleEditor', () => ({
@@ -196,6 +200,7 @@ describe('ChatLayout ACP runtime diagnostics entry', () => {
     expect(
       agentModeSelector.compareDocumentPosition(runtimeStatusButton) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
+    expect(runtimeStatusButton).toHaveAttribute('data-embedded-in-agent-pill', 'true');
   });
 
   it('renders the ACP runtime status button when diagnostics are enabled without backend', () => {

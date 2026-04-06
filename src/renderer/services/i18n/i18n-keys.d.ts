@@ -41,6 +41,8 @@ export type I18nKey =
   | 'acp.status.session_active'
   | 'acp.status.unknown'
   | 'acp.warmup.awaitingFirstResponse'
+  | 'acp.warmup.awaitingInline'
+  | 'acp.warmup.connectingInline'
   | 'agent.health.autoSwitching'
   | 'agent.health.available'
   | 'agent.health.bestMatch'

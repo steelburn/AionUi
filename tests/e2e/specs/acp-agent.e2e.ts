@@ -725,7 +725,7 @@ test.describe.serial('ACP conversation page (hermetic)', () => {
           },
           { timeout: 4_000 }
         )
-        .toMatch(/Processing/);
+        .toMatch(/Connecting Fake ACP Agent|Waiting for Fake ACP Agent/);
 
       const warmupIndicator = hermeticApp.page.locator('[data-testid="acp-warmup-indicator"]');
       await expect
@@ -748,7 +748,7 @@ test.describe.serial('ACP conversation page (hermetic)', () => {
           },
           { timeout: 4_000 }
         )
-        .toMatch(/Connecting to Fake ACP Agent|Waiting for the first response from Fake ACP Agent/);
+        .toMatch(/Connecting Fake ACP Agent|Waiting for Fake ACP Agent/);
 
       await waitForConversationEvent(hermeticApp.page, id, 'content');
       await waitForConversationEvent(hermeticApp.page, id, 'finish');

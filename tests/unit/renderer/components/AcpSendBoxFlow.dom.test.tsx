@@ -405,6 +405,7 @@ vi.mock('@arco-design/web-react', () => ({
 
 vi.mock('@icon-park/react', () => ({
   Shield: () => React.createElement('span'),
+  Robot: () => React.createElement('span'),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -474,6 +475,10 @@ vi.mock('react-i18next', () => ({
           return `Connecting to ${agent}...`;
         case 'acp.warmup.awaitingFirstResponse':
           return `Waiting for the first response from ${agent}...`;
+        case 'acp.warmup.connectingInline':
+          return `Connecting ${agent}...`;
+        case 'acp.warmup.awaitingInline':
+          return `Waiting for ${agent}...`;
         case 'conversation.chat.processing':
           return 'Processing';
         case 'common.retry':
@@ -574,8 +579,8 @@ describe('AcpSendBox live ACP flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('acp-warmup-indicator')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
+    expect(screen.getByTestId('acp-warmup-agent-icon')).toHaveClass('animate-spin');
   });
 
   it('keeps the send box busy while send-time warmup is pending before ACP stream activity starts', async () => {
@@ -624,7 +629,7 @@ describe('AcpSendBox live ACP flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
     });
 
     act(() => {
@@ -639,11 +644,9 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
-        'Waiting for the first response from Claude...'
-      );
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Waiting for Claude...');
     });
-    expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting to Claude...');
+    expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting Claude...');
   });
 
   it('keeps the thread warmup cue visible until assistant-side activity becomes visible in the timeline', async () => {
@@ -667,10 +670,9 @@ describe('AcpSendBox live ACP flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
     });
-    expect(document.querySelectorAll('[data-running="true"]')).toHaveLength(1);
-    expect(screen.queryByTestId('thought-display')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-warmup-agent-icon')).toHaveClass('animate-spin');
 
     act(() => {
       emitAcpResponse({
@@ -690,12 +692,9 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
-        'Waiting for the first response from Claude...'
-      );
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Waiting for Claude...');
     });
-    expect(document.querySelectorAll('[data-running="true"]')).toHaveLength(1);
-    expect(screen.queryByTestId('thought-display')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-warmup-agent-icon')).toHaveClass('animate-spin');
 
     act(() => {
       setMockMessageList([
@@ -819,8 +818,7 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
     });
 
-    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
   });
 
@@ -1026,7 +1024,7 @@ describe('AcpSendBox live ACP flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
     });
 
     act(() => {

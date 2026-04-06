@@ -1,6 +1,7 @@
+import { Robot } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import ThoughtDisplay from '@/renderer/components/chat/ThoughtDisplay';
+import { getAgentLogo } from '@/renderer/utils/model/agentLogo';
 import {
   isAcpRuntimeWaitingSnapshot,
   isAcpRuntimeWarmSessionWaitingSnapshot,
@@ -30,17 +31,36 @@ const AcpWarmupIndicator: React.FC<{
   }
 
   const displayName = agentName || backend || 'ACP';
-  const subtitle = shouldDescribeAwaitingFirstResponse(status)
-    ? t('acp.warmup.awaitingFirstResponse', {
+  const logo = getAgentLogo(backend ?? agentName);
+  const statusLabel = shouldDescribeAwaitingFirstResponse(status)
+    ? t('acp.warmup.awaitingInline', {
         agent: displayName,
-        defaultValue: `Waiting for the first response from ${displayName}...`,
+        defaultValue: `Waiting for ${displayName}...`,
       })
-    : t('acp.status.connecting', {
+    : t('acp.warmup.connectingInline', {
         agent: displayName,
-        defaultValue: `Connecting to ${displayName}...`,
+        defaultValue: `Connecting ${displayName}...`,
       });
 
-  return <ThoughtDisplay running subtitle={subtitle} testId='acp-warmup-indicator' />;
+  return (
+    <div
+      data-testid='acp-warmup-indicator'
+      className='mb-8px flex items-center gap-10px rounded-12px border border-[color:var(--color-border-2)] bg-1 px-12px py-10px text-13px text-t-secondary'
+    >
+      <span
+        data-testid='acp-warmup-agent-icon'
+        aria-hidden='true'
+        className='inline-flex h-18px w-18px shrink-0 items-center justify-center rounded-full bg-[var(--brand-light)] animate-spin'
+      >
+        {logo ? (
+          <img src={logo} alt='' className='block h-12px w-12px object-contain' />
+        ) : (
+          <Robot theme='outline' size={12} fill='var(--brand)' />
+        )}
+      </span>
+      <span className='min-w-0 flex-1 truncate'>{statusLabel}</span>
+    </div>
+  );
 };
 
 export default AcpWarmupIndicator;

@@ -28,7 +28,9 @@
     "retryFailed": "無法預熱 {{agent}}。請重試，或直接傳送一則新訊息。"
   },
   "warmup": {
-    "awaitingFirstResponse": "正在等待 {{agent}} 給出第一個回應..."
+    "awaitingFirstResponse": "正在等待 {{agent}} 給出第一個回應...",
+    "connectingInline": "正在連線至 {{agent}}...",
+    "awaitingInline": "正在等待 {{agent}} 回應..."
   },
   "logs": {
     "title": "ACP 日誌",

@@ -28,7 +28,9 @@
     "retryFailed": "无法预热 {{agent}}。请重试，或直接发送一条新消息。"
   },
   "warmup": {
-    "awaitingFirstResponse": "正在等待 {{agent}} 给出首个响应..."
+    "awaitingFirstResponse": "正在等待 {{agent}} 给出首个响应...",
+    "connectingInline": "正在连接 {{agent}}...",
+    "awaitingInline": "正在等待 {{agent}} 响应..."
   },
   "logs": {
     "title": "ACP 日志",

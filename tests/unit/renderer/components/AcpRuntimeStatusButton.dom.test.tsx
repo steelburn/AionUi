@@ -179,7 +179,7 @@ describe('AcpRuntimeStatusButton', () => {
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
-      backgroundColor: 'rgb(var(--primary-6))',
+      backgroundColor: 'var(--brand)',
     });
   });
 
@@ -191,7 +191,7 @@ describe('AcpRuntimeStatusButton', () => {
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
-      backgroundColor: 'rgb(var(--primary-6))',
+      backgroundColor: 'var(--brand)',
     });
   });
 
@@ -212,5 +212,18 @@ describe('AcpRuntimeStatusButton', () => {
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
+  });
+
+  it('marks the status dot as embedded when the header tucks it into the agent pill', () => {
+    render(
+      <AcpRuntimeStatusButton
+        conversationId={CONVERSATION_ID}
+        backend='codex'
+        agentName='Codex'
+        embeddedInAgentPill={true}
+      />
+    );
+
+    expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('data-embedded-in-agent-pill', 'true');
   });
 });

@@ -13,6 +13,7 @@ import {
 } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 
 const { Text } = Typography;
+const ACP_WAITING_BRAND_COLOR = 'var(--brand)';
 
 const getStatusColor = (status: AcpRuntimeStatus | null): string => {
   switch (status) {
@@ -30,6 +31,10 @@ const getStatusColor = (status: AcpRuntimeStatus | null): string => {
     default:
       return 'var(--color-text-4)';
   }
+};
+
+const getWaitingColor = (warmSessionWaiting: boolean): string => {
+  return warmSessionWaiting ? 'rgb(var(--success-6))' : ACP_WAITING_BRAND_COLOR;
 };
 
 const isTerminalStatus = (status: AcpRuntimeStatus | null): boolean => {
@@ -87,7 +92,8 @@ const AcpRuntimeStatusButton: React.FC<{
   conversationId: string;
   backend?: string;
   agentName?: string;
-}> = ({ conversationId, backend, agentName }) => {
+  embeddedInAgentPill?: boolean;
+}> = ({ conversationId, backend, agentName, embeddedInAgentPill = false }) => {
   const { t } = useTranslation();
   const runtimeDiagnostics = useAcpRuntimeDiagnostics(conversationId);
   const { status, statusSource, activityPhase, logs } = runtimeDiagnostics;
@@ -105,11 +111,13 @@ const AcpRuntimeStatusButton: React.FC<{
     t,
   });
   const shouldPulse = isWaiting && !isWarmSessionWaiting;
-  const color = isWaiting
-    ? isWarmSessionWaiting
-      ? 'rgb(var(--success-6))'
-      : 'rgb(var(--primary-6))'
-    : getStatusColor(effectiveStatus);
+  const color = isWaiting ? getWaitingColor(isWarmSessionWaiting) : getStatusColor(effectiveStatus);
+  const dotStyle: React.CSSProperties = {
+    backgroundColor: color,
+    boxShadow: shouldPulse
+      ? '0 0 0 1px var(--color-border-2), 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent)'
+      : '0 0 0 1px var(--color-border-2)',
+  };
 
   const panelEntries = React.useMemo<AcpLogEntry[]>(() => {
     if (logs.length > 0) {
@@ -160,16 +168,19 @@ const AcpRuntimeStatusButton: React.FC<{
         type='text'
         size='mini'
         data-testid='acp-runtime-status-button'
+        data-embedded-in-agent-pill={String(embeddedInAgentPill)}
         aria-label={statusLabel}
         title={statusLabel}
-        className='!min-w-18px !w-18px !h-18px !p-0 shrink-0 rounded-full hover:bg-[var(--color-fill-2)]'
+        className={
+          embeddedInAgentPill
+            ? '!min-w-20px !w-20px !h-20px !p-0 !-ml-10px !mr-2px shrink-0 rounded-full !bg-2 hover:!bg-[var(--brand-light)]'
+            : '!min-w-18px !w-18px !h-18px !p-0 shrink-0 rounded-full hover:bg-[var(--color-fill-2)]'
+        }
       >
         <span
           data-testid='acp-runtime-status-dot'
-          className={`block h-8px w-8px rounded-full shadow-[0_0_0_1px_var(--color-border-2)] ${
-            shouldPulse ? 'animate-pulse' : ''
-          }`}
-          style={{ backgroundColor: color }}
+          className={`block h-8px w-8px rounded-full ${shouldPulse ? 'animate-pulse' : ''}`}
+          style={dotStyle}
         />
       </Button>
     </Popover>

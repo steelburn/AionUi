@@ -28,7 +28,9 @@
     "retryFailed": "{{agent}} ısıtması başarısız oldu. Yeniden deneyin veya yeni bir mesaj gönderin."
   },
   "warmup": {
-    "awaitingFirstResponse": "{{agent}} için ilk yanıt bekleniyor..."
+    "awaitingFirstResponse": "{{agent}} için ilk yanıt bekleniyor...",
+    "connectingInline": "{{agent}} bağlanıyor...",
+    "awaitingInline": "{{agent}} yanıtı bekleniyor..."
   },
   "logs": {
     "title": "ACP Günlükleri",

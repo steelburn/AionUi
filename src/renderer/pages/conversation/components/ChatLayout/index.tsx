@@ -101,6 +101,9 @@ const ChatLayout: React.FC<{
     ACP_BACKENDS_ALL[backend as keyof typeof ACP_BACKENDS_ALL]?.name ||
     backend;
   const shouldShowAcpRuntimeStatusButton = Boolean(props.showAcpRuntimeDiagnostics && conversationId);
+  const shouldEmbedAcpRuntimeStatusInAgentPill = Boolean(
+    shouldShowAcpRuntimeStatusButton && !layout?.isMobile && (backend || agentLogo)
+  );
 
   const {
     splitRatio: workspaceSplitRatio,
@@ -205,7 +208,9 @@ const ChatLayout: React.FC<{
         <div className='flex items-center gap-12px shrink-0'>
           {props.headerExtra}
           {(backend || agentLogo || shouldShowAcpRuntimeStatusButton) && (
-            <div className='flex items-center gap-4px shrink-0'>
+            <div
+              className={`flex items-center shrink-0 ${shouldEmbedAcpRuntimeStatusInAgentPill ? 'gap-0' : 'gap-4px'}`}
+            >
               {(backend || agentLogo) && (
                 <AgentModeSelector
                   backend={backend}
@@ -218,7 +223,12 @@ const ChatLayout: React.FC<{
                 />
               )}
               {shouldShowAcpRuntimeStatusButton && conversationId && (
-                <AcpRuntimeStatusButton conversationId={conversationId} backend={backend} agentName={displayName} />
+                <AcpRuntimeStatusButton
+                  conversationId={conversationId}
+                  backend={backend}
+                  agentName={displayName}
+                  embeddedInAgentPill={shouldEmbedAcpRuntimeStatusInAgentPill}
+                />
               )}
             </div>
           )}

@@ -3311,3 +3311,104 @@
   - 按当前与 Zed 的差距复盘，下一优先级建议：
     - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
     - 第二优先：评估是否补更完整的 generating affordance，而不是继续在现有 waiting cue 上微调
+
+### 2026-04-06 / Batch 48
+
+- 对应 SC:
+  - `SC-051`
+- Goal:
+  - 把 ACP cold waiting 的视觉表达再压一轮，收掉仍然明显像补丁层的两处差距：
+    - thread 底部过重的 processing banner
+    - agent 胶囊外置、过淡的 runtime dot
+  - 让 fresh/cold waiting 的表达更接近一套紧凑的 agent status UI：
+    - thread 里改成简单单行 waiting row
+    - header dot 视觉上收入 agent 胶囊内
+    - cold waiting 的 pulse 改成更可见的品牌色
+- Root cause:
+  - 即使前几轮已经把 warm/cold waiting 语义收稳，cold waiting 的 UI 仍然暴露出“额外有一层 ACP processing 模块”的感觉：
+    - `AcpWarmupIndicator` 复用了大块 `ThoughtDisplay` 风格
+    - agent 图标、文案、背景层次都偏重
+    - 用户容易把它感知成系统内部处理层，而不是 agent 自己的状态
+  - header runtime dot 仍然外挂在 agent 胶囊外侧：
+    - 与 agent pill 不是一套 affordance
+    - 在默认主题下 `primary-6` pulse 辨识度不够
+  - ACP e2e 共享 fixture 还在读取默认 `AionUi-Dev` profile：
+    - guid 页会继承本机已有首页状态
+    - `agent pill bar` 断言会被用户本地状态污染，不再稳定
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-051 ACP Waiting Affordance Should Collapse Into A Simpler Agent Status UI`
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 用紧凑单行 waiting row 替换原大块 processing banner
+    - 左侧使用 agent logo / `Robot` fallback，并加轻量旋转
+    - cold waiting 文案缩成 inline 版本：
+      - `Connecting {{agent}}...`
+      - `Waiting for {{agent}}...`
+    - warm waiting 仍继续 suppress thread indicator，不回退合同
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - 新增 `embeddedInAgentPill` 视觉模式
+    - cold waiting 从 `primary-6` 改为品牌色 `var(--brand)` pulse
+    - brand halo 也一并增强，解决默认主题下不明显的问题
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - ACP conversation header 在桌面端把 runtime dot 直接并入 agent pill 区域
+    - 调整间距，让 dot 视觉上属于同一枚胶囊，而不是外挂控件
+  - `src/renderer/services/i18n/locales/*/acp.json`
+    - 新增短版 waiting 文案 key：
+      - `acp.warmup.connectingInline`
+      - `acp.warmup.awaitingInline`
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 回归 cold waiting 品牌色 pulse
+    - 回归 embedded pill prop
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 回归新的单行 waiting row
+    - 断言 warm session 不会回归出 thread banner
+  - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 回归 desktop ACP header 会把 runtime dot 收入 agent pill
+  - `tests/e2e/fixtures.ts`
+    - 共享 Electron fixture 改用独立 `AIONUI_DEV_PROFILE`
+    - 避免 ACP e2e 再读到本机真实 dev profile，修复 guid pill bar 断言被用户状态污染
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - warmup cue e2e 断言更新为新的紧凑 waiting 文案
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-051` 固定：
+    - cold waiting 要继续和 warm waiting 分流，不能因为视觉简化重新混成 generic waiting
+    - dot 收进胶囊后，diagnostics popover / dropdown 交互不能坏
+    - e2e 必须基于隔离 profile，不能继续吃用户本机状态
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 结果：`59 passed`
+  - `bunx playwright test tests/e2e/specs/acp-agent.e2e.ts --grep "agent pill bar renders on guid page|can see agent backend names|clicking an agent pill selects it|shows a warmup cue for a fresh ACP conversation before the first response arrives" --reporter=line`
+    - 结果：`4 passed`
+  - `bun run i18n:types && node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - `31` 条 unknown literal i18n key warning 仍为仓库既有 warning-only 基线
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`438 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 通过
+    - 结果：`3236 passed | 17 skipped (3253 tests)`
+- Product judgement:
+  - 这轮不是继续修状态合同，而是把一块已经“逻辑对了、但产品味道还不够”的 ACP UI 收到更像成品。
+  - cold waiting 现在不再像一块额外的系统 processing 模块，而更像 agent 自己正在连接 / 等待响应。
+  - header dot 收进 agent pill 后，视觉负担明显更低；品牌色 pulse 也终于在默认主题下可见。
+  - 同时，这轮顺手把 ACP e2e 从真实本机 dev profile 解耦出来，后续 batch 的门禁可信度更高。
+- Open risks:
+  - 这轮仍然是 renderer-side ACP affordance 收口，不是更底层 runtime / queue-busy ownership 的最终真相源。
+  - cold waiting 的视觉已经明显更克制，但整体 generating affordance 仍没有 Zed 那种完整的 thread-level row / elapsed meta。
+  - 共享 e2e fixture 已隔离 dev profile，但 `process` exit listener 数量和 `--localstorage-file` warning 仍是当前测试基线噪音。
+- Next:
+  - 先请用户直接体验这轮肉眼可见的变化：
+    - 发一条新的 ACP 消息
+    - 只看 thread 底部的 waiting row 和右上角 agent 胶囊
+    - 确认不再出现大块 processing banner，dot 也更容易看见
+  - 按当前与 Zed 的差距复盘，下一优先级建议：
+    - 第一优先：继续往更底层 runtime / queue-busy ownership 收口
+    - 第二优先：评估是否补更完整的 generating affordance，而不是继续在 dot / waiting row 上做局部视觉修饰

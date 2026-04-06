@@ -28,7 +28,9 @@
     "retryFailed": "Failed to warm up {{agent}}. Try again or send a new message."
   },
   "warmup": {
-    "awaitingFirstResponse": "Waiting for the first response from {{agent}}..."
+    "awaitingFirstResponse": "Waiting for the first response from {{agent}}...",
+    "connectingInline": "Connecting {{agent}}...",
+    "awaitingInline": "Waiting for {{agent}}..."
   },
   "logs": {
     "title": "ACP Logs",
