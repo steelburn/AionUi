@@ -40,6 +40,7 @@ export type I18nKey =
   | 'acp.status.error'
   | 'acp.status.session_active'
   | 'acp.status.unknown'
+  | 'acp.warmup.awaitingFirstResponse'
   | 'agent.health.autoSwitching'
   | 'agent.health.available'
   | 'agent.health.bestMatch'

@@ -2352,3 +2352,62 @@
 - Next:
   - 跑完全量 ACP 门禁并推远端
   - 再回到 send-time waiting affordance / diagnostics 入口这些剩余产品化差距
+
+### 2026-04-06 / Batch 36
+
+- 对应 SC:
+  - `SC-039`
+- Goal:
+  - 把 `send -> first response` 的线程底部 warmup row 再往真实语义收一层：
+    - 没有 live 激活证据前，继续显示 `Connecting`
+    - 已经拿到 live `connected / authenticated / session_active` 但还没首个可见响应时，切到“等待首个响应”
+- Root cause:
+  - 之前的 warmup row 只有一个副标题：`Connecting to {agent}...`
+  - 这会把“已经 active，只是在等 first visible response”误报成“还没连上”，和用户实际感知不一致
+  - reopen 一个 hydrated running 线程时，也缺少显式合同来防止过早乐观
+- Changes:
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 基于 runtime diagnostics status 切换 warmup 副标题
+    - `connected / authenticated / session_active` 下改为 `Waiting for the first response from {agent}...`
+    - 其余 waiting 情况保持 `Connecting to {agent}...`
+  - `src/renderer/services/i18n/locales/*/acp.json`
+    - 新增 `acp.warmup.awaitingFirstResponse`
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 继续守住 fresh send 初始 `Connecting`
+    - 新增合同：runtime status 进入 `session_active` 后，warmup row 切到 `Waiting for the first response...`
+    - 补充合同：hydrated running / pre-first-response 仍保持 `Connecting`
+- Reviewer:
+  - reviewer：`Boole`
+  - 第一轮 finding：
+    - 测试初版过度依赖 `start` 事件这个实现细节
+    - reopen waiting 的 `Connecting` 真相没有显式断言
+  - 修复：
+    - 改为用 `agent_status: session_active` 守住运行时合同
+    - 给 hydrated waiting 场景补了 `Connecting` 断言
+  - 最终结论：
+    - `no remaining findings`
+- Verification:
+  - `bun run test tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`41 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过（仓库既有 unknown-key warnings 保持 warning-only）
+  - `bun run verify:acp`
+    - 结果：
+      - lint：仓库既有 warning-only，`0 errors`
+      - format / tsc：通过
+      - ACP unit：`416 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`18 passed | 4 skipped`
+      - `verify:acp`：通过
+- Product judgement:
+  - 这批没有靠“插一条假消息”来制造热闹感，而是把现有 warmup 机制做得更真实：
+    - 真在连接时，用户看到 `Connecting`
+    - 已经连上但还没首包时，用户看到“等待首个响应”
+  - 这让 AionUi 的 send-time waiting affordance 更接近 Zed 的成熟感，同时仍保持克制。
+- Next:
+  - 再决定是否需要进一步做更完整的 thread-level generating row / elapsed meta
+  - 再继续评估 diagnostics 入口是否还要继续下沉

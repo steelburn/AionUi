@@ -457,6 +457,8 @@ vi.mock('react-i18next', () => ({
           return 'Connection error';
         case 'acp.status.connecting':
           return `Connecting to ${agent}...`;
+        case 'acp.warmup.awaitingFirstResponse':
+          return `Waiting for the first response from ${agent}...`;
         case 'conversation.chat.processing':
           return 'Processing';
         case 'common.retry':
@@ -561,6 +563,49 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
   });
 
+  it('updates the warmup subtitle when runtime status becomes session_active before the first visible response', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+    });
+
+    act(() => {
+      emitAcpResponse({
+        type: 'agent_status',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'status-before-first-content',
+        data: {
+          status: 'session_active',
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
+        'Waiting for the first response from Claude...'
+      );
+    });
+    expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting to Claude...');
+  });
+
   it('does not show the warmup indicator when reopening a running ACP conversation mid-turn', async () => {
     setMockMessageList([
       {
@@ -624,6 +669,7 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Processing');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
   });
 

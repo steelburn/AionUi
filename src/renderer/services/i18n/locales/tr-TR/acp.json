@@ -27,6 +27,9 @@
     "disconnectedHint": "ACP çalışma zamanı beklenmedik şekilde durdu. Şimdi bağlantıyı yeniden deneyebilir veya yeni bir oturum başlatmak için başka bir mesaj gönderebilirsiniz.",
     "retryFailed": "{{agent}} ısıtması başarısız oldu. Yeniden deneyin veya yeni bir mesaj gönderin."
   },
+  "warmup": {
+    "awaitingFirstResponse": "{{agent}} için ilk yanıt bekleniyor..."
+  },
   "logs": {
     "title": "ACP Günlükleri",
     "requestStarted": "{{backend}} -> {{model}} başlatıldı",

@@ -27,6 +27,9 @@
     "disconnectedHint": "The ACP runtime stopped unexpectedly. Retry the connection now, or send another message to start a fresh session.",
     "retryFailed": "Failed to warm up {{agent}}. Try again or send a new message."
   },
+  "warmup": {
+    "awaitingFirstResponse": "Waiting for the first response from {{agent}}..."
+  },
   "logs": {
     "title": "ACP Logs",
     "requestStarted": "{{backend}} -> {{model}} started",

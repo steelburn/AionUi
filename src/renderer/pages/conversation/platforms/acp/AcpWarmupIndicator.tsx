@@ -1,7 +1,7 @@
 import { Spin, Typography } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAcpRuntimeDiagnostics } from './acpRuntimeDiagnostics';
+import { useAcpRuntimeDiagnostics, type AcpRuntimeStatus } from './acpRuntimeDiagnostics';
 
 const { Text } = Typography;
 
@@ -15,13 +15,17 @@ const formatElapsedTime = (seconds: number): string => {
   return `${minutes}m ${remainingSeconds}s`;
 };
 
+const shouldDescribeAwaitingFirstResponse = (status: AcpRuntimeStatus | null): boolean => {
+  return status === 'connected' || status === 'authenticated' || status === 'session_active';
+};
+
 const AcpWarmupIndicator: React.FC<{
   conversationId: string;
   backend?: string;
   agentName?: string;
 }> = ({ conversationId, backend, agentName }) => {
   const { t } = useTranslation();
-  const { activityPhase, hasThinkingMessage } = useAcpRuntimeDiagnostics(conversationId);
+  const { activityPhase, hasThinkingMessage, status } = useAcpRuntimeDiagnostics(conversationId);
   const [elapsedTime, setElapsedTime] = React.useState(0);
   const startTimeRef = React.useRef<number>(Date.now());
 
@@ -48,6 +52,15 @@ const AcpWarmupIndicator: React.FC<{
   }
 
   const displayName = agentName || backend || 'ACP';
+  const subtitle = shouldDescribeAwaitingFirstResponse(status)
+    ? t('acp.warmup.awaitingFirstResponse', {
+        agent: displayName,
+        defaultValue: `Waiting for the first response from ${displayName}...`,
+      })
+    : t('acp.status.connecting', {
+        agent: displayName,
+        defaultValue: `Connecting to ${displayName}...`,
+      });
 
   return (
     <div
@@ -57,12 +70,7 @@ const AcpWarmupIndicator: React.FC<{
       <Spin size={14} />
       <div className='min-w-0 flex-1'>
         <div className='text-13px font-medium text-t-primary'>{t('conversation.chat.processing')}</div>
-        <Text className='mt-2px block text-12px text-t-secondary'>
-          {t('acp.status.connecting', {
-            agent: displayName,
-            defaultValue: `Connecting to ${displayName}...`,
-          })}
-        </Text>
+        <Text className='mt-2px block text-12px text-t-secondary'>{subtitle}</Text>
       </div>
       <Text className='text-12px whitespace-nowrap text-t-tertiary'>{formatElapsedTime(elapsedTime)}</Text>
     </div>

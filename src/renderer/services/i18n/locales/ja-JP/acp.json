@@ -27,6 +27,9 @@
     "disconnectedHint": "ACP ランタイムが予期せず停止しました。今すぐ接続を再試行するか、新しいメッセージを送って新しいセッションを開始できます。",
     "retryFailed": "{{agent}} のウォームアップに失敗しました。再試行するか、新しいメッセージを送信してください。"
   },
+  "warmup": {
+    "awaitingFirstResponse": "{{agent}} からの最初の応答を待っています..."
+  },
   "logs": {
     "title": "ACP ログ",
     "requestStarted": "{{backend}} -> {{model}} を開始しました",

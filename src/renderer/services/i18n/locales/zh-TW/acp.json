@@ -27,6 +27,9 @@
     "disconnectedHint": "ACP 執行階段已意外停止。你可以立即重試連線，或傳送一則新訊息來啟動新的工作階段。",
     "retryFailed": "無法預熱 {{agent}}。請重試，或直接傳送一則新訊息。"
   },
+  "warmup": {
+    "awaitingFirstResponse": "正在等待 {{agent}} 給出第一個回應..."
+  },
   "logs": {
     "title": "ACP 日誌",
     "requestStarted": "{{backend}} -> {{model}} 已開始",

@@ -1541,3 +1541,43 @@ Reviewer adjustment:
   - 不能把 retry 接到“当前草稿内容”；必须重放上一次失败命令。
   - 不能让 retry 状态在 conversation 间串线。
   - 不能让历史 hydrate error 获得错误的 retry CTA。
+
+## SC-039 ACP Warmup Cue Must Differentiate Connecting From Waiting For The First Response
+
+- Goal:
+  - 把 `send -> first response` 这一段等待态再收紧一层：
+    - 刚发出去、还没有 live 激活证据时，继续诚实显示 `Connecting`
+    - 一旦 ACP 已经进入 `connected / authenticated / session_active`，但首个可见响应还没到，就切到“等待首个响应”
+  - 让线程底部 warmup row 更接近 Zed 的 generating affordance，但不插入假的 assistant 正文。
+- User action:
+  - 用户点击 `Send`
+  - 或者切回一个仍处在 pre-first-response 的 running ACP 线程
+- Current failure:
+  - 现有 warmup row 一律写成 `Connecting to {agent}...`
+  - 这会把“已经 session_active，只是在等首个 thinking/content/tool step”也误报成“还没连上”
+  - 体感上会显得既冷静，又不够真实
+- Expected UI state:
+  - fresh send / pre-activation：
+    - 显示 `Processing`
+    - 副标题为 `Connecting to {agent}...`
+  - live status 已到 `connected / authenticated / session_active`，但还没首包：
+    - 仍显示 `Processing`
+    - 副标题切到 `Waiting for the first response from {agent}...`
+  - reopen 一个 hydrated running 线程，如果还没有新的 live 激活信号：
+    - 仍保持 `Connecting to {agent}...`
+- Automation plan:
+  - `AcpWarmupIndicator`
+    - 基于 runtime diagnostics status 切换副标题
+  - locale:
+    - 新增 `acp.warmup.awaitingFirstResponse`
+  - `AcpSendBoxFlow.dom.test.tsx`
+    - fresh send 初始仍显示 `Connecting`
+    - runtime status 进入 `session_active` 后切成 `Waiting for the first response...`
+    - hydrated running / pre-first-response 仍保持 `Connecting`
+- Exit criteria:
+  - warmup row 不再把所有等待都误报成“连接中”
+  - 发送后的等待体感更自然，但仍保持真实、不插假消息
+  - reopen waiting 线程时不会过早乐观地显示“已在等回复”
+- Reviewer focus:
+  - 测试不能只绑 `start` 这种实现细节；要盯住 runtime status 合同
+  - hydrated waiting 线程在没有 live 激活前，不能误显示“等待首个响应”
