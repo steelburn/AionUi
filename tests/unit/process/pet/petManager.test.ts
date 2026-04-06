@@ -154,9 +154,7 @@ describe('petManager', () => {
       process.env['ELECTRON_RENDERER_URL'] = 'http://localhost:5173';
       createPetWindow();
       const petWin = createdWindows[0];
-      expect(petWin.loadURL).toHaveBeenCalledWith(
-        expect.stringContaining('/pet/pet.html'),
-      );
+      expect(petWin.loadURL).toHaveBeenCalledWith(expect.stringContaining('/pet/pet.html'));
       delete process.env['ELECTRON_RENDERER_URL'];
     });
   });
@@ -220,9 +218,7 @@ describe('petManager', () => {
       const handler = mockIpcHandlers.get('pet:click');
       handler?.({}, { side: 'left', count: 1 });
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'attention')).toBe(true);
     });
 
@@ -231,9 +227,7 @@ describe('petManager', () => {
       const handler = mockIpcHandlers.get('pet:click');
       handler?.({}, { side: 'left', count: 2 });
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'poke-left')).toBe(true);
     });
 
@@ -242,9 +236,7 @@ describe('petManager', () => {
       const handler = mockIpcHandlers.get('pet:click');
       handler?.({}, { side: 'right', count: 2 });
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'poke-right')).toBe(true);
     });
 
@@ -253,9 +245,7 @@ describe('petManager', () => {
       const handler = mockIpcHandlers.get('pet:click');
       handler?.({}, { side: 'left', count: 3 });
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'error')).toBe(true);
     });
   });
@@ -268,9 +258,7 @@ describe('petManager', () => {
       const handler = mockIpcHandlers.get('pet:drag-start');
       handler?.();
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'dragging')).toBe(true);
     });
 
@@ -281,9 +269,7 @@ describe('petManager', () => {
       startHandler?.();
       endHandler?.();
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       const lastState = stateChanges[stateChanges.length - 1]?.[1];
       expect(lastState).toBe('idle');
     });
@@ -331,9 +317,7 @@ describe('petManager', () => {
       hook('chat.response.stream', { type: 'thinking' });
 
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'thinking')).toBe(true);
     });
 
@@ -345,9 +329,7 @@ describe('petManager', () => {
       hook('confirmation.add', {});
 
       const sendCalls = createdWindows[0].webContents.send.mock.calls;
-      const stateChanges = sendCalls.filter(
-        (c: [string, ...unknown[]]) => c[0] === 'pet:state-changed',
-      );
+      const stateChanges = sendCalls.filter((c: [string, ...unknown[]]) => c[0] === 'pet:state-changed');
       expect(stateChanges.some((c: [string, string]) => c[1] === 'notification')).toBe(true);
     });
   });
