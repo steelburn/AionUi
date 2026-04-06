@@ -1630,10 +1630,15 @@ export class AcpAgent {
       let args: string[];
 
       if (this.extra.cliPath.startsWith('npx ')) {
-        // For "npx @qwen-code/qwen-code" or "npx @anthropic-ai/claude-code"
+        // Legacy npx path: transform to bun x --bun (backward compat for user overrides)
         const parts = this.extra.cliPath.split(' ');
         command = 'bun';
         args = ['x', '--bun', ...parts.slice(1), loginArg];
+      } else if (this.extra.cliPath.startsWith('bun ')) {
+        // bun x command: split into command + args
+        const parts = this.extra.cliPath.split(' ');
+        command = parts[0];
+        args = [...parts.slice(1), loginArg];
       } else {
         // For regular paths like '/usr/local/bin/qwen' or '/usr/local/bin/claude'
         command = this.extra.cliPath;

@@ -22,11 +22,7 @@ import {
   CODEX_ACP_BRIDGE_VERSION,
   CODEX_ACP_NPX_PACKAGE,
 } from '@/common/types/acpTypes';
-import {
-  getEnhancedEnv,
-  getWindowsShellExecutionOptions,
-  loadFullShellEnvironment,
-} from '@process/utils/shellEnv';
+import { getEnhancedEnv, getWindowsShellExecutionOptions, loadFullShellEnvironment } from '@process/utils/shellEnv';
 import { mainLog, mainWarn } from '@process/utils/mainLogger';
 
 const execFile = promisify(execFileCb);
@@ -144,7 +140,6 @@ export async function prepareCleanEnv(): Promise<Record<string, string | undefin
   return merged;
 }
 
-
 // ── Generic spawn config ────────────────────────────────────────────
 
 /**
@@ -176,10 +171,15 @@ export function createGenericSpawnConfig(
   let spawnArgs: string[];
 
   if (cliPath.startsWith('npx ')) {
-    // For "npx @package/name [extra-args]", split into command and arguments
+    // Legacy npx path: transform to bun x --bun (backward compat for user overrides)
     const parts = cliPath.split(' ').filter(Boolean);
     spawnCommand = 'bun';
     spawnArgs = ['x', '--bun', ...parts.slice(1), ...effectiveAcpArgs];
+  } else if (cliPath.startsWith('bun ')) {
+    // bun x command: split into command + args on all platforms
+    const parts = cliPath.split(' ').filter(Boolean);
+    spawnCommand = isWindows ? `chcp 65001 >nul && "${parts[0]}"` : parts[0];
+    spawnArgs = [...parts.slice(1), ...effectiveAcpArgs];
   } else if (isWindows) {
     // On Windows with shell: true, let cmd.exe handle the full command string.
     // This correctly supports paths with spaces (e.g., "C:\Program Files\agent.exe")
@@ -422,11 +422,7 @@ async function connectBunBackend(config: {
     return;
   } catch (error) {
     await cleanup();
-    mainWarn(
-      `[ACP ${backend}]`,
-      'Phase 1 failed, retrying...',
-      error instanceof Error ? error.message : String(error)
-    );
+    mainWarn(`[ACP ${backend}]`, 'Phase 1 failed, retrying...', error instanceof Error ? error.message : String(error));
   }
 
   // Phase 2: retry

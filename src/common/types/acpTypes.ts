@@ -356,7 +356,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     id: 'qwen',
     name: 'Qwen Code',
     cliCommand: 'qwen',
-    defaultCliPath: 'npx @qwen-code/qwen-code',
+    defaultCliPath: 'bun x --bun @qwen-code/qwen-code',
     authRequired: true,
     enabled: true, // ✅ 已验证支持：Qwen CLI v0.0.10+ 支持 --acp
     supportsStreaming: true,
@@ -376,7 +376,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     id: 'codex',
     name: 'Codex',
     cliCommand: 'codex', // Detect local codex CLI (codex-acp bridge invokes it)
-    defaultCliPath: `npx ${CODEX_ACP_NPX_PACKAGE}`,
+    defaultCliPath: `bun x --bun ${CODEX_ACP_NPX_PACKAGE}`,
     authRequired: true, // Needs OPENAI_API_KEY or ChatGPT auth
     enabled: true, // ✅ Codex via codex-acp ACP bridge
     supportsStreaming: false,
@@ -387,7 +387,7 @@ export const ACP_BACKENDS_ALL: Record<AcpBackendAll, AcpBackendConfig> = {
     id: 'codebuddy',
     name: 'CodeBuddy',
     cliCommand: 'codebuddy',
-    defaultCliPath: `npx ${CODEBUDDY_ACP_NPX_PACKAGE}`,
+    defaultCliPath: `bun x --bun ${CODEBUDDY_ACP_NPX_PACKAGE}`,
     authRequired: true,
     enabled: true, // ✅ Tencent CodeBuddy Code CLI，使用 `codebuddy --acp` 启动
     supportsStreaming: false,

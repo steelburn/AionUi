@@ -228,9 +228,7 @@ export function mergePaths(path1?: string, path2?: string): string {
  */
 export function getBundledBunDir(): string | null {
   const isPackaged = !!process.resourcesPath || (appModule && appModule.app && appModule.app.isPackaged);
-  const resourcesPath = isPackaged
-    ? process.resourcesPath || ''
-    : path.join(process.cwd(), 'resources');
+  const resourcesPath = isPackaged ? process.resourcesPath || '' : path.join(process.cwd(), 'resources');
   const platform = process.platform === 'win32' ? 'win32' : process.platform;
   const arch = process.arch;
   const bunDir = path.join(resourcesPath, 'bundled-bun', `${platform}-${arch}`);
@@ -386,7 +384,6 @@ export function getEnhancedEnv(customEnv?: Record<string, string>): Record<strin
   } as Record<string, string>;
 }
 
-
 /**
  * Parse `env` command output into a key-value map.
  * Handles multi-line values correctly by detecting new variable starts
@@ -425,7 +422,6 @@ export function getWindowsShellExecutionOptions(): {
 } {
   return process.platform === 'win32' ? { shell: true, windowsHide: true } : {};
 }
-
 
 /**
  * Promise-based dedup guard so concurrent callers share one spawn.
@@ -630,4 +626,3 @@ export function getNpxCacheDir(): string {
   const npmCacheBase = posixCacheCandidates.find((candidate) => existsSync(candidate)) || posixCacheCandidates[0];
   return path.join(npmCacheBase, '_npx');
 }
-

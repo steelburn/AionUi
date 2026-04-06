@@ -77,11 +77,7 @@ describe('spawnBunBackend - Windows UTF-8 fix', () => {
   it('uses bunCommand directly on non-Windows (no chcp prefix)', () => {
     spawnBunBackend('claude', '@pkg/cli@1.0.0', 'bun', {}, '/cwd', false);
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      'bun',
-      expect.any(Array),
-      expect.objectContaining({ shell: false })
-    );
+    expect(mockSpawn).toHaveBeenCalledWith('bun', expect.any(Array), expect.objectContaining({ shell: false }));
   });
 
   it('prefixes command with chcp 65001 on Windows to enable UTF-8', () => {
@@ -170,7 +166,9 @@ describe('createGenericSpawnConfig - Windows path handling', () => {
   });
 
   it('splits npx package into bun command and args', () => {
-    const config = createGenericSpawnConfig('npx @pkg/cli', '/cwd', ['--acp'], undefined, { PATH: '/bundled-bun/bin:/usr/bin' });
+    const config = createGenericSpawnConfig('npx @pkg/cli', '/cwd', ['--acp'], undefined, {
+      PATH: '/bundled-bun/bin:/usr/bin',
+    });
 
     expect(config.command).toBe('bun');
     expect(config.args).toContain('x');
