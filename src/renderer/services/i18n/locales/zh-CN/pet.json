@@ -1,0 +1,14 @@
+{
+  "desktopPet": "桌面宠物",
+  "enable": "启用桌面宠物",
+  "size": "宠物大小",
+  "sizeSmall": "小 ({{px}}px)",
+  "sizeMedium": "中 ({{px}}px)",
+  "sizeLarge": "大 ({{px}}px)",
+  "dnd": "免打扰",
+  "dndDescription": "宠物保持空闲，忽略 AI 事件",
+  "pat": "摸摸",
+  "resetPosition": "重置位置",
+  "hide": "隐藏",
+  "showHide": "显示/隐藏"
+}

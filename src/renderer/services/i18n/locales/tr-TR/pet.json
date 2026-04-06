@@ -1,0 +1,14 @@
+{
+  "desktopPet": "Masaüstü Pet",
+  "enable": "Masaüstü Pet'i Etkinleştir",
+  "size": "Pet Boyutu",
+  "sizeSmall": "Küçük ({{px}}px)",
+  "sizeMedium": "Orta ({{px}}px)",
+  "sizeLarge": "Büyük ({{px}}px)",
+  "dnd": "Rahatsız Etmeyin",
+  "dndDescription": "Pet boşta kalır, AI olaylarını yok sayar",
+  "pat": "Okşa",
+  "resetPosition": "Konumu Sıfırla",
+  "hide": "Gizle",
+  "showHide": "Göster/Gizle"
+}

@@ -154,10 +154,10 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
 
   template.push({ type: 'separator' });
   template.push({
-    label: '🐾 Desktop Pet',
+    label: `🐾 ${i18n.t('pet.desktopPet')}`,
     submenu: [
       {
-        label: 'Show/Hide',
+        label: i18n.t('pet.showHide'),
         click: async () => {
           try {
             const petManager = await import('../pet/petManager');
@@ -170,7 +170,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
       },
       { type: 'separator' as const },
       {
-        label: 'Small (200px)',
+        label: i18n.t('pet.sizeSmall', { px: 200 }),
         click: async () => {
           try {
             const { destroyPetWindow, createPetWindow } = await import('../pet/petManager');
@@ -182,7 +182,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
         },
       },
       {
-        label: 'Medium (280px)',
+        label: i18n.t('pet.sizeMedium', { px: 280 }),
         click: async () => {
           try {
             const { destroyPetWindow, createPetWindow } = await import('../pet/petManager');
@@ -194,7 +194,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
         },
       },
       {
-        label: 'Large (360px)',
+        label: i18n.t('pet.sizeLarge', { px: 360 }),
         click: async () => {
           try {
             const { destroyPetWindow, createPetWindow } = await import('../pet/petManager');

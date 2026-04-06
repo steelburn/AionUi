@@ -1,0 +1,14 @@
+{
+  "desktopPet": "デスクトップペット",
+  "enable": "デスクトップペットを有効にする",
+  "size": "ペットのサイズ",
+  "sizeSmall": "小 ({{px}}px)",
+  "sizeMedium": "中 ({{px}}px)",
+  "sizeLarge": "大 ({{px}}px)",
+  "dnd": "おやすみモード",
+  "dndDescription": "ペットはアイドル状態を維持し、AIイベントを無視します",
+  "pat": "なでなで",
+  "resetPosition": "位置をリセット",
+  "hide": "非表示",
+  "showHide": "表示/非表示"
+}

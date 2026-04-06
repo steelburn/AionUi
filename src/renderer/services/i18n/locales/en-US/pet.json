@@ -1,0 +1,14 @@
+{
+  "desktopPet": "Desktop Pet",
+  "enable": "Enable Desktop Pet",
+  "size": "Pet Size",
+  "sizeSmall": "Small ({{px}}px)",
+  "sizeMedium": "Medium ({{px}}px)",
+  "sizeLarge": "Large ({{px}}px)",
+  "dnd": "Do Not Disturb",
+  "dndDescription": "Pet stays idle, ignores AI events",
+  "pat": "Pat",
+  "resetPosition": "Reset Position",
+  "hide": "Hide",
+  "showHide": "Show/Hide"
+}
