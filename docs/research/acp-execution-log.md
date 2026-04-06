@@ -3586,3 +3586,109 @@
     - 第一优先：继续评估 diagnostics 入口是否还能更下沉、更克制
     - 第二优先：决定是否继续把 generating row 做到更完整的 turn stats / tool-aware 语义
     - 第三优先：再进入更深层 runtime / queue-busy ownership 收口
+
+### 2026-04-06 / Batch 51
+
+- 对应 SC:
+  - `SC-054`
+- Goal:
+  - 在不触碰 ACP 主进程、session lifecycle、runtime contract 的前提下，把 desktop ACP header 的 idle diagnostics 再收一层。
+  - 用户空闲时不该一直看到像“外挂调试灯”的状态入口：
+    - `idle + neutral / warm` 时默认退到 agent pill hover / focus 后才显现
+    - `waiting / streaming / live terminal failure` 时继续保持显性
+  - 本轮还必须守住 reviewer 的两条红线：
+    - diagnostics 不能因 hover-reveal 变成键盘不可达
+    - 回归不能只测 prop plumbing，必须覆盖真实 pill DOM 交互
+- Root cause:
+  - 虽然 `ACP logs` 早已收成二级入口，但 embedded status entry 在 desktop header 上依然长期露出，主观观感仍比 Zed 更“把内部状态挂在脸上”。
+  - 第一版 hover-reveal 方案只靠 CSS 的 `group-hover / group-focus-within`：
+    - 对没有其他可聚焦子节点的 agent pill，会把 diagnostics 入口变成鼠标 hover-only
+    - e2e helper 仍用过宽 locator，也会在 hover-reveal 场景下被 pill 容器拦截
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-054 Idle ACP Diagnostics Should Recede Until The Agent Pill Is Engaged`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 新增共享 selector `shouldProminentlyShowAcpRuntimeDiagnosticsEntry`
+    - 用统一 runtime snapshot 判断 embedded diagnostics 应该 `always` 还是 `hover`
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - desktop ACP header 改为按共享 selector 给 agent pill 的 trailing accessory 切换显隐策略
+    - 保持当前改动只停留在 renderer header 组合层
+  - `src/renderer/components/agent/AgentModeSelector.tsx`
+    - trailing accessory hover-reveal 改为由真实 `mouse + focus-within` 状态驱动
+    - hover 模式下为 full pill 提供显式 focus 入口，保证键盘也能进入 diagnostics
+    - 增加 `data-trailing-accessory-revealed`，让真实 DOM 交互更容易回归
+  - `tests/unit/renderer/components/AgentModeSelector.dom.test.tsx`
+    - 新增真实 DOM 回归：
+      - pill 获取键盘焦点后会显出 diagnostics accessory
+      - diagnostics button 仍能继续 Tab 进入
+      - pointer hover 离开时 reveal 语义正确切换
+  - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 保留 ChatLayout 层的 prop plumbing 断言
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 保留 shared selector 的 prominent / non-prominent 语义断言
+  - `tests/e2e/specs/acp-agent.e2e.ts`
+    - `openAcpDiagnostics()` 改成优先作用于当前 agent pill 内的 embedded runtime button
+    - hover-reveal 场景下不再用宽 locator 去点一个可能被 pill 容器拦截的按钮
+- Reviewer:
+  - 按 V2 拉起隔离 reviewer `Gibbs`
+  - reviewer 结论有 2 条有效发现：
+    - `High`：idle diagnostics 在无其他 focus target 的 pill 上会变成键盘不可达
+    - `Medium`：原有新测试只验证 `hover / always` prop，没有覆盖真实 DOM 交互路径
+  - 本轮已按 reviewer 口径修复：
+    - diagnostics 入口恢复键盘可达
+    - 新增真实 `AgentModeSelector` DOM 回归
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AgentModeSelector.dom.test.tsx tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 结果：`19 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - `31` 条 unknown literal i18n key warning 仍为仓库既有 warning-only 基线
+  - `bun run test:acp:all`
+    - 通过
+    - 结果：
+      - ACP unit：`444 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run verify:acp`
+    - 本轮未作为最终门禁直接采用
+    - 原因：
+      - 仓库存在用户本地未跟踪草稿 `docs/research/acp-development-workflow-v2.md`
+      - `verify:acp` 中的全局 `format:check` 会把这份未跟踪文件也算进去
+    - 替代门禁：
+      - `bunx oxfmt --check`（仅本轮改动文件）：通过
+      - `git diff --check`：通过
+  - `bun run test`
+    - 通过
+    - 结果：`3244 passed | 17 skipped (3261 tests)`
+- Product judgement:
+  - 这轮收的是“克制感”，不是新功能。
+  - 现在 ACP diagnostics 入口的用户感知已经更接近 Zed：
+    - 空闲时不会长期挂一个显眼 dot 在 header 上
+    - 真正生成中或 live failure 时，又不会失去状态入口
+  - 更重要的是，这次收口没有把问题做成更深层 runtime 改造：
+    - 没动 `AcpConnection`
+    - 没动 `AcpAgentManager`
+    - 没动 session / queue / busy ownership
+  - 这使得当前阶段已经具备一个更适合直接合入 `main` 的边界。
+- Open risks:
+  - 当前 diagnostics 入口虽然已从“常亮”收成“hover / focus 才显现”，但它仍然位于主 header / agent pill 中，和 Zed 更深层的调试入口相比仍偏前台。
+  - hover-reveal 现在依赖 `AgentModeSelector` 的真实 focus 路径；后续若 header/pill 再重构，需要继续守住这一可达性合同。
+  - 更深层的 `runtime / queue-busy ownership` 仍未回收到最终单一真相源，但这已不属于本轮 UI 收敛的范围。
+- Plan review:
+  - 本轮已回看并更新 `docs/research/acp-optimization-plan-final.md`
+  - 调整点：
+    - 不再把“desktop idle diagnostics 长期外露”保留为默认现状
+    - 改写为“idle 入口已退到 agent pill hover / focus；剩余差距主要是入口仍处于主 header，而不是更深层调试 surface”
+  - 本轮 Zed 对照依据继续保持代码事实：
+    - `/Users/veryliu/Documents/GitHub/zed/docs/src/ai/external-agents.md`
+- Next:
+  - 当前阶段可以作为一个适合合入 `main` 的停点。
+  - 如果后续继续 ACP 优化，建议把优先级调整为：
+    - 第一优先：评估是否还需要把 diagnostics 从当前 agent-pill hover 入口继续下沉
+    - 第二优先：回到更深层 `runtime / queue-busy ownership`
+    - 第三优先：仅在确认仍有明显用户价值时，再继续补更重的 turn stats / tool-aware affordance

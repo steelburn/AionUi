@@ -935,7 +935,7 @@ Zed 也有 ACP logs，但它是：
 
 当前剩余的主要差距更偏产品化：
 
-- AionUi 已将 `ACP logs` 收到二级入口，但 diagnostics status dot 仍比 Zed 更直接暴露在主线程 header 中
+- AionUi 已将 `ACP logs` 收到二级入口；desktop idle diagnostics 也已退到 agent pill hover / focus 后才显现。与 Zed 的剩余差距主要不再是“常亮外露”，而是这个入口仍位于主 header / agent pill，而不是更深层调试 surface
 - AionUi 已补上轻量的 thread-level generating row / elapsed meta，并覆盖了 cold waiting 与普通 streaming；后续如果继续扩展 turn stats / token meta / tool-aware affordance，应视为 AionUi 的产品增强，而不是 Zed external-agent 的默认基线
 - AionUi 的 streaming reveal 已有最小版，但离 Zed 更细腻的观感调优仍有空间
 
@@ -952,6 +952,6 @@ Zed 也有 ACP logs，但它是：
 
 因此后续优先级应继续是：
 
-1. 再决定 diagnostics 入口是否继续下沉到更深层调试入口
-2. 再继续打磨 current generating row / reveal 的克制感与连贯性，而不是先假设必须补 token/tool stats
-3. 再决定是否进入更大的连接拓扑 / runtime 托管阶段
+1. 再决定当前 agent-pill hover diagnostics 入口是否还要继续下沉到更深层调试入口；如果当前阶段以 merge-friendly 为先，也可以先保持现状
+2. 再回到更深层 `runtime / queue-busy ownership` 收口，而不是继续把大量精力花在 header status 微调上
+3. 仅在确认仍有明确用户价值时，再继续打磨 generating row / reveal 的克制感与连贯性，而不是先假设必须补 token/tool stats

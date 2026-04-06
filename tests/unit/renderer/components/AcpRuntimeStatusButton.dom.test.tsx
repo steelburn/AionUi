@@ -6,6 +6,7 @@ import {
   clearAcpRuntimeDiagnosticsSnapshot,
   publishAcpRuntimeDiagnosticsSnapshot,
   setAcpRuntimeUiWarmupPending,
+  shouldProminentlyShowAcpRuntimeDiagnosticsEntry,
   type AcpLogEntry,
 } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 
@@ -225,5 +226,37 @@ describe('AcpRuntimeStatusButton', () => {
     );
 
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('data-embedded-in-agent-pill', 'true');
+  });
+
+  // SC-054: idle neutral ACP diagnostics should not stay prominently visible in the header
+  it('treats idle session warmth as non-prominent for the header diagnostics entry', () => {
+    expect(
+      shouldProminentlyShowAcpRuntimeDiagnosticsEntry({
+        status: 'session_active',
+        statusSource: 'live',
+        activityPhase: 'idle',
+        uiWarmupPending: false,
+      })
+    ).toBe(false);
+  });
+
+  // SC-054: active turns and live terminal failures should keep the diagnostics entry prominent
+  it('keeps waiting turns and live failures prominent for the header diagnostics entry', () => {
+    expect(
+      shouldProminentlyShowAcpRuntimeDiagnosticsEntry({
+        status: null,
+        statusSource: null,
+        activityPhase: 'waiting',
+        uiWarmupPending: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldProminentlyShowAcpRuntimeDiagnosticsEntry({
+        status: 'disconnected',
+        statusSource: 'live',
+        activityPhase: 'idle',
+        uiWarmupPending: false,
+      })
+    ).toBe(true);
   });
 });

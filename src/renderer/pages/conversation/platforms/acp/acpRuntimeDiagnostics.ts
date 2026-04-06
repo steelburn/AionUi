@@ -90,6 +90,18 @@ export const isAcpRuntimeBusySnapshot = (
   snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
 ): boolean => snapshot.activityPhase !== 'idle' || snapshot.uiWarmupPending === true;
 
+const isLiveTerminalAcpRuntimeStatus = (
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'status' | 'statusSource'>
+): boolean =>
+  snapshot.statusSource === 'live' &&
+  (snapshot.status === 'auth_required' || snapshot.status === 'disconnected' || snapshot.status === 'error');
+
+export const shouldProminentlyShowAcpRuntimeDiagnosticsEntry = (
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending' | 'status' | 'statusSource'>
+): boolean => {
+  return isAcpRuntimeBusySnapshot(snapshot) || isLiveTerminalAcpRuntimeStatus(snapshot);
+};
+
 const emitAcpRuntimeDiagnosticsSnapshot = (conversationId: string): void => {
   for (const listener of acpRuntimeDiagnosticsListeners.get(conversationId) ?? []) {
     listener();

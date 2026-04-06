@@ -65,7 +65,16 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
 }
 
 async function openAcpDiagnostics(page: Page): Promise<Locator> {
-  const diagnosticsButton = page.locator('[data-testid="acp-runtime-status-button"]');
+  // SC-054: idle ACP diagnostics can recede until the user engages the agent pill.
+  const agentPill = page.locator('[data-testid="agent-mode-selector-pill"]').first();
+  const embeddedDiagnosticsButton = agentPill.locator('[data-testid="acp-runtime-status-button"]').first();
+  const hasEmbeddedDiagnosticsButton = (await agentPill.count()) > 0 && (await embeddedDiagnosticsButton.count()) > 0;
+  const diagnosticsButton = hasEmbeddedDiagnosticsButton
+    ? embeddedDiagnosticsButton
+    : page.locator('[data-testid="acp-runtime-status-button"]').first();
+  if (hasEmbeddedDiagnosticsButton) {
+    await agentPill.hover();
+  }
   await expect(diagnosticsButton).toBeVisible({ timeout: 15_000 });
   await diagnosticsButton.click();
   const logsPanel = page.locator('[data-testid="acp-logs-panel"]');
@@ -1097,7 +1106,7 @@ test.describe.serial('ACP conversation page (hermetic)', () => {
       const postRecallConversation = await readHermeticConversation(reopenedApp.page, conversationId);
       expect(postRecallConversation.extra?.acpSessionId).toBe(persistedSessionId);
 
-      const logsPanel = await openAcpDiagnostics(reopenedApp.page);
+      await openAcpDiagnostics(reopenedApp.page);
       await expect(reopenedApp.page.locator('[data-testid="acp-auth-banner"]')).toHaveCount(0);
       await expect(reopenedApp.page.locator('[data-testid="acp-disconnected-banner"]')).toHaveCount(0);
 

@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import ChatLayout from '@/renderer/pages/conversation/components/ChatLayout';
 
+const mockRuntimeDiagnosticsSnapshot = {
+  status: null,
+  statusSource: null,
+  statusRevision: 0,
+  activityPhase: 'idle',
+  pendingFirstResponseMode: null,
+  uiWarmupPending: false,
+  hasThinkingMessage: false,
+  logs: [],
+};
+
 const mockLayoutContext = {
   isMobile: false,
   siderCollapsed: false,
@@ -17,10 +28,19 @@ vi.mock('@/common/config/storage', () => ({
 
 vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
   __esModule: true,
-  default: ({ trailingAccessory }: { trailingAccessory?: React.ReactNode }) =>
+  default: ({
+    trailingAccessory,
+    trailingAccessoryVisibility,
+  }: {
+    trailingAccessory?: React.ReactNode;
+    trailingAccessoryVisibility?: string;
+  }) =>
     React.createElement(
       'div',
-      { 'data-testid': 'agent-mode-selector' },
+      {
+        'data-testid': 'agent-mode-selector',
+        'data-trailing-accessory-visibility': trailingAccessoryVisibility ?? 'always',
+      },
       React.createElement('div', { 'data-testid': 'agent-mode-selector-trigger' }),
       trailingAccessory
     ),
@@ -126,6 +146,15 @@ vi.mock('@/renderer/pages/conversation/Preview', () => ({
   }),
 }));
 
+vi.mock('@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics', () => ({
+  useAcpRuntimeDiagnostics: () => mockRuntimeDiagnosticsSnapshot,
+  shouldProminentlyShowAcpRuntimeDiagnosticsEntry: (snapshot: typeof mockRuntimeDiagnosticsSnapshot) =>
+    snapshot.activityPhase !== 'idle' ||
+    snapshot.uiWarmupPending ||
+    (snapshot.statusSource === 'live' &&
+      (snapshot.status === 'auth_required' || snapshot.status === 'disconnected' || snapshot.status === 'error')),
+}));
+
 vi.mock('@/renderer/pages/conversation/utils/detectPlatform', () => ({
   isMacEnvironment: () => false,
   isWindowsEnvironment: () => false,
@@ -169,6 +198,14 @@ vi.mock('@arco-design/web-react', () => {
 describe('ChatLayout ACP runtime diagnostics entry', () => {
   beforeEach(() => {
     mockLayoutContext.isMobile = false;
+    mockRuntimeDiagnosticsSnapshot.status = null;
+    mockRuntimeDiagnosticsSnapshot.statusSource = null;
+    mockRuntimeDiagnosticsSnapshot.statusRevision = 0;
+    mockRuntimeDiagnosticsSnapshot.activityPhase = 'idle';
+    mockRuntimeDiagnosticsSnapshot.pendingFirstResponseMode = null;
+    mockRuntimeDiagnosticsSnapshot.uiWarmupPending = false;
+    mockRuntimeDiagnosticsSnapshot.hasThinkingMessage = false;
+    mockRuntimeDiagnosticsSnapshot.logs = [];
   });
 
   it('renders the ACP runtime status button when diagnostics are enabled', () => {
@@ -204,6 +241,42 @@ describe('ChatLayout ACP runtime diagnostics entry', () => {
     const runtimeStatusButton = within(agentModeSelector).getByTestId('acp-runtime-status-button');
 
     expect(runtimeStatusButton).toHaveAttribute('data-embedded-in-agent-pill', 'true');
+  });
+
+  // SC-054: idle neutral ACP diagnostics should recede until the user engages the agent pill
+  it('keeps the embedded desktop diagnostics entry hover-revealed when ACP is idle and neutral', () => {
+    render(
+      <ChatLayout
+        title='Test'
+        backend='codex'
+        conversationId='conv-acp'
+        showAcpRuntimeDiagnostics={true}
+        sider={<div />}
+      >
+        <div>body</div>
+      </ChatLayout>
+    );
+
+    expect(screen.getByTestId('agent-mode-selector')).toHaveAttribute('data-trailing-accessory-visibility', 'hover');
+  });
+
+  // SC-054: active ACP turns should keep the embedded diagnostics entry prominent
+  it('keeps the embedded desktop diagnostics entry prominent while ACP is actively waiting', () => {
+    mockRuntimeDiagnosticsSnapshot.activityPhase = 'waiting';
+
+    render(
+      <ChatLayout
+        title='Test'
+        backend='codex'
+        conversationId='conv-acp'
+        showAcpRuntimeDiagnostics={true}
+        sider={<div />}
+      >
+        <div>body</div>
+      </ChatLayout>
+    );
+
+    expect(screen.getByTestId('agent-mode-selector')).toHaveAttribute('data-trailing-accessory-visibility', 'always');
   });
 
   it('renders the ACP runtime status button when diagnostics are enabled without backend', () => {

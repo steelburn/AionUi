@@ -50,6 +50,8 @@ export interface AgentModeSelectorProps {
   onModeChanged?: (mode: string) => void;
   /** Optional trailing accessory rendered inside the full-mode agent pill */
   trailingAccessory?: React.ReactNode;
+  /** Visibility mode for the trailing accessory inside the full-mode agent pill */
+  trailingAccessoryVisibility?: 'always' | 'hover';
 }
 
 /**
@@ -77,6 +79,7 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   hideCompactLabelPrefixOnMobile = false,
   onModeChanged,
   trailingAccessory,
+  trailingAccessoryVisibility = 'always',
 }) => {
   const { t } = useTranslation();
   const layout = useLayoutContext();
@@ -97,6 +100,12 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   const canSwitchMode = supportsModeSwitch(backend) && (conversationId || onModeSelect);
   // Mobile conversation header agent pill is display-only by design.
   const canInteract = canSwitchMode && !(compact && compactLabelType === 'agent');
+  const shouldRevealTrailingAccessoryOnEngagement =
+    Boolean(trailingAccessory) && trailingAccessoryVisibility === 'hover';
+  const [isTrailingAccessoryHovered, setIsTrailingAccessoryHovered] = useState(false);
+  const [isTrailingAccessoryFocusWithin, setIsTrailingAccessoryFocusWithin] = useState(false);
+  const isTrailingAccessoryVisible =
+    trailingAccessoryVisibility === 'always' || isTrailingAccessoryHovered || isTrailingAccessoryFocusWithin;
 
   // When initialMode prop changes (e.g. agent switch on Guid page), update local state.
   // Validate against available modes to handle backends with non-standard default
@@ -295,8 +304,25 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
 
   const content = (
     <div
-      className='flex items-center gap-0 bg-2 w-fit rounded-full px-[8px] py-[2px]'
+      data-testid='agent-mode-selector-pill'
+      data-trailing-accessory-revealed={String(isTrailingAccessoryVisible)}
+      className='group flex items-center gap-0 bg-2 w-fit rounded-full px-[8px] py-[2px]'
       style={{ opacity: isLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}
+      tabIndex={shouldRevealTrailingAccessoryOnEngagement ? 0 : undefined}
+      onMouseEnter={shouldRevealTrailingAccessoryOnEngagement ? () => setIsTrailingAccessoryHovered(true) : undefined}
+      onMouseLeave={shouldRevealTrailingAccessoryOnEngagement ? () => setIsTrailingAccessoryHovered(false) : undefined}
+      onFocusCapture={
+        shouldRevealTrailingAccessoryOnEngagement ? () => setIsTrailingAccessoryFocusWithin(true) : undefined
+      }
+      onBlurCapture={
+        shouldRevealTrailingAccessoryOnEngagement
+          ? (event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsTrailingAccessoryFocusWithin(false);
+              }
+            }
+          : undefined
+      }
     >
       {canSwitchMode ? (
         <Dropdown
@@ -311,7 +337,20 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
         triggerContent
       )}
       {trailingAccessory ? (
-        <span className='ml-4px pl-4px inline-flex items-center shrink-0 border-l border-[color:var(--color-border-2)]'>
+        <span
+          data-testid='agent-mode-selector-trailing-accessory'
+          data-visibility={trailingAccessoryVisibility}
+          data-revealed={String(isTrailingAccessoryVisible)}
+          className={
+            trailingAccessoryVisibility === 'hover'
+              ? `ml-4px pl-4px inline-flex items-center shrink-0 border-l transition-[opacity,border-color] duration-150 ${
+                  isTrailingAccessoryVisible
+                    ? 'visible opacity-100 pointer-events-auto border-[color:var(--color-border-2)]'
+                    : 'invisible opacity-0 pointer-events-none border-transparent'
+                }`
+              : 'ml-4px pl-4px inline-flex items-center shrink-0 border-l border-[color:var(--color-border-2)]'
+          }
+        >
           {trailingAccessory}
         </span>
       ) : null}

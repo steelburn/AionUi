@@ -2306,3 +2306,57 @@ Reviewer adjustment:
   - 不能把 warm waiting 又做回 reconnect-style banner
   - elapsed 必须绑定真实 turn start，而不是每次 render 重新起表
   - 不能让 stale hydration 把历史 elapsed 错误带进新会话
+
+## SC-054 Idle ACP Diagnostics Should Recede Until The Agent Pill Is Engaged
+
+- Goal:
+  - 继续追平 Zed 在 external agent 调试入口上的“克制感”，但只做局部、可回滚、可直接合入 main 的 UI 收敛，不动 ACP 主链和底层状态机。
+  - 当前 AionUi 的 ACP runtime status dot 虽然已经收入 agent pill，但在 thread 空闲时仍然常驻可见，header 仍比 Zed 更像“把调试状态挂在用户脸上”。
+  - 这轮要把 idle diagnostics 入口收成：
+    - active turn 或 live failure 时，状态入口继续明显可见
+    - 空闲且没有当前故障时，状态入口默认退到 hover / focus 才显现
+    - 仍然保留 diagnostics 可访问性，不把它彻底删掉
+- User action:
+  - 用户打开一个 ACP 会话，且该会话当前没有在生成，也没有 live error。
+  - 用户看右上角 agent pill。
+  - 用户把鼠标移到 agent pill 上，或通过聚焦操作进入这块 header。
+  - 用户再发一条新消息，观察 active turn 时的状态入口。
+- Current failure:
+  - 当前 header 的 diagnostics/status 入口几乎一直可见：
+    - 即使 thread 已空闲
+    - 即使没有正在等待、生成、断连、认证或 error
+  - 它已经比之前收敛，但仍然比 Zed 更直接暴露在主线程 header 中。
+  - 如果继续往更深架构层改 before 收这种 UI 差距，会让这条线过早进入高侵入改造，不利于当前阶段合入 main。
+- Expected UI state:
+  - 对 desktop ACP header：
+    - `waiting / streaming / live terminal failure` 时，embedded status entry 保持明显可见
+    - `idle + neutral / warm` 时，embedded status entry 默认退隐，只有 hover / focus agent pill 才显现
+  - diagnostics popover 仍然可打开
+  - mobile 入口合同不退化
+  - agent pill 本身布局不抖动，不出现明显的宽度跳变或点击冲突
+- Architecture guardrails:
+  - 只允许改 renderer header 组合层和共享 selector
+  - 不允许改 ACP protocol、`AcpConnection`、`AcpAgentManager`、session lifecycle
+  - 不允许引入新的全局 store 或额外持久化
+  - 必须保持当前实现是“局部 UI 策略切换”，方便后续直接回滚或合入 main
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 新增共享 selector，统一判断“header diagnostics 入口是否需要 prominent”
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - desktop embedded 模式下，根据共享 selector 决定 trailing accessory 是 `always visible` 还是 `recede until hover / focus`
+  - `src/renderer/components/agent/AgentModeSelector.tsx`
+    - trailing accessory slot 支持 `hover-reveal` 模式，但不能破坏 dropdown / accessory 点击
+  - 回归覆盖：
+    - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 如有必要补 `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx` 的 idle / active header 断言
+- Exit criteria:
+  - 空闲 ACP 会话的 desktop header 不再长期露出明显的 diagnostics dot
+  - 把鼠标移到 agent pill 上时，diagnostics 入口会显现
+  - 等待 / 生成 / live error 时，入口依旧明显可见
+  - diagnostics popover、agent dropdown、mobile 入口都不退化
+  - 本轮改动保持在 renderer header / selector 范围，便于当前阶段合入 main
+- Reviewer focus:
+  - 不能为了“更克制”而让 diagnostics 实际不可达
+  - 不能引入 pill 宽度跳变、点击穿透、popover / dropdown 冲突
+  - 不能把一个纯 UI 收敛问题演变成底层 runtime 重构
