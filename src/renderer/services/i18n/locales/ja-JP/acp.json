@@ -5,6 +5,8 @@
     "failed_confirm": "ACP {{backend}} 認証が失敗しました：\n\n{{error}}\n\n設定ページで設定しますか？",
     "requiredHint": "{{agent}} をこのスレッドで続行するには認証が必要です。今すぐ認証するか、ローカル CLI のログイン状態を更新してください。",
     "authenticate": "認証する",
+    "authenticating": "認証中...",
+    "authenticatingHint": "{{agent}} の認証フローを開始しています。CLI またはブラウザでサインインを完了してから、ここに戻ってください。",
     "authenticateFailed": "{{agent}} の認証に失敗しました。再試行するか、ローカル CLI のログイン状態を更新してください。"
   },
   "send": {

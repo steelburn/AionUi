@@ -11,7 +11,7 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button, Dropdown, Input, Menu, Typography } from '@arco-design/web-react';
-import { CornerDownRight, Delete, Drag, MoreOne } from '@icon-park/react';
+import { CornerDownRight, Delete, Drag, Lightning, MoreOne } from '@icon-park/react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -540,11 +540,19 @@ const CommandQueuePanel: React.FC<CommandQueuePanelProps> = ({
               {t('conversation.commandQueue.title', { defaultValue: 'Queued Commands' })}
             </Typography.Text>
             <Button
-              type='primary'
+              type='secondary'
               size='mini'
+              shape='round'
               loading={sendNowLoading}
               onClick={onSendNow}
               data-testid='command-queue-send-now'
+              icon={<Lightning theme='filled' size='12' fill='rgb(var(--primary-6))' strokeWidth={2.4} />}
+              className='min-h-24px px-10px font-600'
+              style={{
+                color: 'rgb(var(--primary-6))',
+                borderColor: 'color-mix(in srgb, rgb(var(--primary-6)) 18%, var(--color-border-2))',
+                background: 'color-mix(in srgb, rgb(var(--primary-1)) 46%, var(--color-bg-1))',
+              }}
             >
               {t('conversation.commandQueue.sendNow', { defaultValue: 'Send Now' })}
             </Button>

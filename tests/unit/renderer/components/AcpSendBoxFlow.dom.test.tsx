@@ -460,6 +460,10 @@ vi.mock('react-i18next', () => ({
           return `${agent} needs authentication before this thread can continue. Authenticate now, or refresh the local CLI login.`;
         case 'acp.auth.authenticate':
           return 'Authenticate';
+        case 'acp.auth.authenticating':
+          return 'Authenticating...';
+        case 'acp.auth.authenticatingHint':
+          return `Starting the ${agent} authentication flow. Complete sign-in in your CLI or browser, then return here.`;
         case 'acp.auth.authenticateFailed':
           return `Failed to authenticate ${agent}. Try again or refresh your local CLI login.`;
         case 'acp.send.failed':
@@ -2575,6 +2579,73 @@ describe('AcpSendBox live ACP flow', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows visible progress feedback while authenticate is still running', async () => {
+    const authDeferred = createDeferred<{ success: boolean }>();
+    mockAcpAuthenticateInvoke.mockReturnValueOnce(authDeferred.promise);
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    act(() => {
+      emitAcpResponse({
+        type: 'agent_status',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'status-auth-required-progress-feedback',
+        data: {
+          backend: 'claude',
+          status: 'auth_required',
+          agentName: 'Claude',
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-auth-banner')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
+
+    await waitFor(() => {
+      expect(mockAcpAuthenticateInvoke).toHaveBeenCalledWith({ conversationId: CONVERSATION_ID });
+    });
+
+    expect(screen.getByRole('button', { name: 'Authenticating...' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Starting the Claude authentication flow. Complete sign-in in your CLI or browser, then return here.'
+      )
+    ).toBeInTheDocument();
+
+    await act(async () => {
+      authDeferred.resolve({ success: true });
+      await authDeferred.promise;
+    });
+
+    act(() => {
+      emitAcpResponse({
+        type: 'agent_status',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'status-session-active-after-progress-feedback',
+        data: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('acp-auth-banner')).not.toBeInTheDocument();
+    });
+  });
+
   it('keeps the auth banner visible while authenticate is still in flight through authenticated status noise', async () => {
     const authDeferred = createDeferred<{ success: boolean }>();
     mockAcpAuthenticateInvoke.mockReturnValueOnce(authDeferred.promise);
@@ -2784,7 +2855,7 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('acp-auth-banner')).toBeInTheDocument();
     });
 
-    const authButton = within(screen.getByTestId('acp-auth-banner')).getByRole('button', { name: 'Authenticate' });
+    const authButton = within(screen.getByTestId('acp-auth-banner')).getByRole('button');
     fireEvent.click(authButton);
     expect(mockAcpAuthenticateInvoke).toHaveBeenCalledTimes(1);
 

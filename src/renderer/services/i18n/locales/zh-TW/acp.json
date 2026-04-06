@@ -5,6 +5,8 @@
     "failed_confirm": "ACP {{backend}} 身份驗證失敗：\n\n{{error}}\n\n是否立即前往設定頁面進行配置？",
     "requiredHint": "{{agent}} 需要先完成認證才能繼續此執行緒。現在進行認證，或先重新整理本機 CLI 登入狀態。",
     "authenticate": "立即認證",
+    "authenticating": "認證中...",
+    "authenticatingHint": "正在啟動 {{agent}} 的認證流程。請在 CLI 或瀏覽器中完成登入，然後再回到這裡。",
     "authenticateFailed": "無法完成 {{agent}} 認證。請重試，或先重新整理本機 CLI 登入狀態。"
   },
   "send": {

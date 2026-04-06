@@ -5,6 +5,8 @@
     "failed_confirm": "ACP {{backend}} kimlik doğrulaması başarısız:\n\n{{error}}\n\nŞimdi yapılandırmak için ayarlar sayfasına gitmek ister misiniz?",
     "requiredHint": "Bu iş parçacığının devam etmesi için {{agent}} kimlik doğrulaması gerekiyor. Şimdi doğrulayın veya yerel CLI oturumunu yenileyin.",
     "authenticate": "Doğrula",
+    "authenticating": "Doğrulanıyor...",
+    "authenticatingHint": "{{agent}} kimlik doğrulama akışı başlatılıyor. CLI veya tarayıcıda oturum açmayı tamamlayıp buraya geri dönün.",
     "authenticateFailed": "{{agent}} için kimlik doğrulama başarısız oldu. Yeniden deneyin veya yerel CLI oturumunu yenileyin."
   },
   "send": {

@@ -1213,6 +1213,7 @@ Please check your local CLI tool authentication status`,
         slashCommands={slashCommands}
         onSlashBuiltinCommand={onSlashBuiltinCommand}
         allowSendWhileLoading
+        loadingActionMode='single-slot'
         compactActions={!!teamId}
         autoFocus={false}
         sendButtonPrefix={

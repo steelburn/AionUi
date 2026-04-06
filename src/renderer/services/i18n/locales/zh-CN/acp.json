@@ -5,6 +5,8 @@
     "failed_confirm": "ACP {{backend}} 认证失败：\n\n{{error}}\n\n是否现在前往设置页面配置？",
     "requiredHint": "{{agent}} 需要先完成认证才能继续此线程。现在进行认证，或先刷新本地 CLI 登录状态。",
     "authenticate": "立即认证",
+    "authenticating": "认证中...",
+    "authenticatingHint": "正在启动 {{agent}} 的认证流程。请在 CLI 或浏览器中完成登录，然后回到这里。",
     "authenticateFailed": "无法完成 {{agent}} 认证。请重试，或先刷新本地 CLI 登录状态。"
   },
   "send": {

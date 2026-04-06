@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen } from '@testing-library/react';
 import React from 'react';
 
 // --- Mocks ---
@@ -78,8 +78,14 @@ vi.mock('@arco-design/web-react', () => ({
   Button: ({ onClick, children, icon, ...props }: React.ComponentProps<'button'>) =>
     React.createElement('button', { onClick, ...props }, icon ?? children),
   Input: {
-    TextArea: ({ onFocus, onBlur, ...props }: React.ComponentProps<'textarea'>) =>
-      React.createElement('textarea', { onFocus, onBlur, ...props }),
+    TextArea: ({ onFocus, onBlur, onChange, value, ...props }: React.ComponentProps<'textarea'> & { value?: string }) =>
+      React.createElement('textarea', {
+        onFocus,
+        onBlur,
+        onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => onChange?.(event.target.value),
+        value,
+        ...props,
+      }),
   },
   Message: {
     useMessage: () => [{ warning: vi.fn() }, null],
@@ -137,6 +143,23 @@ vi.mock('@/renderer/utils/ui/focus', () => ({
 }));
 
 import SendBox from '@/renderer/components/chat/sendbox';
+
+const SendBoxLoadingActionHarness: React.FC<{
+  onSend: (message: string) => Promise<void>;
+  onStop: () => Promise<void>;
+}> = ({ onSend, onStop }) => {
+  const [value, setValue] = React.useState('');
+
+  return React.createElement(SendBox, {
+    value,
+    onChange: setValue,
+    onSend,
+    onStop,
+    loading: true,
+    allowSendWhileLoading: true,
+    loadingActionMode: 'single-slot',
+  });
+};
 
 // --- Tests ---
 
@@ -303,5 +326,28 @@ describe('SendBox warmup debounce logic', () => {
     expect(mockWarmupInvoke).toHaveBeenCalledTimes(2);
     expect(mockWarmupInvoke).toHaveBeenNthCalledWith(1, { conversation_id: 'test-conv-1' });
     expect(mockWarmupInvoke).toHaveBeenNthCalledWith(2, { conversation_id: 'test-conv-2' });
+  });
+
+  it('keeps ACP-style loading actions in a single button slot while allowing queued sends', async () => {
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const onStop = vi.fn().mockResolvedValue(undefined);
+
+    const { container } = render(React.createElement(SendBoxLoadingActionHarness, { onSend, onStop }));
+
+    const textarea = container.querySelector('textarea');
+    expect(textarea).toBeTruthy();
+    expect(screen.getByTestId('sendbox-stop-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('sendbox-send-button')).not.toBeInTheDocument();
+
+    fireEvent.change(textarea!, { target: { value: 'queue this next' } });
+
+    expect(screen.getByTestId('sendbox-send-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('sendbox-stop-button')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sendbox-send-button'));
+
+    expect(onSend).toHaveBeenCalledWith('queue this next');
+    await Promise.resolve();
+    expect(screen.getByTestId('sendbox-stop-button')).toBeInTheDocument();
   });
 });

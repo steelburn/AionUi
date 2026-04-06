@@ -7,6 +7,8 @@
 export type I18nKey =
   | 'acp.auth.authenticate'
   | 'acp.auth.authenticateFailed'
+  | 'acp.auth.authenticating'
+  | 'acp.auth.authenticatingHint'
   | 'acp.auth.console_error'
   | 'acp.auth.failed'
   | 'acp.auth.failed_confirm'
