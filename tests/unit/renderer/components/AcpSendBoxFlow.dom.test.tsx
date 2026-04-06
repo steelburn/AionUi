@@ -748,6 +748,48 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
   });
 
+  it('restores the runtime status dot immediately when reopening a streaming ACP conversation with a live session', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-mid-turn-live-session',
+        type: 'text',
+        msg_id: 'assistant-mid-turn-live-session',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Assistant content is already streaming' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {
+        liveAcpStatus: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+          updatedAt: 1234,
+        },
+      },
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--success-6))',
+    });
+  });
+
   it('shows the warmup indicator when reopening a running ACP conversation before the first response arrives', async () => {
     setMockMessageList([
       {
@@ -779,6 +821,52 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Processing');
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting to Claude...');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+  });
+
+  it('treats the next send as warm-session waiting instead of reconnect when a finished ACP conversation still has a live session', async () => {
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {
+        liveAcpStatus: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+          updatedAt: 1234,
+        },
+      },
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send' }));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledWith({
+        input: 'Hermetic request trace fallback',
+        msg_id: expect.any(String),
+        conversation_id: CONVERSATION_ID,
+        files: [],
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent(
+        'Waiting for the first response from Claude...'
+      );
+    });
+
+    expect(screen.getByTestId('acp-warmup-indicator')).not.toHaveTextContent('Connecting to Claude...');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
   });
 

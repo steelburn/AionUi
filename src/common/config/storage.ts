@@ -265,6 +265,13 @@ export type TChatConversation =
             disconnectSignal?: string | null;
             updatedAt: number;
           };
+          /** Ephemeral live ACP runtime hint injected by conversation.get for remount continuity; never persisted */
+          liveAcpStatus?: {
+            backend: AcpBackend;
+            status: 'session_active';
+            agentName?: string;
+            updatedAt: number;
+          };
           /** Persisted session mode for resume support / 持久化的会话模式，用于恢复 */
           sessionMode?: string;
           /** Persisted model ID for resume support / 持久化的模型 ID，用于恢复 */

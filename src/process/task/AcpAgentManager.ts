@@ -1407,6 +1407,33 @@ class AcpAgentManager extends BaseAgentManager<AcpAgentManagerData, AcpPermissio
     });
   }
 
+  getLiveRuntimeStatus(): {
+    backend: AcpBackend;
+    status: 'session_active';
+    agentName?: string;
+    updatedAt: number;
+  } | null {
+    if (
+      !this.agent ||
+      typeof this.agent !== 'object' ||
+      !('isConnected' in this.agent) ||
+      !('hasActiveSession' in this.agent) ||
+      typeof this.agent.isConnected !== 'boolean' ||
+      typeof this.agent.hasActiveSession !== 'boolean' ||
+      !this.agent.isConnected ||
+      !this.agent.hasActiveSession
+    ) {
+      return null;
+    }
+
+    return {
+      backend: this.options.backend,
+      status: 'session_active',
+      ...(this.options.agentName ? { agentName: this.options.agentName } : {}),
+      updatedAt: Date.now(),
+    };
+  }
+
   /**
    * Save session mode to database for resume support.
    * 保存会话模式到数据库以支持恢复。

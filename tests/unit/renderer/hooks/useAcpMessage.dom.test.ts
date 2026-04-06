@@ -1855,6 +1855,39 @@ describe('useAcpMessage', () => {
     ]);
   });
 
+  it('hydrates a live session_active hint when a warm ACP runtime survives remount', async () => {
+    mockConversationGetInvoke.mockResolvedValueOnce({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'finished',
+      extra: {
+        liveAcpStatus: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+          updatedAt: 1234,
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.running).toBe(false);
+    expect(result.current.acpStatus).toBe('session_active');
+    expect(result.current.acpStatusSource).toBe('hydrated');
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        status: 'session_active',
+        statusSource: 'hydrated',
+        activityPhase: 'idle',
+      })
+    );
+  });
+
   it('does not hydrate a stale session_active status without a live runtime', async () => {
     mockConversationGetInvoke.mockResolvedValueOnce({
       id: CONVERSATION_ID,

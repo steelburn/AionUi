@@ -48,6 +48,25 @@ const VALID_CONVERSATION_TYPES = new Set<TChatConversation['type']>([
   'aionrs',
 ]);
 
+const attachLiveAcpStatus = (conversation: TChatConversation, task?: IAgentManager): TChatConversation => {
+  if (conversation.type !== 'acp' || task?.type !== 'acp') {
+    return conversation;
+  }
+
+  const liveAcpStatus = (task as unknown as AcpAgentManager).getLiveRuntimeStatus?.();
+  if (!liveAcpStatus) {
+    return conversation;
+  }
+
+  return {
+    ...conversation,
+    extra: {
+      ...conversation.extra,
+      liveAcpStatus,
+    },
+  };
+};
+
 export function initConversationBridge(
   conversationService: IConversationService,
   workerTaskManager: IWorkerTaskManager
@@ -343,7 +362,7 @@ export function initConversationBridge(
       if (conversation) {
         // Found in database, update status and return
         const task = workerTaskManager.getTask(id);
-        return { ...conversation, status: task?.status || 'finished' };
+        return attachLiveAcpStatus({ ...conversation, status: task?.status || 'finished' }, task);
       }
 
       // Not in database, try to load from file storage and migrate
@@ -356,7 +375,7 @@ export function initConversationBridge(
         // Lazy migrate this conversation to database in background
         void migrateConversationToDatabase(fileConversation);
 
-        return { ...fileConversation, status: task?.status || 'finished' };
+        return attachLiveAcpStatus({ ...fileConversation, status: task?.status || 'finished' }, task);
       }
 
       return undefined;

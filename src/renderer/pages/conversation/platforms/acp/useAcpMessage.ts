@@ -832,6 +832,17 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
       }
       setHasHydratedRunningState(true);
 
+      if (
+        res.type === 'acp' &&
+        res.extra?.liveAcpStatus?.status === 'session_active' &&
+        !hasLiveAcpActivity &&
+        !hasPendingProcessing
+      ) {
+        setAcpStatus('session_active');
+        setAcpStatusSource('hydrated');
+        setAcpStatusRevision(1);
+      }
+
       // Restore persisted context usage data
       if (res.type === 'acp' && res.extra?.lastTokenUsage) {
         const { lastTokenUsage, lastContextLimit } = res.extra;

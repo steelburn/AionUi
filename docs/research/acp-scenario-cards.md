@@ -1912,3 +1912,59 @@ Reviewer adjustment:
   - 首个 `content` 到达时不能过早清掉 `uiWarmupPending`
   - helper 收口不能让 hydrated running / request-trace / terminal clear 路径漏掉重置
   - `AcpSendBox` 与 `useAcpInitialMessage` 不能重新长出一套手工双 flag 合同
+
+## SC-047 Warm Session Remount Should Not Replay ACP Reconnect Semantics
+
+- Goal:
+  - 把 ACP warm session 在 remount 后的连续性补回 UI 合同：
+    - 切回仍在运行中的 ACP 会话时，header status dot 应立即恢复 active
+    - 上一轮已完成但 session 仍热着时，下一次 send 不该再被渲染成 fresh connect
+  - 继续收窄 “和 Zed 相比仍不够丝滑” 的一条具体差距：
+    - warm session 的下一轮等待，不应给人“又重新连了一次”的体感
+- User action:
+  - 用户在 ACP 会话里完成一轮对话，然后切到别的会话，再切回来继续发送下一条
+  - 或在两个仍在 streaming 的 ACP 会话之间来回切换
+  - 用户观察：
+    - 右上角 runtime status dot
+    - 线程里的 warmup / waiting cue
+- Current failure:
+  - `SC-040 ~ SC-046` 已经把 waiting、reveal、status dot、thread warmup cue 收口到较稳定的合同
+  - 但 remount 时：
+    - `useAcpMessage` 会清空 non-terminal `acpStatus`
+    - 只 hydrate persisted terminal status
+    - `conversation.get` 也没有把“task 还活着、session 仍然 warm”这件事告诉 renderer
+  - 结果是：
+    - reopen 一个仍在 streaming 的会话时，status dot 先灰，等下一条 live chunk 才转绿
+    - reopen 一个上一轮已完成但 warm session 仍在的会话后，再次 send 会重放 `Connecting / Waiting for the first response` 的首连体感
+- Expected UI state:
+  - 如果 ACP task 仍在，且底层 session 仍然 active：
+    - remount 后应立即恢复 `session_active`
+    - status dot 不再先灰后等 live chunk 才变绿
+  - 对于上一轮 finished 但 warm session 仍在的会话：
+    - 下一次 send 仍然允许首包前等待
+    - 但等待文案/语义应落在 “waiting for the first response”
+    - 不应再表现成 fresh connect / reconnect
+  - 只有真正冷启动、断连、或 session 失效时，才显示 `Connecting...`
+- Automation plan:
+  - `src/process/task/AcpAgentManager.ts`
+    - 暴露 live warm-session runtime hint
+  - `src/process/bridge/conversationBridge.ts`
+    - `conversation.get` 在 ACP task 仍热着时注入 ephemeral live status
+  - `src/common/config/storage.ts`
+    - 给 ACP 会话 extra 增加仅用于 hydration 的 `liveAcpStatus` 类型
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - remount hydration 优先消费 live warm-session hint
+    - 在没有 live hint 时仍保持“不 hydrate stale session_active”保护
+  - 回归覆盖：
+    - `tests/unit/conversationBridge.test.ts`
+    - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+- Exit criteria:
+  - remount 不再丢失 live `session_active` 语义
+  - reopen streaming 会话时，status dot 能立即恢复 active
+  - warm session 的下一次 send 不再显示 `Connecting...`
+  - stale persisted `session_active` 仍不会被误 hydrate
+- Reviewer focus:
+  - live warm-session hint 只能来自当前仍存活的 ACP task，不能把 stale persisted status 当成同一回事
+  - terminal hydrated status 的既有 neutral/barrier 语义不能退化
+  - 不能靠“简单改文案”掩盖 runtime ownership 仍然丢失的问题

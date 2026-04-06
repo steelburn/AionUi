@@ -205,6 +205,51 @@ describe('conversationBridge', () => {
     });
   });
 
+  describe('get', () => {
+    it('attaches a live ACP session_active hint when the ACP task still has a warm session', async () => {
+      const acpConversation = {
+        id: 'acp-1',
+        type: 'acp',
+        name: 'ACP',
+        extra: {
+          backend: 'claude',
+        },
+      } as unknown as TChatConversation;
+      vi.mocked(service.getConversation).mockResolvedValue(acpConversation);
+
+      const liveAcpStatus = {
+        backend: 'claude' as const,
+        status: 'session_active' as const,
+        agentName: 'Claude',
+        updatedAt: 1234,
+      };
+      const tm = makeTaskManager({
+        getTask: vi.fn(
+          () =>
+            ({
+              type: 'acp',
+              status: 'finished',
+              getLiveRuntimeStatus: vi.fn(() => liveAcpStatus),
+            }) as unknown as Awaited<ReturnType<IWorkerTaskManager['getOrBuildTask']>>
+        ),
+      });
+      initConversationBridge(service, tm);
+
+      const result = await handlers['get']({ id: 'acp-1' });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'acp-1',
+          status: 'finished',
+          extra: expect.objectContaining({
+            backend: 'claude',
+            liveAcpStatus,
+          }),
+        })
+      );
+    });
+  });
+
   describe('createWithConversation — getOrBuildTask rejection', () => {
     it('does not produce unhandled rejection when getOrBuildTask fails', async () => {
       const conversation = makeConversation('new-id');

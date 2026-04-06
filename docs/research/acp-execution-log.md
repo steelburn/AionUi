@@ -2944,3 +2944,87 @@
   - 如果继续收 `queue / busy` 真相源，下一步可以考虑：
     - 进一步减少 `useAcpMessage` 公开的 raw waiting 痕迹
     - 或继续把 runtime publisher / turn lifecycle 往更统一的 ownership 推进
+
+### 2026-04-06 / Batch 44
+
+- 对应 SC:
+  - `SC-047`
+- Goal:
+  - 让 ACP warm session 在 remount 后继续表现为 warm session，而不是重新掉回 fresh connect 语义。
+  - 直接收一条仍然明显落后于 Zed 的体验缝：
+    - reopen streaming 会话时 status dot 先灰
+    - finished-but-warm 会话回来再 send 时又像“重新连接了一次”
+- Root cause:
+  - `SC-040 ~ SC-046` 已经把 waiting / reveal / status dot / diagnostics 收得比较稳，但 remount 仍然缺一条 live runtime contract。
+  - renderer 侧 `useAcpMessage` 在 remount 时会清掉 non-terminal `acpStatus`，而 hydration 只恢复 persisted terminal status。
+  - process 侧 `conversation.get` 只返回 turn `status`，没有把“ACP task 仍在、底层 session 仍然 active”这件事暴露给 renderer。
+  - 结果是：
+    - reopen streaming 会话时，status dot 要等下一条 live chunk 才能回到绿点
+    - finished-but-warm 会话回来再次 send 时，waiting cue 会重新落成 `Connecting...` 的首连体感
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-047 Warm Session Remount Should Not Replay ACP Reconnect Semantics`
+  - `src/common/config/storage.ts`
+    - 给 ACP extra 增加 ephemeral `liveAcpStatus` 类型
+    - 只用于 remount hydration continuity，不作为持久化 runtime 真相源
+  - `src/process/task/AcpAgentManager.ts`
+    - 新增 `getLiveRuntimeStatus()`
+    - 仅在当前 ACP task 仍然 `isConnected && hasActiveSession` 时暴露 live `session_active` hint
+  - `src/process/bridge/conversationBridge.ts`
+    - `conversation.get` 在 ACP task 仍热着时，注入 `extra.liveAcpStatus`
+    - renderer 不再只能从 `running / finished` 和 persisted terminal status 猜 warm-session continuity
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - remount hydration 优先消费 `liveAcpStatus`
+    - 让 reopen streaming 会话能立即恢复 `session_active`
+    - 让 finished-but-warm 会话的下一次 send 落在 “waiting for the first response” 而不是 “Connecting...”
+    - 继续保留“不 hydrate stale persisted session_active”的保护
+  - `tests/unit/conversationBridge.test.ts`
+    - 新增 bridge 合同：warm ACP task 会通过 `conversation.get` 暴露 live `session_active`
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 新增 remount hydration 回归：finished conversation 也能从 live runtime hint 恢复 `session_active`
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增 DOM 回归：
+      - reopen streaming 会话时 status dot 立即恢复 active
+      - finished-but-warm 会话回来再 send 时不再显示 `Connecting...`
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-047` 固定：
+    - 不能靠“文案更软”掩盖 runtime continuity 丢失
+    - `session_active` 只能来自 live ACP task，不能把 stale persisted status 当作同一回事
+    - terminal hydrated status 的 neutral/barrier 语义不能回退
+- Verification:
+  - `bunx vitest run tests/unit/conversationBridge.test.ts tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`101 passed`
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`433 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 最终通过
+    - 结果：`3231 passed | 17 skipped (3248 tests)`
+    - 补充说明：
+      - 首次全量 run 曾暴露与 ACP 无关的 suite 级波动：
+        - `tests/integration/i18n-performance.test.ts`
+        - `tests/unit/channels/weixinSystemActions.test.ts`
+      - 两者单独重跑均通过；随后整套 `bun run test` 复跑通过
+      - 当前判断是既有全量测试负载波动，不阻塞本轮 ACP 结论
+- Product judgement:
+  - 这轮终于把一个“用户一眼能感到不如 Zed”的剩余缝补上了。
+  - 从体验上看，切回 warm ACP 会话时：
+    - status dot 不再像丢了 runtime 一样先灰着
+    - 下一轮 send 也不再默认像 fresh connect
+  - 它还不是最终的主进程 runtime ownership，但对用户感知已经足够重要，值得单独成一刀。
+- Open risks:
+  - `liveAcpStatus` 仍然是基于当前存活 task 的 bridge hint，不是可持久化的 runtime 真相源。
+  - 如果 ACP task 已被 idle timeout / reset / process restart 清掉，UI 仍会回到真实的 cold-start semantics；这是正确的，但也说明更深层 ownership 还没彻底收口。
+- Next:
+  - 先请用户体验：
+    - reopen streaming 会话时的 status dot
+    - finished-but-warm 会话回来再 send 的等待体感
+  - 如果体验通过，再继续评估：
+    - 是否还需要把 fresh-send waiting 与 warm-session waiting 的视觉差异再收细一点
+    - 或继续往更深层 runtime / queue ownership 推进
