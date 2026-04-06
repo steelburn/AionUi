@@ -311,7 +311,7 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
         triggerContent
       )}
       {trailingAccessory ? (
-        <span className='ml-6px pl-6px inline-flex items-center shrink-0 border-l border-[color:var(--color-border-2)]'>
+        <span className='ml-4px pl-4px inline-flex items-center shrink-0 border-l border-[color:var(--color-border-2)]'>
           {trailingAccessory}
         </span>
       ) : null}
