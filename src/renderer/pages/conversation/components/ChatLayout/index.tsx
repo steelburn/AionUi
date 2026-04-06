@@ -104,6 +104,15 @@ const ChatLayout: React.FC<{
   const shouldEmbedAcpRuntimeStatusInAgentPill = Boolean(
     shouldShowAcpRuntimeStatusButton && !layout?.isMobile && (backend || agentLogo)
   );
+  const acpRuntimeStatusButton =
+    shouldShowAcpRuntimeStatusButton && conversationId ? (
+      <AcpRuntimeStatusButton
+        conversationId={conversationId}
+        backend={backend}
+        agentName={displayName}
+        embeddedInAgentPill={shouldEmbedAcpRuntimeStatusInAgentPill}
+      />
+    ) : null;
 
   const {
     splitRatio: workspaceSplitRatio,
@@ -208,9 +217,7 @@ const ChatLayout: React.FC<{
         <div className='flex items-center gap-12px shrink-0'>
           {props.headerExtra}
           {(backend || agentLogo || shouldShowAcpRuntimeStatusButton) && (
-            <div
-              className={`flex items-center shrink-0 ${shouldEmbedAcpRuntimeStatusInAgentPill ? 'gap-0' : 'gap-4px'}`}
-            >
+            <div className='flex items-center gap-4px shrink-0'>
               {(backend || agentLogo) && (
                 <AgentModeSelector
                   backend={backend}
@@ -220,16 +227,10 @@ const ChatLayout: React.FC<{
                   compact={Boolean(layout?.isMobile)}
                   showLogoInCompact={Boolean(layout?.isMobile)}
                   compactLabelType={layout?.isMobile ? 'agent' : 'mode'}
+                  trailingAccessory={shouldEmbedAcpRuntimeStatusInAgentPill ? acpRuntimeStatusButton : undefined}
                 />
               )}
-              {shouldShowAcpRuntimeStatusButton && conversationId && (
-                <AcpRuntimeStatusButton
-                  conversationId={conversationId}
-                  backend={backend}
-                  agentName={displayName}
-                  embeddedInAgentPill={shouldEmbedAcpRuntimeStatusInAgentPill}
-                />
-              )}
+              {!shouldEmbedAcpRuntimeStatusInAgentPill ? acpRuntimeStatusButton : null}
             </div>
           )}
           {isWindowsRuntime && workspaceEnabled && (

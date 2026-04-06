@@ -48,6 +48,8 @@ export interface AgentModeSelectorProps {
   hideCompactLabelPrefixOnMobile?: boolean;
   /** Callback fired after a successful mode change (for team-mode propagation) */
   onModeChanged?: (mode: string) => void;
+  /** Optional trailing accessory rendered inside the full-mode agent pill */
+  trailingAccessory?: React.ReactNode;
 }
 
 /**
@@ -74,6 +76,7 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   compactLabelPrefix,
   hideCompactLabelPrefixOnMobile = false,
   onModeChanged,
+  trailingAccessory,
 }) => {
   const { t } = useTranslation();
   const layout = useLayoutContext();
@@ -277,11 +280,8 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
   }
 
   // Full mode: logo + name + optional mode label
-  const content = (
-    <div
-      className={`flex items-center gap-2 bg-2 w-fit rounded-full px-[8px] py-[2px] ${canSwitchMode ? 'cursor-pointer hover:bg-3' : ''}`}
-      style={{ opacity: isLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}
-    >
+  const triggerContent = (
+    <div className={`flex items-center gap-2 ${canSwitchMode ? 'cursor-pointer' : ''}`}>
       {renderLogo()}
       <span className='text-sm text-t-primary'>{agentName || backend}</span>
       {canSwitchMode && (
@@ -293,24 +293,32 @@ const AgentModeSelector: React.FC<AgentModeSelectorProps> = ({
     </div>
   );
 
-  // If mode switching is not supported, just render the content without dropdown
-  if (!canSwitchMode) {
-    return <div className='ml-16px'>{content}</div>;
-  }
-
-  // Render dropdown with mode selection menu
-  return (
-    <div className='ml-16px'>
-      <Dropdown
-        trigger='click'
-        popupVisible={dropdownVisible}
-        onVisibleChange={(visible) => !isLoading && setDropdownVisible(visible)}
-        droplist={dropdownMenu}
-      >
-        {content}
-      </Dropdown>
+  const content = (
+    <div
+      className='flex items-center gap-0 bg-2 w-fit rounded-full px-[8px] py-[2px]'
+      style={{ opacity: isLoading ? 0.6 : 1, transition: 'opacity 0.2s' }}
+    >
+      {canSwitchMode ? (
+        <Dropdown
+          trigger='click'
+          popupVisible={dropdownVisible}
+          onVisibleChange={(visible) => !isLoading && setDropdownVisible(visible)}
+          droplist={dropdownMenu}
+        >
+          <div className='rounded-full px-[2px] py-[1px] hover:bg-3'>{triggerContent}</div>
+        </Dropdown>
+      ) : (
+        triggerContent
+      )}
+      {trailingAccessory ? (
+        <span className='ml-6px pl-6px inline-flex items-center shrink-0 border-l border-[color:var(--color-border-2)]'>
+          {trailingAccessory}
+        </span>
+      ) : null}
     </div>
   );
+
+  return <div className='ml-16px'>{content}</div>;
 };
 
 export default AgentModeSelector;

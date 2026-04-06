@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import ChatLayout from '@/renderer/pages/conversation/components/ChatLayout';
 
 const mockLayoutContext = {
@@ -17,7 +17,13 @@ vi.mock('@/common/config/storage', () => ({
 
 vi.mock('@/renderer/components/agent/AgentModeSelector', () => ({
   __esModule: true,
-  default: () => React.createElement('div', { 'data-testid': 'agent-mode-selector' }),
+  default: ({ trailingAccessory }: { trailingAccessory?: React.ReactNode }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'agent-mode-selector' },
+      React.createElement('div', { 'data-testid': 'agent-mode-selector-trigger' }),
+      trailingAccessory
+    ),
 }));
 
 vi.mock('@/renderer/components/layout/FlexFullContainer', () => ({
@@ -181,7 +187,7 @@ describe('ChatLayout ACP runtime diagnostics entry', () => {
     expect(screen.getByTestId('acp-runtime-status-button')).toBeInTheDocument();
   });
 
-  it('renders the ACP runtime status button to the right of the agent pill', () => {
+  it('renders the ACP runtime status button inside the desktop agent pill', () => {
     render(
       <ChatLayout
         title='Test'
@@ -195,11 +201,8 @@ describe('ChatLayout ACP runtime diagnostics entry', () => {
     );
 
     const agentModeSelector = screen.getByTestId('agent-mode-selector');
-    const runtimeStatusButton = screen.getByTestId('acp-runtime-status-button');
+    const runtimeStatusButton = within(agentModeSelector).getByTestId('acp-runtime-status-button');
 
-    expect(
-      agentModeSelector.compareDocumentPosition(runtimeStatusButton) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
     expect(runtimeStatusButton).toHaveAttribute('data-embedded-in-agent-pill', 'true');
   });
 

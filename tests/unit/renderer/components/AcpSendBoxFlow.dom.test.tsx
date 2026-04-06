@@ -744,7 +744,7 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
-    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
   });
 
   it('restores the runtime status dot immediately when reopening a streaming ACP conversation with a live session', async () => {
@@ -787,6 +787,7 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
   });
 
   it('shows the warmup indicator when reopening a running ACP conversation before the first response arrives', async () => {
@@ -819,7 +820,7 @@ describe('AcpSendBox live ACP flow', () => {
     });
 
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-pulse-ring')).toHaveClass('animate-ping');
   });
 
   it('does not replay the warmup indicator when reopening a warm-session next turn before the first response arrives', async () => {
@@ -868,7 +869,7 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
     expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
@@ -912,7 +913,7 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
     expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
@@ -932,7 +933,7 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
     expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });
@@ -1051,7 +1052,7 @@ describe('AcpSendBox live ACP flow', () => {
         }),
       })
     );
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-pulse-ring')).toHaveClass('animate-ping');
   });
 
   it('renders ACP logs for request lifecycle events in the live send box flow', async () => {

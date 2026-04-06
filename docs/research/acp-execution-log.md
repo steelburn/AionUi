@@ -3412,3 +3412,83 @@
   - 按当前与 Zed 的差距复盘，下一优先级建议：
     - 第一优先：继续往更底层 runtime / queue-busy ownership 收口
     - 第二优先：评估是否补更完整的 generating affordance，而不是继续在 dot / waiting row 上做局部视觉修饰
+
+### 2026-04-06 / Batch 49
+
+- 对应 SC:
+  - `SC-052`
+- Goal:
+  - 收掉 `SC-051` 留下的两个视觉瑕疵：
+    - dot 虽然已经收入了 ACP agent 胶囊，但仍然靠负边距硬塞，导致 agent 名字会被压住
+    - cold waiting 的 pulse 仍然让中心点一起变淡，闪烁中段会发灰、不够明显
+  - 让 header status 真正表现成同一枚 agent pill 内的 trailing accessory，而不是“胶囊 + 外挂小圆点”的拼接物。
+- Root cause:
+  - `embeddedInAgentPill` 的第一版实现只是在 header 上把独立 runtime button 用负边距挤回胶囊：
+    - 胶囊自身宽度没有真实扩展
+    - 文字和 dot 会抢空间
+    - 视觉上仍像一个被硬塞进去的外挂控件
+  - cold waiting 的动态仍主要依赖中心 dot 本体透明度变化：
+    - 动画中段会被用户感知成“颜色褪成灰”
+    - 强调的是“变淡”，不是“正在活跃等待”
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-052 Embedded ACP Dot Should Not Overlap The Agent Pill Label`
+  - `src/renderer/components/agent/AgentModeSelector.tsx`
+    - 为 full-mode agent pill 增加 `trailingAccessory` slot
+    - dropdown trigger 只包住左侧 agent 内容，尾部 accessory 在同一枚胶囊内独立布局
+    - 用真实留白和左分隔线承载 runtime dot，不再依赖覆盖文字或负边距
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - desktop ACP header 改为把 runtime status button 作为 `AgentModeSelector` 的 trailing accessory 传入
+    - 非嵌入场景继续维持独立按钮渲染，不扩大这轮改动边界
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - 去掉 embedded 模式的负边距挤压方案
+    - cold waiting 改成“中心点保持常亮 + 外围 ring 呼吸”
+    - warm waiting / success family 继续沿用既有 active 语义，不回退成 generic pulse
+  - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 回归 desktop ACP header 会把 runtime button 真正渲染在 agent pill 内
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 回归 cold waiting 使用外圈 pulse ring
+    - 回归 warm waiting / non-waiting 不会错误渲染 pulse ring
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 更新 waiting pulse 的 DOM 断言，确保 sendbox flow 继续遵守 warm/cold 合同
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-052` 固定：
+    - dot 进入胶囊必须是真正的布局归属变化，不接受继续靠覆盖或负边距伪装
+    - cold waiting 可以增强可见性，但不能把 warm-session waiting 又打回过重的 generic reconnect 体感
+    - diagnostics popover 与 agent mode dropdown 的点击区域不能互相冲突
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 结果：`59 passed`
+  - `bun run i18n:types`
+    - 通过
+  - `node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - `31` 条 unknown literal i18n key warning 仍为仓库既有 warning-only 基线
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - ACP unit：`438 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 通过
+    - 结果：`3236 passed | 17 skipped (3253 tests)`
+- Product judgement:
+  - 这轮不是新合同，而是把 `SC-051` 留下的一块明显“还像补丁”的 UI 再收一轮。
+  - 现在 runtime dot 真正成为 agent pill 的一部分，agent 名字不会再被压住，header affordance 更像一枚完整控件。
+  - cold waiting 的动态也从“中心点忽明忽暗”变成“中心点始终清晰、外围 ring 呼吸”，默认主题下可读性明显更好。
+  - 这轮完成后，ACP header status 与 waiting affordance 的产品味道又向 Zed 靠近了一步，但仍属于 UI 层收口，不是底层 runtime ownership 的终局。
+- Open risks:
+  - 当前仍是 renderer-side status affordance 收口，更深层的 runtime / queue-busy ownership 还没回收到最终单一真相源。
+  - cold waiting 的可见性已经修正，但整体 generating affordance 仍没有 Zed 那种完整的 thread-level row / elapsed meta。
+  - 这轮引入了 `AgentModeSelector` trailing accessory slot；后续若还有 header accessory 需求，需要继续守住 pill 内点击区与 dropdown 的边界。
+- Next:
+  - 先请用户肉眼确认这轮细节：
+    - dot 不再覆盖 agent 名字
+    - 胶囊会自然变宽
+    - waiting 闪烁时中心点始终看得见，变化主要来自外圈
+  - 按当前与 Zed 的差距复盘，下一优先级建议：
+    - 第一优先：继续往更底层 runtime / queue-busy ownership 收口
+    - 第二优先：评估是否补更完整的 generating affordance，而不是继续在 header status 微调

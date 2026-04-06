@@ -2191,3 +2191,53 @@ Reviewer adjustment:
   - 不能把 warm/cold waiting 重新混在一起
   - 不能因为把 dot 收进胶囊而破坏 agent mode dropdown 或 diagnostics popover 交互
   - 不能直接硬编码用户文案或颜色值，必须走 i18n / 主题 token
+
+## SC-052 Embedded ACP Dot Should Not Overlap The Agent Pill Label
+
+- Goal:
+  - 收掉 `SC-051` 留下的两个细节问题：
+    - dot 虽然被收入了胶囊，但仍然是靠负边距挤进去，导致文字被压住
+    - cold waiting 的 pulse 仍然主要靠中心点透明度变化，用户在闪烁中段会觉得颜色发灰、不明显
+  - 让 header 的 agent status 真正像同一枚胶囊，而不是一枚胶囊加一个被硬塞进去的小按钮。
+- User action:
+  - 用户打开一个 ACP 会话，看右上角 agent 胶囊。
+  - 用户发送一条新消息，在首包前观察：
+    - 胶囊里的 agent 名字和 dot 是否还会互相遮挡
+    - waiting 闪烁过程中，颜色是否仍然会“发灰看不清”
+- Current failure:
+  - 当前 `embeddedInAgentPill` 只是把独立 button 用负边距推回 pill 里：
+    - 胶囊宽度没真正增长
+    - 文案会被 dot 压住
+    - 视觉上仍然是“外挂控件”
+  - 当前 cold waiting pulse 仍把中心 dot 一起做透明度动画：
+    - 闪烁中段会显得发灰
+    - 用户更容易注意到“变淡”，而不是“正在 active 等待”
+- Expected UI state:
+  - header agent pill 会自然变宽，把 runtime dot 作为尾部 accessory 真正纳入同一胶囊
+  - dot 与 agent 名字之间有明确的留白或分隔，不再互相覆盖
+  - cold waiting 采用“中心点保持亮、外围呼吸”的表达：
+    - 中心点始终清晰可见
+    - 外围 ring 或 halo 表达 waiting 动态
+    - 不再依赖中心点本体变灰
+- Automation plan:
+  - `src/renderer/components/agent/AgentModeSelector.tsx`
+    - 为 full-mode agent pill 增加 trailing accessory slot
+    - 让 header runtime status button 真正进入同一胶囊结构
+  - `src/renderer/pages/conversation/components/ChatLayout/index.tsx`
+    - desktop ACP header 改为把 status button 作为 pill accessory 传入，而不是继续并排负边距拼接
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - 去掉 embedded 模式的负边距挤压
+    - cold waiting 改为“solid center + animated outer ring/halo”
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - `tests/unit/renderer/components/ChatLayoutAcpRuntimeStatus.dom.test.tsx`
+    - 如有必要补 `AgentModeSelector` 或 sendbox 相关 DOM 回归
+- Exit criteria:
+  - dot 不再覆盖 agent 文字
+  - ACP agent pill 会因 dot 的加入而自然变宽
+  - cold waiting 在 pulse 过程中中心点始终清晰可见
+  - diagnostics popover 和 agent mode dropdown 交互保持正常
+- Reviewer focus:
+  - 不能为了收 dot 而让 dropdown / popover 点击冲突
+  - 不能退回成“视觉上又分成两个分离胶囊”
+  - 不能重新引入依赖负边距或覆盖文字的临时方案

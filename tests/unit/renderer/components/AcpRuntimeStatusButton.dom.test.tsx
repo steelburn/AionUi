@@ -177,10 +177,10 @@ describe('AcpRuntimeStatusButton', () => {
     render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
 
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'var(--brand)',
     });
+    expect(screen.getByTestId('acp-runtime-status-pulse-ring')).toHaveClass('animate-ping');
   });
 
   it('keeps the header dot animated while send-time warmup is pending even before live activity starts', () => {
@@ -189,10 +189,10 @@ describe('AcpRuntimeStatusButton', () => {
     render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
 
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'var(--brand)',
     });
+    expect(screen.getByTestId('acp-runtime-status-pulse-ring')).toHaveClass('animate-ping');
   });
 
   it('keeps a live warm-session waiting dot green without falling back to generic pulse', () => {
@@ -208,7 +208,7 @@ describe('AcpRuntimeStatusButton', () => {
     render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
 
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.queryByTestId('acp-runtime-status-pulse-ring')).not.toBeInTheDocument();
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });

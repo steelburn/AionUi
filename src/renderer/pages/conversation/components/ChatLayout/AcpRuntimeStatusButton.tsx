@@ -114,9 +114,11 @@ const AcpRuntimeStatusButton: React.FC<{
   const color = isWaiting ? getWaitingColor(isWarmSessionWaiting) : getStatusColor(effectiveStatus);
   const dotStyle: React.CSSProperties = {
     backgroundColor: color,
-    boxShadow: shouldPulse
-      ? '0 0 0 1px var(--color-border-2), 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent)'
-      : '0 0 0 1px var(--color-border-2)',
+    boxShadow: '0 0 0 1px var(--color-border-2), 0 1px 4px color-mix(in srgb, black 12%, transparent)',
+  };
+  const pulseRingStyle: React.CSSProperties = {
+    backgroundColor: color,
+    opacity: 0.32,
   };
 
   const panelEntries = React.useMemo<AcpLogEntry[]>(() => {
@@ -173,15 +175,25 @@ const AcpRuntimeStatusButton: React.FC<{
         title={statusLabel}
         className={
           embeddedInAgentPill
-            ? '!min-w-20px !w-20px !h-20px !p-0 !-ml-10px !mr-2px shrink-0 rounded-full !bg-2 hover:!bg-[var(--brand-light)]'
+            ? '!min-w-16px !w-16px !h-16px !p-0 shrink-0 rounded-full hover:!bg-[var(--color-fill-2)]'
             : '!min-w-18px !w-18px !h-18px !p-0 shrink-0 rounded-full hover:bg-[var(--color-fill-2)]'
         }
       >
-        <span
-          data-testid='acp-runtime-status-dot'
-          className={`block h-8px w-8px rounded-full ${shouldPulse ? 'animate-pulse' : ''}`}
-          style={dotStyle}
-        />
+        <span className='relative flex h-10px w-10px items-center justify-center'>
+          {shouldPulse ? (
+            <span
+              data-testid='acp-runtime-status-pulse-ring'
+              aria-hidden='true'
+              className='absolute inset-0 rounded-full animate-ping'
+              style={pulseRingStyle}
+            />
+          ) : null}
+          <span
+            data-testid='acp-runtime-status-dot'
+            className='relative block h-8px w-8px rounded-full'
+            style={dotStyle}
+          />
+        </span>
       </Button>
     </Popover>
   );
