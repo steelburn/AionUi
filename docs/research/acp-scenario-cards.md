@@ -1801,3 +1801,60 @@ Reviewer adjustment:
   - pause reason 不能因为 remount / persist / hydrate 丢失
   - `CommandQueuePanel` 的临时编辑 pause 不能和真正的 barrier/manual pause 混淆
   - ACP live error barrier 必须继续守住“explicit Resume 才放行”的用户合同
+
+## SC-045 ACP Send Box Busy Contract Must Follow Runtime Diagnostics
+
+- Goal:
+  - 继续收口 ACP 前台的 `queue / busy` 合同：
+    - header status dot、warmup indicator、send box loading/stop、queue gate 都应读同一份 runtime diagnostics snapshot
+  - 为后续更深层 `queue / busy` 真相源迁移保留单入口，而不是让 `AcpSendBox` 继续直接拼 `running / aiProcessing / uiWarmupPending`
+- User action:
+  - 用户发起一条 ACP 请求，经历：
+    - fresh send / waiting
+    - 首包到达后的 streaming
+    - turn finish 后回到 idle
+  - 同时观察：
+    - header status dot
+    - thread warmup indicator
+    - send box 的 loading/stop
+    - queue 是否继续把后续消息当作 busy
+- Current failure:
+  - `SC-029 ~ SC-043` 已经把 header dot 与 warmup cue 收到 conversation-scoped runtime diagnostics snapshot
+  - 但 `AcpSendBox` 仍然直接基于 hook 内部 `running / aiProcessing / uiWarmupPending` 手工拼 `isBusy`
+  - 结果是 ACP 前台还保留两套 busy 读法：
+    - diagnostics UI 读 snapshot phase
+    - send box / queue gate 读 hook-local booleans
+  - 这会继续把 queue gate 绑在 renderer 内部实现细节上，不利于后续再往更统一的 runtime contract 收束
+- Expected UI state:
+  - runtime diagnostics 为 `waiting` 或 `streaming` 时：
+    - send box 保持 busy
+    - queue 继续把后续发送当作 enqueue / gated execution
+  - runtime diagnostics 回到 `idle` 时：
+    - send box 退出 loading
+    - queue 才重新允许后续推进
+  - `waiting` 与 `streaming` 的视觉语义仍然分开：
+    - status dot / warmup cue 继续只在 waiting 期表现为首包前等待
+    - 但 busy 语义由同一份 snapshot 统一承载
+- Automation plan:
+  - `acpRuntimeDiagnostics.ts`
+    - 导出 shared selectors，明确区分：
+      - waiting
+      - busy
+  - `AcpRuntimeStatusButton.tsx`
+  - `AcpWarmupIndicator.tsx`
+  - `AcpSendBox.tsx`
+    - 全部改为消费同一份 runtime diagnostics selectors
+  - `AcpSendBoxQueueFlow.dom.test.tsx`
+    - 守住 waiting -> streaming -> idle 三个阶段里：
+      - runtime diagnostics busy
+      - sendbox loading
+      - queue gate busy 语义
+        三者保持一致
+- Exit criteria:
+  - ACP header/warmup/send box/queue gate 不再各自维护独立 busy 公式
+  - `AcpSendBox` 不再直接拼装第二套 `running / aiProcessing / uiWarmupPending` busy 真相
+  - DOM 回归证明 waiting / streaming / idle 三个阶段都守住共享 busy contract
+- Reviewer focus:
+  - streaming 仍必须被视为 busy，不能因为 selector 收口而退化成“只在 waiting 才 busy”
+  - hydrated running / warmup pending 的既有合同不能退化
+  - 不能让 send box、queue gate、status dot 因 selector 改造重新出现时序分叉

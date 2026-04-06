@@ -2781,3 +2781,82 @@
   - 如果要继续 ACP 产品化收口，下一优先级可以回到：
     - queue / busy runtime contract 的更深层统一
     - 或 settings / guid 侧现有 ACP e2e 失败的独立修复
+
+### 2026-04-06 / Batch 42
+
+- 对应 SC:
+  - `SC-045`
+- Goal:
+  - 继续收口 ACP 前台 `queue / busy` 合同，让 send box / queue gate 不再维护独立 busy 公式。
+  - 用 shared runtime diagnostics selectors 统一：
+    - header status dot
+    - warmup indicator
+    - send box loading / stop
+    - queue gate
+- Root cause:
+  - `SC-029 ~ SC-043` 已经把 header dot 与 waiting affordance 收到 conversation-scoped runtime diagnostics snapshot。
+  - 但 `AcpSendBox` 仍直接基于 hook 内部 `running / aiProcessing / uiWarmupPending` 手工拼 `isBusy`。
+  - 结果是 ACP 前台还保留两套 busy 读法：
+    - diagnostics UI 读 runtime snapshot
+    - send box / queue gate 读 hook-local booleans
+  - 平台级 send box 测试桩也还停留在旧合同上：
+    - 只 mock `useAcpMessage.running`
+    - 没有跟随 runtime diagnostics snapshot 的 shared busy contract
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-045 ACP Send Box Busy Contract Must Follow Runtime Diagnostics`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 新增 shared selectors：
+      - `isAcpRuntimeWaitingSnapshot`
+      - `isAcpRuntimeBusySnapshot`
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - 改为消费 shared waiting selector
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 改为消费 shared waiting selector
+  - `src/renderer/pages/conversation/platforms/acp/AcpSendBox.tsx`
+    - send box / queue gate 的 `isBusy` 改为直接吃 runtime diagnostics busy selector
+    - 不再在组件里手工拼第二套 `running / aiProcessing / uiWarmupPending`
+  - `tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx`
+    - 新增 ACP DOM 合同：
+      - waiting -> streaming -> idle 三阶段里
+      - sendbox loading 与 runtime diagnostics busy 始终保持一致
+  - `tests/unit/renderer/platformSendBoxes.dom.test.tsx`
+    - ACP 平台级测试桩改为 mock runtime diagnostics snapshot
+    - 不再只依赖 `useAcpMessage.running`
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径沿用 `SC-045`：
+    - streaming 仍必须被视为 busy
+    - waiting selector 与 busy selector 不能混成一条
+    - send box / queue gate 不得再直接绑定 hook-local busy 公式
+- Verification:
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run test tests/unit/renderer/components/AcpSendBoxQueueFlow.dom.test.tsx tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 结果：`63 passed`
+  - `bun run test tests/unit/renderer/platformSendBoxes.dom.test.tsx`
+    - 结果：`17 passed`
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`427 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run test`
+    - 结果：`3224 passed | 17 skipped (3241 tests)`
+    - 补充说明：
+      - suite 里仍有既有 warning：
+        - `MaxListenersExceededWarning`
+        - `tests/unit/skillsMarket.test.ts` 的 hoisted `vi.mock(...)` warning
+      - 本轮不阻塞通过
+- Product judgement:
+  - 这一刀没有新增一个更显眼的 UI，而是在把 ACP 前台最后那套“局部拼 busy”的读法收回到 shared runtime snapshot。
+  - 从用户视角看，header dot、warmup cue、send box、queue gate 在 `waiting / streaming / idle` 三阶段里会更像一套完整合同，而不是几处碰巧同步的实现。
+- Open risks:
+  - runtime diagnostics 目前仍由 renderer-side `useAcpMessage` 发布，还不是最终的主进程 turn lifecycle ownership。
+  - `setAiProcessing` 与 hydrated-running 推导仍是过渡期结构；这轮只是先把外层消费者统一到同一份 snapshot contract。
+- Next:
+  - 继续把 `queue / busy` 更深层真相源往 runtime publisher / main-process lifecycle 收回去。
+  - 或回到 settings / guid 侧 ACP 场景的独立补缺。

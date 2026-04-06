@@ -3,6 +3,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import AcpLogsPanel from '@/renderer/pages/conversation/platforms/acp/AcpLogsPanel';
 import {
+  isAcpRuntimeWaitingSnapshot,
   useAcpRuntimeDiagnostics,
   type AcpLogEntry,
   type AcpRuntimeActivityPhase,
@@ -87,12 +88,13 @@ const AcpRuntimeStatusButton: React.FC<{
   agentName?: string;
 }> = ({ conversationId, backend, agentName }) => {
   const { t } = useTranslation();
-  const { status, statusSource, activityPhase, logs, uiWarmupPending } = useAcpRuntimeDiagnostics(conversationId);
+  const runtimeDiagnostics = useAcpRuntimeDiagnostics(conversationId);
+  const { status, statusSource, activityPhase, logs } = runtimeDiagnostics;
   const [visible, setVisible] = React.useState(false);
   const displayName = agentName || backend || 'ACP';
   const diagnosticsOnly = shouldDemoteHydratedTerminalStatus(status, statusSource);
   const effectiveStatus = diagnosticsOnly ? null : status;
-  const isWaiting = activityPhase === 'waiting' || uiWarmupPending;
+  const isWaiting = isAcpRuntimeWaitingSnapshot(runtimeDiagnostics);
   const statusLabel = getButtonLabel({
     activityPhase: isWaiting ? 'waiting' : activityPhase,
     diagnosticsOnly,

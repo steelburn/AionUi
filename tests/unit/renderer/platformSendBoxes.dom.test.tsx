@@ -57,6 +57,15 @@ const mockAcpResetState = vi.fn();
 const mockAppendAcpUiLog = vi.fn();
 const mockPrimeRequestTraceFallback = vi.fn();
 const mockClearPendingRequestTraceFallback = vi.fn(() => false);
+const mockUseAcpRuntimeDiagnostics = vi.fn(() => ({
+  status: null,
+  statusSource: null,
+  statusRevision: 0,
+  activityPhase: 'idle',
+  uiWarmupPending: false,
+  hasThinkingMessage: false,
+  logs: [],
+}));
 const mockUseAcpMessage = vi.fn(() => ({
   thought: { subject: '', description: '' },
   running: false,
@@ -291,6 +300,25 @@ vi.mock('@/renderer/pages/conversation/platforms/acp/useAcpMessage', () => ({
   useAcpMessage: (...args: unknown[]) => mockUseAcpMessage(...args),
 }));
 
+vi.mock('@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics', () => ({
+  useAcpRuntimeDiagnostics: (...args: unknown[]) => mockUseAcpRuntimeDiagnostics(...args),
+  setAcpRuntimeUiWarmupPending: vi.fn(),
+  isAcpRuntimeWaitingSnapshot: ({
+    activityPhase,
+    uiWarmupPending,
+  }: {
+    activityPhase?: string;
+    uiWarmupPending?: boolean;
+  }) => activityPhase === 'waiting' || uiWarmupPending === true,
+  isAcpRuntimeBusySnapshot: ({
+    activityPhase,
+    uiWarmupPending,
+  }: {
+    activityPhase?: string;
+    uiWarmupPending?: boolean;
+  }) => activityPhase !== 'idle' || uiWarmupPending === true,
+}));
+
 vi.mock('@/renderer/pages/conversation/platforms/acp/useAcpInitialMessage', () => ({
   useAcpInitialMessage: vi.fn(),
 }));
@@ -437,6 +465,15 @@ describe('platform send box queue integration', () => {
       tokenUsage: null,
       contextLimit: 0,
       hasThinkingMessage: false,
+    });
+    mockUseAcpRuntimeDiagnostics.mockReturnValue({
+      status: null,
+      statusSource: null,
+      statusRevision: 0,
+      activityPhase: 'idle',
+      uiWarmupPending: false,
+      hasThinkingMessage: false,
+      logs: [],
     });
     mockUseConversationCommandQueue.mockReturnValue({
       items: [],
@@ -678,6 +715,15 @@ describe('platform send box queue integration', () => {
       tokenUsage: null,
       contextLimit: 0,
       hasThinkingMessage: false,
+    });
+    mockUseAcpRuntimeDiagnostics.mockReturnValue({
+      status: 'session_active',
+      statusSource: 'live',
+      statusRevision: 2,
+      activityPhase: 'streaming',
+      uiWarmupPending: false,
+      hasThinkingMessage: false,
+      logs: [],
     });
 
     render(<AcpSendBox conversation_id='conv-acp' backend='claude' agentName='Claude' />);

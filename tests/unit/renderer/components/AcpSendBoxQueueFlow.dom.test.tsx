@@ -2,7 +2,11 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AcpRuntimeStatusButton from '@/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton';
 import AcpSendBox from '@/renderer/pages/conversation/platforms/acp/AcpSendBox';
-import { clearAcpRuntimeDiagnosticsSnapshot } from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
+import {
+  clearAcpRuntimeDiagnosticsSnapshot,
+  isAcpRuntimeBusySnapshot,
+  readAcpRuntimeDiagnosticsSnapshot,
+} from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const responseListeners = new Set<(message: unknown) => void>();
@@ -444,6 +448,87 @@ describe('AcpSendBox queue flow', () => {
     mockAcpAuthenticateInvoke.mockResolvedValue({ success: true });
     mockAcpSendInvoke.mockResolvedValue({ success: true });
     mockDatabaseMessagesInvoke.mockResolvedValue([]);
+  });
+
+  it('keeps send box busy in sync with the shared ACP runtime diagnostics phases', async () => {
+    const conversationId = createConversationId();
+    clearAcpRuntimeDiagnosticsSnapshot(conversationId);
+    mockConversationGetInvoke.mockResolvedValue({
+      id: conversationId,
+      type: 'acp',
+      status: 'finished',
+      extra: {},
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: conversationId,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      expect(isAcpRuntimeBusySnapshot(readAcpRuntimeDiagnosticsSnapshot(conversationId))).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'trigger-send-1' }));
+
+    await waitFor(() => {
+      expect(mockAcpSendInvoke).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+      expect(isAcpRuntimeBusySnapshot(readAcpRuntimeDiagnosticsSnapshot(conversationId))).toBe(true);
+      expect(readAcpRuntimeDiagnosticsSnapshot(conversationId)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'waiting',
+        })
+      );
+    });
+
+    mockMessageList = [
+      {
+        id: 'assistant-streaming-content',
+        type: 'text',
+        msg_id: 'content-runtime-busy',
+        position: 'left',
+        conversation_id: conversationId,
+        content: { content: 'assistant content' },
+      },
+    ];
+    emitAcpResponse({
+      type: 'content',
+      conversation_id: conversationId,
+      msg_id: 'content-runtime-busy',
+      data: {
+        content: 'assistant content',
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+      expect(isAcpRuntimeBusySnapshot(readAcpRuntimeDiagnosticsSnapshot(conversationId))).toBe(true);
+      expect(readAcpRuntimeDiagnosticsSnapshot(conversationId)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'streaming',
+        })
+      );
+    });
+
+    emitAcpResponse({
+      type: 'finish',
+      conversation_id: conversationId,
+      msg_id: 'finish-runtime-busy',
+      data: null,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('false');
+      expect(isAcpRuntimeBusySnapshot(readAcpRuntimeDiagnosticsSnapshot(conversationId))).toBe(false);
+      expect(readAcpRuntimeDiagnosticsSnapshot(conversationId)).toEqual(
+        expect.objectContaining({
+          activityPhase: 'idle',
+        })
+      );
+    });
   });
 
   it('starts the next queued command exactly once after stop resets a running ACP conversation', async () => {

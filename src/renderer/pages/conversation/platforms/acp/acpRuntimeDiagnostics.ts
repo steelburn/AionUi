@@ -73,6 +73,14 @@ export const readAcpRuntimeDiagnosticsSnapshot = (conversationId: string): AcpRu
   return acpRuntimeDiagnosticsStore.get(conversationId) ?? EMPTY_ACP_RUNTIME_DIAGNOSTICS_SNAPSHOT;
 };
 
+export const isAcpRuntimeWaitingSnapshot = (
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
+): boolean => snapshot.activityPhase === 'waiting' || snapshot.uiWarmupPending === true;
+
+export const isAcpRuntimeBusySnapshot = (
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
+): boolean => snapshot.activityPhase !== 'idle' || snapshot.uiWarmupPending === true;
+
 const emitAcpRuntimeDiagnosticsSnapshot = (conversationId: string): void => {
   for (const listener of acpRuntimeDiagnosticsListeners.get(conversationId) ?? []) {
     listener();
