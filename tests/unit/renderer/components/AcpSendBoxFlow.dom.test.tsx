@@ -580,6 +580,7 @@ describe('AcpSendBox live ACP flow', () => {
       expect(screen.getByTestId('acp-warmup-indicator')).toBeInTheDocument();
     });
     expect(screen.getByTestId('acp-warmup-indicator')).toHaveTextContent('Connecting Claude...');
+    expect(screen.getByTestId('acp-warmup-indicator')).toHaveClass('w-full', 'max-w-800px', 'mx-auto');
     expect(screen.getByTestId('acp-warmup-agent-icon')).toHaveClass('animate-spin');
   });
 

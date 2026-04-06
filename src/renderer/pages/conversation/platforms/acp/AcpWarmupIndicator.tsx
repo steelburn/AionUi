@@ -45,7 +45,7 @@ const AcpWarmupIndicator: React.FC<{
   return (
     <div
       data-testid='acp-warmup-indicator'
-      className='mb-8px flex items-center gap-10px rounded-12px border border-[color:var(--color-border-2)] bg-1 px-12px py-10px text-13px text-t-secondary'
+      className='mb-8px flex w-full max-w-800px items-center gap-10px rounded-12px border border-[color:var(--color-border-2)] bg-1 px-12px py-10px text-13px text-t-secondary mx-auto'
     >
       <span
         data-testid='acp-warmup-agent-icon'
