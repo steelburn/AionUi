@@ -104,6 +104,7 @@ const AcpRuntimeStatusButton: React.FC<{
     agentName: displayName,
     t,
   });
+  const shouldPulse = isWaiting && !isWarmSessionWaiting;
   const color = isWaiting
     ? isWarmSessionWaiting
       ? 'rgb(var(--success-6))'
@@ -166,7 +167,7 @@ const AcpRuntimeStatusButton: React.FC<{
         <span
           data-testid='acp-runtime-status-dot'
           className={`block h-8px w-8px rounded-full shadow-[0_0_0_1px_var(--color-border-2)] ${
-            isWaiting ? 'animate-pulse' : ''
+            shouldPulse ? 'animate-pulse' : ''
           }`}
           style={{ backgroundColor: color }}
         />

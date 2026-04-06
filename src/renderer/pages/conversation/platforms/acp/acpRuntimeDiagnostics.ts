@@ -11,6 +11,7 @@ export type AcpRuntimeStatus =
 
 export type AcpRuntimeStatusSource = 'live' | 'hydrated';
 export type AcpRuntimeActivityPhase = 'idle' | 'waiting' | 'streaming';
+export type AcpPendingFirstResponseMode = 'cold' | 'warm' | null;
 
 export type AcpLogLevel = 'info' | 'success' | 'warning' | 'error';
 
@@ -50,6 +51,7 @@ export type AcpRuntimeDiagnosticsSnapshot = {
   statusSource: AcpRuntimeStatusSource | null;
   statusRevision: number;
   activityPhase: AcpRuntimeActivityPhase;
+  pendingFirstResponseMode: AcpPendingFirstResponseMode;
   uiWarmupPending?: boolean;
   hasThinkingMessage?: boolean;
   logs: AcpLogEntry[];
@@ -60,6 +62,7 @@ const EMPTY_ACP_RUNTIME_DIAGNOSTICS_SNAPSHOT: AcpRuntimeDiagnosticsSnapshot = Ob
   statusSource: null,
   statusRevision: 0,
   activityPhase: 'idle',
+  pendingFirstResponseMode: null,
   uiWarmupPending: false,
   hasThinkingMessage: false,
   logs: [],
@@ -78,9 +81,8 @@ export const isAcpRuntimeWaitingSnapshot = (
 ): boolean => snapshot.activityPhase === 'waiting' || snapshot.uiWarmupPending === true;
 
 export const isAcpRuntimeWarmSessionWaitingSnapshot = (
-  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending' | 'status' | 'statusSource'>
-): boolean =>
-  isAcpRuntimeWaitingSnapshot(snapshot) && snapshot.status === 'session_active' && snapshot.statusSource === 'hydrated';
+  snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending' | 'pendingFirstResponseMode'>
+): boolean => isAcpRuntimeWaitingSnapshot(snapshot) && snapshot.pendingFirstResponseMode === 'warm';
 
 export const isAcpRuntimeBusySnapshot = (
   snapshot: Pick<AcpRuntimeDiagnosticsSnapshot, 'activityPhase' | 'uiWarmupPending'>
@@ -107,6 +109,7 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
     currentSnapshot.statusSource === nextSnapshot.statusSource &&
     currentSnapshot.statusRevision === nextSnapshot.statusRevision &&
     currentSnapshot.activityPhase === nextSnapshot.activityPhase &&
+    currentSnapshot.pendingFirstResponseMode === nextSnapshot.pendingFirstResponseMode &&
     currentSnapshot.uiWarmupPending === nextSnapshot.uiWarmupPending &&
     Boolean(currentSnapshot.hasThinkingMessage) === Boolean(nextSnapshot.hasThinkingMessage) &&
     currentSnapshot.logs === nextSnapshot.logs
@@ -119,6 +122,7 @@ export const publishAcpRuntimeDiagnosticsSnapshot = (
     nextSnapshot.statusSource === null &&
     nextSnapshot.statusRevision === 0 &&
     nextSnapshot.activityPhase === 'idle' &&
+    nextSnapshot.pendingFirstResponseMode === null &&
     !nextSnapshot.uiWarmupPending &&
     !nextSnapshot.hasThinkingMessage &&
     nextSnapshot.logs.length === 0
@@ -155,6 +159,7 @@ export const setAcpRuntimeUiWarmupPending = (conversationId: string, pending: bo
       nextSnapshot.statusSource === null &&
       nextSnapshot.statusRevision === 0 &&
       nextSnapshot.activityPhase === 'idle' &&
+      nextSnapshot.pendingFirstResponseMode === null &&
       !nextSnapshot.uiWarmupPending &&
       !nextSnapshot.hasThinkingMessage &&
       nextSnapshot.logs.length === 0

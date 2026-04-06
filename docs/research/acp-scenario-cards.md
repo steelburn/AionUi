@@ -2020,3 +2020,59 @@ Reviewer adjustment:
   - 不能只靠把颜色改绿就掩盖 busy 语义；warm-session waiting 仍需让用户感知到“正在处理”
   - suppress warmup banner 不能让 true cold-start waiting 丢失必要反馈
   - selector 必须绑定明确的 warm-session 条件，不能把普通 waiting 一起误降级
+
+## SC-049 Warm Session Next Turn Must Not Fall Back To Generic Waiting
+
+- Goal:
+  - 把 `SC-048` 还没压住的那半段继续收掉：
+    - warm session 的下一轮 send 在真正开始 live turn 之后，仍然不应重新掉回 generic waiting
+  - 让用户感知更接近 Zed：
+    - thread 不再重放 processing banner
+    - header dot 继续保持 active，而不是切回 generic pulse
+- User action:
+  - 用户在一个 ACP 会话里完成一轮对话。
+  - 切到别的会话，再切回来。
+  - 发送下一条消息，并观察从点击 send 到首个 `content` 到来前的整个窗口：
+    - thread 是否出现 processing banner
+    - header dot 是否重新开始 pulse
+    - sendbox placeholder 是否仍能提示正在处理
+- Current failure:
+  - `SC-048` 只覆盖了 warm-session waiting 的初始 hydration 窗口：
+    - `AcpWarmupIndicator` 不再在最开始那一拍直接出现
+    - dot 在最开始那一拍维持 success family
+  - 但一旦下一轮真正进入 live waiting：
+    - renderer waiting 合同会重新退回 generic waiting
+    - thread 又会出现 processing banner
+    - dot 也会重新切回 pulse
+  - 结果是：
+    - 用户仍然会本能感觉“切回来后又重新进了一次 processing/reconnect”
+- Expected UI state:
+  - 对 finished-but-warm 会话回来后的下一轮 send：
+    - 从点击 send 到首包到来前，整段 waiting 都维持 warm-session 语义
+    - thread 不再出现 reconnect-style processing banner
+    - header dot 保持 active/success，且不再退回 generic pulse
+    - sendbox placeholder 仍可保留 `Processing` 作为轻量反馈
+  - 对 fresh connect / cold start / reopen running-before-first-response：
+    - 继续保留既有更强的 waiting/banner 语义
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 把 “当前 pending-first-response 是否来自 warm session next turn” 显式记成一条 latched state
+    - 不能只依赖瞬时 `hydrated + session_active`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 让 diagnostics snapshot 暴露 warm/cold pending-first-response mode
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - warm-session next-turn waiting 保持 active dot，不再 pulse
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - warm-session next-turn waiting 全程不再显示 processing banner
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+- Exit criteria:
+  - finished-but-warm 会话切回后再 send，直到首包到来前都不再出现 thread processing banner
+  - 同一窗口内 header dot 不再退回 generic pulse
+  - sendbox placeholder 仍能体现 processing
+  - fresh connect / cold start waiting 合同不退化
+- Reviewer focus:
+  - warm-session waiting 必须覆盖到 live turn 开始后，而不是只覆盖 hydration 瞬间
+  - 不能因此误伤 reopen running-before-first-response 的强 waiting cue
+  - 不要靠隐藏所有反馈来“消除问题”，需要保留轻量 processing affordance

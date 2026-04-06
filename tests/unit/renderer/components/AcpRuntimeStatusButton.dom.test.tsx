@@ -109,6 +109,7 @@ describe('AcpRuntimeStatusButton', () => {
       statusSource: 'live',
       statusRevision: 3,
       activityPhase: 'idle',
+      pendingFirstResponseMode: null,
       logs: [createEntry({ backend: 'Codex', agentName: 'Codex' })],
     });
 
@@ -128,6 +129,7 @@ describe('AcpRuntimeStatusButton', () => {
       statusSource: 'hydrated',
       statusRevision: 5,
       activityPhase: 'idle',
+      pendingFirstResponseMode: null,
       logs: [],
     });
 
@@ -150,6 +152,7 @@ describe('AcpRuntimeStatusButton', () => {
       statusSource: 'live',
       statusRevision: 6,
       activityPhase: 'idle',
+      pendingFirstResponseMode: null,
       logs: [],
     });
 
@@ -167,6 +170,7 @@ describe('AcpRuntimeStatusButton', () => {
       statusSource: null,
       statusRevision: 0,
       activityPhase: 'waiting',
+      pendingFirstResponseMode: 'cold',
       logs: [],
     });
 
@@ -191,19 +195,20 @@ describe('AcpRuntimeStatusButton', () => {
     });
   });
 
-  it('keeps a hydrated warm-session waiting dot green while the next ACP turn is pending', () => {
+  it('keeps a live warm-session waiting dot green without falling back to generic pulse', () => {
     publishAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID, {
       status: 'session_active',
-      statusSource: 'hydrated',
+      statusSource: 'live',
       statusRevision: 7,
       activityPhase: 'waiting',
+      pendingFirstResponseMode: 'warm',
       logs: [],
     });
 
     render(<AcpRuntimeStatusButton conversationId={CONVERSATION_ID} backend='codex' agentName='Codex' />);
 
     expect(screen.getByTestId('acp-runtime-status-button')).toHaveAttribute('aria-label', 'Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });

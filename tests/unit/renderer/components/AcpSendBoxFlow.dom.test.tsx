@@ -862,7 +862,27 @@ describe('AcpSendBox live ACP flow', () => {
 
     expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
     expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
-    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--success-6))',
+    });
+
+    act(() => {
+      emitAcpResponse({
+        type: 'start',
+        conversation_id: CONVERSATION_ID,
+        msg_id: 'warm-session-live-start',
+        data: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
+    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
       backgroundColor: 'rgb(var(--success-6))',
     });

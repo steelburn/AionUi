@@ -15,6 +15,7 @@ import {
   publishAcpRuntimeDiagnosticsSnapshot,
   setAcpRuntimeUiWarmupPending,
   type AcpLogEntry,
+  type AcpPendingFirstResponseMode,
   type AcpRuntimeStatus,
   type AcpRuntimeStatusSource,
 } from './acpRuntimeDiagnostics';
@@ -181,6 +182,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const [slashCommandsRevision, setSlashCommandsRevision] = useState(0);
   const [acpLogs, setAcpLogs] = useState<AcpLogEntry[]>([]);
   const [aiProcessing, setAiProcessingValue] = useState(false);
+  const [pendingFirstResponseMode, setPendingFirstResponseModeValue] = useState<AcpPendingFirstResponseMode>(null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const [contextLimit, setContextLimit] = useState<number>(0);
   const acpLogSequenceRef = useRef(0);
@@ -194,21 +196,40 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const aiProcessingRef = useRef(aiProcessing);
   const aiProcessingOwnerConversationIdRef = useRef<string | null>(aiProcessing ? conversation_id : null);
   const hasLiveAcpActivityRef = useRef(false);
+  const acpStatusRef = useRef(acpStatus);
+  acpStatusRef.current = acpStatus;
 
-  const setPendingFirstResponseState = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((nextValue) => {
-    const currentValue = aiProcessingRef.current;
-    const resolvedValue =
-      typeof nextValue === 'function' ? (nextValue as (previousValue: boolean) => boolean)(currentValue) : nextValue;
+  const setPendingFirstResponseMode = useCallback((nextMode: AcpPendingFirstResponseMode) => {
+    setPendingFirstResponseModeValue(nextMode);
+  }, []);
 
-    aiProcessingRef.current = resolvedValue;
-    aiProcessingOwnerConversationIdRef.current = resolvedValue ? conversationIdRef.current : null;
-    setAiProcessingValue(resolvedValue);
+  const setPendingFirstResponseState = useCallback(
+    (nextValue: React.SetStateAction<boolean>, nextMode?: AcpPendingFirstResponseMode) => {
+      const currentValue = aiProcessingRef.current;
+      const resolvedValue =
+        typeof nextValue === 'function' ? (nextValue as (previousValue: boolean) => boolean)(currentValue) : nextValue;
+
+      if (!resolvedValue) {
+        setPendingFirstResponseMode(null);
+      } else if (nextMode !== undefined) {
+        setPendingFirstResponseMode(nextMode);
+      }
+
+      aiProcessingRef.current = resolvedValue;
+      aiProcessingOwnerConversationIdRef.current = resolvedValue ? conversationIdRef.current : null;
+      setAiProcessingValue(resolvedValue);
+    },
+    [setPendingFirstResponseMode]
+  );
+
+  const shouldTreatNextPendingFirstResponseAsWarmSession = useCallback((): boolean => {
+    return acpStatusRef.current === 'session_active' && !runningRef.current;
   }, []);
 
   const beginPendingFirstResponse = useCallback(() => {
     setAcpRuntimeUiWarmupPending(conversation_id, true);
-    setPendingFirstResponseState(true);
-  }, [conversation_id, setPendingFirstResponseState]);
+    setPendingFirstResponseState(true, shouldTreatNextPendingFirstResponseAsWarmSession() ? 'warm' : 'cold');
+  }, [conversation_id, setPendingFirstResponseState, shouldTreatNextPendingFirstResponseAsWarmSession]);
 
   const clearPendingFirstResponse = useCallback(() => {
     setAcpRuntimeUiWarmupPending(conversation_id, false);
@@ -735,6 +756,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
       statusSource: acpStatusSource,
       statusRevision: acpStatusRevision,
       activityPhase,
+      pendingFirstResponseMode,
       hasThinkingMessage,
       logs: acpLogs,
     });
@@ -747,6 +769,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     conversation_id,
     messageList,
     hasThinkingMessage,
+    pendingFirstResponseMode,
     running,
   ]);
 
@@ -788,6 +811,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     setAcpStatusRevision(0);
     setSlashCommandsRevision(0);
     setAcpLogs([]);
+    setPendingFirstResponseMode(null);
     setTokenUsage(null);
     setContextLimit(0);
     hasContentInTurnRef.current = false;

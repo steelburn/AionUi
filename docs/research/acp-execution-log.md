@@ -3113,3 +3113,102 @@
   - 按本轮与 Zed 的差距复盘，下一优先级建议：
     - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
     - 第二优先：评估是否补更完整的 thread-level generating affordance，而不是只靠 sendbox placeholder + dot
+
+### 2026-04-06 / Batch 46
+
+- 对应 SC:
+  - `SC-049`
+- Goal:
+  - 把 `SC-048` 没收干净的那半段继续压掉：
+    - warm session 的下一轮 send 在真正进入 live waiting 之后，不应再重新掉回 generic processing / reconnect 体感
+  - 让用户从点击 send 到首包到来前的整个窗口里，都感知到：
+    - session 仍然是热的
+    - 正在处理，但不是“又重新连了一次”
+- Root cause:
+  - `SC-048` 只把 warm-session waiting 的“hydration 那一拍”降级了：
+    - dot 先维持 success family
+    - thread 先不显示 warmup banner
+  - 但这条 warm-session 合同仍然绑定在瞬时 `hydrated + session_active + waiting` 上。
+  - 一旦下一轮 turn 真正收到 live `start`，renderer 就会重新退回 generic waiting：
+    - `AcpWarmupIndicator` 再次出现
+    - header dot 再次开始 generic pulse
+  - 结果是：
+    - 用户虽然没有真的断开重连
+    - 但视觉上仍然像“切回来后又重新进入了一次 processing / reconnect”
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-049 Warm Session Next Turn Must Not Fall Back To Generic Waiting`
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 新增 `pendingFirstResponseMode`
+    - 把 pending-first-response 明确区分为 `warm / cold`
+    - `isAcpRuntimeWarmSessionWaitingSnapshot()` 改为基于 latched mode，而不是只看瞬时 hydrated status
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 在 send path 上显式 latch 当前 pending-first-response 是 `warm` 还是 `cold`
+    - warm 判断回到会话语义：
+      - `session_active`
+      - 且当前不是 `running`
+    - 让 warm-session next turn 从点击 send 到首包 / terminal clear 前都维持同一条 waiting 语义
+  - `src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx`
+    - warm-session waiting 继续保持 success/active dot
+    - 不再退回 generic pulse
+  - `src/renderer/pages/conversation/platforms/acp/AcpWarmupIndicator.tsx`
+    - 通过新的 warm-session selector，整个 warm next-turn waiting 窗口都不再重放 thread-level processing banner
+  - `tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx`
+    - 更新回归：live warm-session waiting dot 维持绿色，且不再 pulse
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 扩展回归：
+      - finished-but-warm 会话回来再 send 时，不显示 `acp-warmup-indicator`
+      - 收到 live `start` 之后仍然不显示 banner
+      - sendbox placeholder 继续保留 `Processing`
+      - header dot 维持 success family，且不再 pulse
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-049` 固定：
+    - 不能只修 warm-session waiting 的 hydration 瞬间，必须覆盖到 live waiting
+    - 不能通过“把所有反馈都藏掉”来消除问题，sendbox 仍需保留轻量 processing affordance
+    - fresh connect / cold start / reopen-before-first-response 的强等待提示不能被误伤
+- Verification:
+  - `bunx vitest run tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`52 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run lint:fix src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`0 warnings | 0 errors`
+  - `bun run format docs/research/acp-scenario-cards.md src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts src/renderer/pages/conversation/components/ChatLayout/AcpRuntimeStatusButton.tsx tests/unit/renderer/components/AcpRuntimeStatusButton.dom.test.tsx tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 通过
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`434 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run i18n:types && node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - `check-i18n` 仍报告仓库里既有 `31` 条 unknown literal i18n key warning
+      - 当前为 warning-only，不阻塞本轮 ACP 结论
+  - `bun run test`
+    - 通过
+    - 结果：`3232 passed | 17 skipped (3249 tests)`
+- Product judgement:
+  - 这轮把一个用户已经明确感知到、而且仍明显不如 Zed 的缝补上了。
+  - 现在 finished-but-warm 会话切走再切回、发送下一条消息时：
+    - thread 不再重放一整块 processing banner
+    - header dot 不再从 active 掉回 generic 呼吸态
+    - sendbox 仍保留轻量 `Processing`
+  - 从用户感知上，这已经更接近“warm session 继续工作”，而不是“又重新连接了一次”。
+- Open risks:
+  - `pendingFirstResponseMode` 仍然是 renderer-side runtime publisher 的一部分；更底层的 runtime / queue ownership 还没回收到最终单一真相源。
+  - 虽然 warm-session waiting 的体感已经更克制，但整体生成观感仍然没有 Zed 那种更完整的 thread-level generating row / elapsed meta。
+  - ACP diagnostics 已经被压到二级入口，但整体存在感仍稍高于 Zed。
+- Next:
+  - 先请用户体验这条具体路径：
+    - 完成一轮 ACP 对话
+    - 切到别的会话再切回
+    - 再发下一条消息
+    - 确认从 send 到首包前都不再出现 reconnect-style banner / generic pulse
+  - 按当前与 Zed 的差距复盘，下一优先级建议：
+    - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
+    - 第二优先：评估是否补更完整的 generating affordance，而不是继续在现有 dot / placeholder 上做小修
