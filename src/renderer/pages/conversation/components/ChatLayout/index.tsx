@@ -16,10 +16,6 @@ import { usePreviewAutoCollapse } from '@/renderer/pages/conversation/hooks/useP
 import { useTitleRename } from '@/renderer/pages/conversation/hooks/useTitleRename';
 import { useWorkspaceCollapse } from '@/renderer/pages/conversation/hooks/useWorkspaceCollapse';
 import { PreviewPanel, usePreviewContext } from '@/renderer/pages/conversation/Preview';
-import {
-  shouldProminentlyShowAcpRuntimeDiagnosticsEntry,
-  useAcpRuntimeDiagnostics,
-} from '@/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics';
 import { dispatchWorkspaceToggleEvent } from '@/renderer/utils/workspace/workspaceEvents';
 import { ACP_BACKENDS_ALL } from '@/common/types/acpTypes';
 import classNames from 'classnames';
@@ -104,15 +100,10 @@ const ChatLayout: React.FC<{
     (backend === 'custom' && customAgents?.[0]?.name) ||
     ACP_BACKENDS_ALL[backend as keyof typeof ACP_BACKENDS_ALL]?.name ||
     backend;
-  const acpRuntimeDiagnostics = useAcpRuntimeDiagnostics(conversationId ?? '__chat-layout-acp-runtime__');
   const shouldShowAcpRuntimeStatusButton = Boolean(props.showAcpRuntimeDiagnostics && conversationId);
   const shouldEmbedAcpRuntimeStatusInAgentPill = Boolean(
     shouldShowAcpRuntimeStatusButton && !layout?.isMobile && (backend || agentLogo)
   );
-  const embeddedAcpRuntimeStatusVisibility =
-    shouldEmbedAcpRuntimeStatusInAgentPill && !shouldProminentlyShowAcpRuntimeDiagnosticsEntry(acpRuntimeDiagnostics)
-      ? 'hover'
-      : 'always';
   const acpRuntimeStatusButton =
     shouldShowAcpRuntimeStatusButton && conversationId ? (
       <AcpRuntimeStatusButton
@@ -237,7 +228,7 @@ const ChatLayout: React.FC<{
                   showLogoInCompact={Boolean(layout?.isMobile)}
                   compactLabelType={layout?.isMobile ? 'agent' : 'mode'}
                   trailingAccessory={shouldEmbedAcpRuntimeStatusInAgentPill ? acpRuntimeStatusButton : undefined}
-                  trailingAccessoryVisibility={embeddedAcpRuntimeStatusVisibility}
+                  trailingAccessoryVisibility='always'
                 />
               )}
               {!shouldEmbedAcpRuntimeStatusInAgentPill ? acpRuntimeStatusButton : null}
