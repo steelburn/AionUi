@@ -101,6 +101,43 @@ const shouldHydratedRunningEnterWaitingPhase = (conversationId: string, messages
   return true;
 };
 
+const getHydratedPendingFirstResponseMode = (
+  conversationId: string,
+  messages: TMessage[],
+  hasLiveWarmSession: boolean
+): AcpPendingFirstResponseMode => {
+  const sanitizedMessages = sanitizeAcpTimelineMessages(
+    messages.filter((message) => message.conversation_id === conversationId)
+  );
+  let sawTrailingUserMessage = false;
+
+  for (let index = sanitizedMessages.length - 1; index >= 0; index -= 1) {
+    const message = sanitizedMessages[index];
+    if (message.hidden) {
+      continue;
+    }
+
+    if (!sawTrailingUserMessage) {
+      if (message.position === 'right') {
+        sawTrailingUserMessage = true;
+        continue;
+      }
+
+      if (message.position === 'left' || HYDRATED_RUNNING_ASSISTANT_ACTIVITY_TYPES.has(message.type)) {
+        return null;
+      }
+
+      continue;
+    }
+
+    if (message.position === 'left' || HYDRATED_RUNNING_ASSISTANT_ACTIVITY_TYPES.has(message.type)) {
+      return hasLiveWarmSession ? 'warm' : 'cold';
+    }
+  }
+
+  return sawTrailingUserMessage ? 'cold' : null;
+};
+
 const isTerminalAcpStatus = (
   status: AcpRuntimeStatus | null | undefined
 ): status is 'auth_required' | 'disconnected' | 'error' =>
@@ -189,7 +226,9 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const bufferedContentRef = useRef<BufferedContentMessage[]>([]);
   const contentFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const conversationIdRef = useRef(conversation_id);
+  const messageListRef = useRef(messageList);
   conversationIdRef.current = conversation_id;
+  messageListRef.current = messageList;
 
   // Use refs to sync state for immediate access in event handlers
   const runningRef = useRef(running);
@@ -197,7 +236,10 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const aiProcessingOwnerConversationIdRef = useRef<string | null>(aiProcessing ? conversation_id : null);
   const hasLiveAcpActivityRef = useRef(false);
   const acpStatusRef = useRef(acpStatus);
+  const pendingFirstResponseModeRef = useRef(pendingFirstResponseMode);
+  const hydratedConversationIdRef = useRef<string | null>(null);
   acpStatusRef.current = acpStatus;
+  pendingFirstResponseModeRef.current = pendingFirstResponseMode;
 
   const setPendingFirstResponseMode = useCallback((nextMode: AcpPendingFirstResponseMode) => {
     setPendingFirstResponseModeValue(nextMode);
@@ -225,6 +267,23 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
   const shouldTreatNextPendingFirstResponseAsWarmSession = useCallback((): boolean => {
     return acpStatusRef.current === 'session_active' && !runningRef.current;
   }, []);
+
+  const syncHydratedPendingFirstResponseState = useCallback(
+    (shouldWaitForFirstResponse: boolean, nextMode: AcpPendingFirstResponseMode) => {
+      const isCurrentConversationProcessing =
+        aiProcessingRef.current && aiProcessingOwnerConversationIdRef.current === conversation_id;
+
+      if (
+        isCurrentConversationProcessing === shouldWaitForFirstResponse &&
+        (!shouldWaitForFirstResponse || pendingFirstResponseModeRef.current === nextMode)
+      ) {
+        return;
+      }
+
+      setPendingFirstResponseState(shouldWaitForFirstResponse, nextMode ?? undefined);
+    },
+    [conversation_id, setPendingFirstResponseState]
+  );
 
   const beginPendingFirstResponse = useCallback(() => {
     setAcpRuntimeUiWarmupPending(conversation_id, true);
@@ -788,19 +847,22 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
 
   // Reset state when conversation changes and restore actual running status
   useEffect(() => {
-    if (!hasHydratedRunningState || hasLiveAcpActivityRef.current || !runningRef.current) {
+    if (
+      !hasHydratedRunningState ||
+      hydratedConversationIdRef.current !== conversation_id ||
+      hasLiveAcpActivityRef.current ||
+      !runningRef.current
+    ) {
       return;
     }
 
     const shouldWaitForFirstResponse = shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
-    const isCurrentConversationProcessing =
-      aiProcessingRef.current && aiProcessingOwnerConversationIdRef.current === conversation_id;
-    if (isCurrentConversationProcessing === shouldWaitForFirstResponse) {
-      return;
-    }
+    const nextPendingFirstResponseMode = shouldWaitForFirstResponse
+      ? getHydratedPendingFirstResponseMode(conversation_id, messageList, acpStatusRef.current === 'session_active')
+      : null;
 
-    setPendingFirstResponseState(shouldWaitForFirstResponse);
-  }, [hasHydratedRunningState, messageList]);
+    syncHydratedPendingFirstResponseState(shouldWaitForFirstResponse, nextPendingFirstResponseMode);
+  }, [conversation_id, hasHydratedRunningState, messageList, syncHydratedPendingFirstResponseState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -822,6 +884,7 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
     hasLiveAcpActivityRef.current = false;
     requestTraceRef.current = null;
     acpLogSequenceRef.current = 0;
+    hydratedConversationIdRef.current = null;
     clearBufferedContent();
     setAcpRuntimeUiWarmupPending(conversation_id, false);
 
@@ -842,18 +905,24 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
           runningRef.current = false;
           setPendingFirstResponseState(false);
         }
+        hydratedConversationIdRef.current = conversation_id;
         setHasHydratedRunningState(true);
         return;
       }
 
       if (!hasLiveAcpActivity && !hasPendingProcessing) {
         const isRunning = res.status === 'running';
+        const hasLiveWarmSession = res.type === 'acp' && res.extra?.liveAcpStatus?.status === 'session_active';
         setRunning(isRunning);
         runningRef.current = isRunning;
         const shouldWaitForFirstResponse =
-          isRunning && shouldHydratedRunningEnterWaitingPhase(conversation_id, messageList);
-        setPendingFirstResponseState(shouldWaitForFirstResponse);
+          isRunning && shouldHydratedRunningEnterWaitingPhase(conversation_id, messageListRef.current);
+        const nextPendingFirstResponseMode = shouldWaitForFirstResponse
+          ? getHydratedPendingFirstResponseMode(conversation_id, messageListRef.current, hasLiveWarmSession)
+          : null;
+        syncHydratedPendingFirstResponseState(shouldWaitForFirstResponse, nextPendingFirstResponseMode);
       }
+      hydratedConversationIdRef.current = conversation_id;
       setHasHydratedRunningState(true);
 
       if (
@@ -919,10 +988,11 @@ export const useAcpMessage = (conversation_id: string, options: UseAcpMessageOpt
 
     return () => {
       cancelled = true;
+      hydratedConversationIdRef.current = null;
       clearBufferedContent();
       setAcpRuntimeUiWarmupPending(conversation_id, false);
     };
-  }, [clearBufferedContent, conversation_id]);
+  }, [clearBufferedContent, conversation_id, syncHydratedPendingFirstResponseState]);
 
   const resetState = useCallback(() => {
     clearBufferedContent();

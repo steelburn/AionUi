@@ -824,6 +824,58 @@ describe('AcpSendBox live ACP flow', () => {
     expect(screen.getByTestId('acp-runtime-status-dot')).toHaveClass('animate-pulse');
   });
 
+  it('does not replay the warmup indicator when reopening a warm-session next turn before the first response arrives', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-turn-1',
+        type: 'text',
+        msg_id: 'assistant-turn-1',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Previous answer already finished' },
+      },
+      {
+        id: 'user-turn-2',
+        type: 'text',
+        msg_id: 'user-turn-2',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Next turn is still waiting for the first response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {
+        liveAcpStatus: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+          updatedAt: 1234,
+        },
+      },
+    });
+
+    renderAcpSendBoxWithDiagnostics({
+      conversation_id: CONVERSATION_ID,
+      backend: 'claude',
+      agentName: 'Claude',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sendbox-loading')).toHaveTextContent('true');
+    });
+
+    expect(screen.queryByTestId('acp-warmup-indicator')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sendbox-placeholder')).toHaveTextContent('Processing');
+    expect(screen.getByTestId('acp-runtime-status-dot')).not.toHaveClass('animate-pulse');
+    expect(screen.getByTestId('acp-runtime-status-dot')).toHaveStyle({
+      backgroundColor: 'rgb(var(--success-6))',
+    });
+  });
+
   it('treats the next send as warm-session waiting instead of reconnect when a finished ACP conversation still has a live session', async () => {
     mockConversationGetInvoke.mockResolvedValue({
       id: CONVERSATION_ID,

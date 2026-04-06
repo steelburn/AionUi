@@ -3212,3 +3212,102 @@
   - 按当前与 Zed 的差距复盘，下一优先级建议：
     - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
     - 第二优先：评估是否补更完整的 generating affordance，而不是继续在现有 dot / placeholder 上做小修
+
+### 2026-04-06 / Batch 47
+
+- 对应 SC:
+  - `SC-050`
+- Goal:
+  - 把 `SC-049` 剩下的 remount 漏洞补上：
+    - finished-but-warm 会话的下一轮消息已经发出、但首包前用户切走再切回时，不应重新掉回 generic waiting
+  - 让 warm-session next-turn waiting 在 remount/hydration 下仍维持同一条用户感知：
+    - thread 不重放 processing banner
+    - header dot 保持 active/success
+    - sendbox 仍只保留轻量 `Processing`
+- Root cause:
+  - `SC-049` 已把 warm-session next turn 在单次 mount 里的 waiting contract 收稳：
+    - live `start` 之后不再退回 generic waiting
+    - dot 不再 generic pulse
+    - thread 不再重放 processing banner
+  - 但 `pendingFirstResponseMode` 仍是 renderer hook 内的本地 latch。
+  - 一旦用户在首包前切走导致 remount：
+    - hook 会清空 `pendingFirstResponseMode`
+    - hydration 只能恢复 `waiting`，却不知道当前是 warm 还是 cold
+  - 结果是：
+    - warm-session next turn 在 remount 后又会重新像“首次连接 / 重新连接”
+- Changes:
+  - `docs/research/acp-scenario-cards.md`
+    - 新增 `SC-050 Warm Next-Turn Waiting Must Survive Remount`
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 新增 `getHydratedPendingFirstResponseMode()`
+    - 对 hydrated running-before-first-response 显式恢复 `pendingFirstResponseMode`
+    - warm/cold 判定绑定两条条件：
+      - timeline 存在历史 assistant-side activity
+      - 当前 remount 仍有 live warm-session hint
+    - 新增 `hydratedConversationIdRef`
+    - 防止旧会话的 hydrated/pending 状态在 conversation 切换瞬间串到新会话
+  - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+    - 补充回归：
+      - hydrated running first-turn waiting -> `pendingFirstResponseMode: cold`
+      - warm next-turn + live session hint -> `pendingFirstResponseMode: warm`
+      - 只有历史 assistant 消息、但没有 live session hint -> 仍然是 `cold`
+      - 旧会话 pending wait 不会压住新会话 hydration
+  - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 新增 remount DOM 回归：
+      - reopening warm-session next turn before first response
+      - 不再显示 `acp-warmup-indicator`
+      - dot 保持 success 且不 pulse
+      - sendbox placeholder 仍为 `Processing`
+- Reviewer:
+  - 本轮未新拉 reviewer。
+  - 裁决口径按 `SC-050` 固定：
+    - remount 恢复必须同时看 timeline 和 live session 语义，不能把所有 `session_active` hydration 都当成 warm
+    - 不能再长出一套脱离 `pendingFirstResponseMode` 的第三套 waiting 合同
+    - 修复 remount 漏洞不能回归到“旧会话 pending 状态串到新会话”的问题
+- Verification:
+  - `bunx vitest run tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`89 passed`
+  - `bunx tsc --noEmit`
+    - 通过
+  - `bun run lint:fix src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 结果：`0 warnings | 0 errors`
+  - `bun run format docs/research/acp-scenario-cards.md src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts tests/unit/renderer/hooks/useAcpMessage.dom.test.ts tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - 通过
+  - `bun run verify:acp`
+    - 通过
+    - 结果：
+      - lint：`1503 warnings | 0 errors`
+      - format / tsc：通过
+      - ACP unit：`437 passed | 1 skipped`
+      - ACP integration：`21 passed | 3 skipped`
+      - ACP e2e：`19 passed | 4 skipped`
+  - `bun run i18n:types && node scripts/check-i18n.js`
+    - 通过
+    - 补充说明：
+      - 仍有仓库既有 `31` 条 unknown literal i18n key warning
+      - 当前为 warning-only，不阻塞本轮 ACP 结论
+  - `bun run test`
+    - 通过
+    - 结果：`3235 passed | 17 skipped (3252 tests)`
+- Product judgement:
+  - 这轮把 warm-session waiting 这条体验线最后一个明显的 remount 洞补上了。
+  - 到现在为止，这一整族问题已经从：
+    - 切回后像重新连接
+    - 下一轮 send 后像重新连接
+    - live `start` 后又像重新连接
+    - remount 后又像重新连接
+      收到：
+    - warm session 就继续表现成 warm session
+  - 这已经明显更接近 Zed 的“热会话 continuity”，而不是靠局部文案修饰。
+- Open risks:
+  - `pendingFirstResponseMode` 与 hydrated waiting 的恢复逻辑仍在 renderer-side runtime publisher 内；更深层的 runtime / queue ownership 还没有回收到最终单一真相源。
+  - 当前 waiting / streaming 的可见反馈已经稳定，但还没有 Zed 那种更完整的 generating row / elapsed meta。
+  - diagnostics 虽然已经被压成二级入口，但 header 上的 status dot 仍比 Zed 更显眼。
+- Next:
+  - 现在是一个合适的体验节点：
+    - finished-but-warm 会话里发送下一条消息
+    - 在首包前切到别的会话，再切回来
+    - 确认整个 remount 后仍然没有 reconnect-style banner / generic pulse
+  - 按当前与 Zed 的差距复盘，下一优先级建议：
+    - 第一优先：继续往更底层 runtime publisher / queue-busy ownership 收口
+    - 第二优先：评估是否补更完整的 generating affordance，而不是继续在现有 waiting cue 上微调

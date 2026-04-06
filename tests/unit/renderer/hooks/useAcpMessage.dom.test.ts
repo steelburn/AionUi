@@ -475,6 +475,105 @@ describe('useAcpMessage', () => {
       expect.objectContaining({
         activityPhase: 'waiting',
         hasThinkingMessage: false,
+        pendingFirstResponseMode: 'cold',
+      })
+    );
+  });
+
+  it('hydrates a running warm ACP next turn as warm waiting when a live session survives remount', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-turn-1',
+        type: 'text',
+        msg_id: 'assistant-turn-1',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Previous answer already finished' },
+      },
+      {
+        id: 'user-turn-2',
+        type: 'text',
+        msg_id: 'user-turn-2',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Next turn is still waiting for the first response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {
+        liveAcpStatus: {
+          backend: 'claude',
+          status: 'session_active',
+          agentName: 'Claude',
+          updatedAt: 1234,
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.running).toBe(true);
+    expect(result.current.aiProcessing).toBe(true);
+    expect(result.current.acpStatus).toBe('session_active');
+    expect(result.current.acpStatusSource).toBe('hydrated');
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+        status: 'session_active',
+        statusSource: 'hydrated',
+        pendingFirstResponseMode: 'warm',
+      })
+    );
+  });
+
+  it('keeps a hydrated running ACP next turn in cold waiting without a live warm-session hint', async () => {
+    setMockMessageList([
+      {
+        id: 'assistant-turn-1',
+        type: 'text',
+        msg_id: 'assistant-turn-1',
+        position: 'left',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Previous answer already finished' },
+      },
+      {
+        id: 'user-turn-2',
+        type: 'text',
+        msg_id: 'user-turn-2',
+        position: 'right',
+        conversation_id: CONVERSATION_ID,
+        content: { content: 'Next turn is still waiting for the first response' },
+      },
+    ]);
+
+    mockConversationGetInvoke.mockResolvedValue({
+      id: CONVERSATION_ID,
+      type: 'acp',
+      status: 'running',
+      extra: {},
+    });
+
+    const { result } = renderHook(() => useAcpMessage(CONVERSATION_ID));
+
+    await waitFor(() => {
+      expect(result.current.hasHydratedRunningState).toBe(true);
+    });
+
+    expect(result.current.running).toBe(true);
+    expect(result.current.aiProcessing).toBe(true);
+    expect(result.current.acpStatus).toBeNull();
+    expect(readAcpRuntimeDiagnosticsSnapshot(CONVERSATION_ID)).toEqual(
+      expect.objectContaining({
+        activityPhase: 'waiting',
+        pendingFirstResponseMode: 'cold',
       })
     );
   });

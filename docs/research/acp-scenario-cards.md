@@ -2076,3 +2076,56 @@ Reviewer adjustment:
   - warm-session waiting 必须覆盖到 live turn 开始后，而不是只覆盖 hydration 瞬间
   - 不能因此误伤 reopen running-before-first-response 的强 waiting cue
   - 不要靠隐藏所有反馈来“消除问题”，需要保留轻量 processing affordance
+
+## SC-050 Warm Next-Turn Waiting Must Survive Remount
+
+- Goal:
+  - 把 `SC-049` 剩下的一条 remount 缝继续收掉：
+    - finished-but-warm 会话发出下一条消息后，如果用户在首包前切走再切回，不应重新掉回 generic waiting
+  - 让 warm-session next-turn waiting 在 remount/hydration 下仍保持同一条语义：
+    - thread 不重放 processing banner
+    - header dot 保持 active/success，而不是重新 pulse 成 generic waiting
+- User action:
+  - 用户在一个 ACP 会话里完成一轮对话，确认 session 仍然 warm。
+  - 在这个会话里发送下一条消息，但在首个 `content` 到来前先切到别的会话。
+  - 再切回原会话，观察：
+    - thread 是否重新出现 `Processing / Waiting for the first response` 大 banner
+    - header dot 是否从 active 掉回 generic waiting pulse
+    - sendbox 是否仍然只保留轻量 `Processing`
+- Current failure:
+  - `SC-049` 已经让 warm-session next turn 在单次 mount 里从 send 到首包前都不再回到 generic waiting。
+  - 但这条 `pendingFirstResponseMode = warm` 仍然只存在于 renderer hook 的本地 latch state。
+  - 一旦用户在首包前切走导致 remount：
+    - hook 会清空 `pendingFirstResponseMode`
+    - hydration 只会恢复 “当前正在 waiting”，却不知道这段 waiting 是 warm 还是 cold
+  - 结果是：
+    - 切回后 thread 可能重新出现 processing banner
+    - header dot 也会重新掉回 generic waiting pulse
+    - 用户再次感知到“像是重新连接了一次”
+- Expected UI state:
+  - 对 finished-but-warm 会话里“下一条消息已发送但首包未到”的 remount 场景：
+    - hydration 后仍应恢复 warm waiting 语义
+    - thread 不显示 processing banner
+    - header dot 保持 active/success，不回到 generic pulse
+    - sendbox 仍保留 `Processing`
+  - 对真正 cold start / fresh connect / 首次 turn before first response：
+    - 继续保留强 waiting/banner 语义
+- Automation plan:
+  - `src/renderer/pages/conversation/platforms/acp/useAcpMessage.ts`
+    - 为 hydrated running-before-first-response 显式恢复 warm/cold pending-first-response mode
+    - 不能只恢复 waiting boolean
+    - warm/cold 必须根据 timeline + live session 语义推断，不能简单把所有 `session_active` hydration 都当成 warm
+  - `src/renderer/pages/conversation/platforms/acp/acpRuntimeDiagnostics.ts`
+    - 继续复用现有 `pendingFirstResponseMode` contract，不新长第二套推断口径
+  - 回归覆盖：
+    - `tests/unit/renderer/components/AcpSendBoxFlow.dom.test.tsx`
+    - `tests/unit/renderer/hooks/useAcpMessage.dom.test.ts`
+- Exit criteria:
+  - warm-session next-turn waiting 在 remount 后仍维持 warm 语义
+  - thread 不再因 remount 重放 processing banner
+  - header dot 不再因 remount 退回 generic pulse
+  - cold-start waiting 合同不退化
+- Reviewer focus:
+  - hydrated warm waiting 的恢复必须绑定明确的 “已有历史 assistant-side activity + 当前 trailing user wait” 语义，不能误伤 fresh connect
+  - 不能再长出一套独立于 `pendingFirstResponseMode` 之外的第三套 waiting 合同
+  - remount 后的恢复必须覆盖到 user-visible diagnostics，而不仅仅是 sendbox loading
