@@ -16,6 +16,7 @@ import { ipcBridge } from '@/common';
 import { getPlatformServices } from '@/common/platform';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { changeLanguage } from '@process/services/i18n';
+import type { PetSize } from '@process/pet/petTypes';
 
 // Keep-awake power blocker state
 let _keepAwakeBlockerId: number | null = null;
@@ -145,7 +146,12 @@ export function initSystemSettingsBridge(): void {
 
   ipcBridge.systemSettings.setPetEnabled.provider(async ({ enabled }) => {
     await ProcessConfig.set('pet.enabled', enabled);
-    // TODO: notify petManager to create/destroy window
+    const { createPetWindow, destroyPetWindow } = await import('../pet/petManager');
+    if (enabled) {
+      createPetWindow();
+    } else {
+      destroyPetWindow();
+    }
   });
 
   ipcBridge.systemSettings.getPetSize.provider(async () => {
@@ -155,7 +161,8 @@ export function initSystemSettingsBridge(): void {
 
   ipcBridge.systemSettings.setPetSize.provider(async ({ size }) => {
     await ProcessConfig.set('pet.size', size);
-    // TODO: notify petManager to resize window
+    const { resizePetWindow } = await import('../pet/petManager');
+    resizePetWindow(size as PetSize);
   });
 
   ipcBridge.systemSettings.getPetDnd.provider(async () => {
@@ -165,6 +172,7 @@ export function initSystemSettingsBridge(): void {
 
   ipcBridge.systemSettings.setPetDnd.provider(async ({ dnd }) => {
     await ProcessConfig.set('pet.dnd', dnd);
-    // TODO: notify petManager to toggle DND mode
+    const { setPetDndMode } = await import('../pet/petManager');
+    setPetDndMode(dnd);
   });
 }

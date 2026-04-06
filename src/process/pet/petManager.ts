@@ -190,6 +190,14 @@ export function getEventBridge(): PetEventBridge | null {
   return eventBridge;
 }
 
+export function resizePetWindow(size: PetSize): void {
+  resizePet(size);
+}
+
+export function setPetDndMode(dnd: boolean): void {
+  stateMachine?.setDnd(dnd);
+}
+
 // ---------------------------------------------------------------------------
 // Window content loading
 // ---------------------------------------------------------------------------
