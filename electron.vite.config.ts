@@ -129,9 +129,9 @@ export default defineConfig(({ mode }) => {
         reportCompressedSize: false,
         rollupOptions: {
           input: {
-            index: resolve('src/preload.ts'),
-            petPreload: resolve('src/petPreload.ts'),
-            petHitPreload: resolve('src/petHitPreload.ts'),
+            index: resolve('src/preload/main.ts'),
+            petPreload: resolve('src/preload/petPreload.ts'),
+            petHitPreload: resolve('src/preload/petHitPreload.ts'),
           },
         },
       },

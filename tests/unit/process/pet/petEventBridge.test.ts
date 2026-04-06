@@ -44,10 +44,7 @@ describe('PetEventBridge', () => {
       expect(sm.requestState).toHaveBeenCalledWith('notification');
     });
 
-    describe.each([
-      ['chat.response.stream'],
-      ['openclaw.response.stream'],
-    ])('stream channel %s', (channel) => {
+    describe.each([['chat.response.stream'], ['openclaw.response.stream']])('stream channel %s', (channel) => {
       it.each([
         ['thinking', 'thinking'],
         ['thought', 'thinking'],
